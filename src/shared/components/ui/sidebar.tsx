@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
-import { MenuIcon } from "lucide-react";
+import { PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
 
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { cn } from "@/shared/lib/utils";
@@ -283,8 +283,7 @@ const SidebarTrigger = React.forwardRef<
           }}
           {...props}
         >
-          {/* El MenuIcon estático actúa como un botón 'toggle' estándar similar a Inkdrop */}
-          <MenuIcon />
+          {state === "expanded" ? <PanelLeftCloseIcon /> : <PanelLeftOpenIcon />}
           <span className="sr-only">Toggle Sidebar</span>
         </Button>
       </TooltipTrigger>

@@ -1,4 +1,4 @@
-import React, { Suspense, Activity } from "react";
+import React, { Suspense, lazy } from "react";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { TabContext } from "../hooks/use-tab-context";
 import { useTabStore } from "../store/tab-store";
@@ -6,6 +6,8 @@ import { RouteRegistry } from "@/core/routing/route-registry";
 import type { TabInstance } from "../types";
 import { ErrorBoundary } from "@/shared/components/error/ErrorBoundary";
 import { ErrorFallback } from "@/shared/components/error/ErrorFallback";
+
+const WelcomeScreen = lazy(() => import("@/features/diagram/WelcomeScreen"));
 
 const TabSkeleton = () => (
   <div className="p-6 space-y-4">
@@ -30,15 +32,22 @@ const TabRenderer = React.memo(
     const route = RouteRegistry.getRoute(tab.routeId);
     const Component = route?.component;
 
+    const keepMounted = route?.tabConfig?.keepMounted ?? false;
+
     return (
       <TabContext.Provider value={{ tabId: tab.id, isActive }}>
-        <Activity mode={isActive ? "visible" : "hidden"}>
+        <div
+          className="h-full"
+          style={
+            !isActive && keepMounted ? { visibility: "hidden", pointerEvents: "none" } : undefined
+          }
+        >
           <ErrorBoundary fallback={ErrorFallback} name={`TabBoundary-${route?.name || tab.id}`}>
             <Suspense fallback={<TabSkeleton />}>
-              {Component ? <Component /> : <FallbackPage />}
+              {isActive || keepMounted ? Component ? <Component /> : <FallbackPage /> : null}
             </Suspense>
           </ErrorBoundary>
-        </Activity>
+        </div>
       </TabContext.Provider>
     );
   },
@@ -57,19 +66,18 @@ const TabContent: React.FC = () => {
 
   if (tabs.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center text-muted-foreground">
-          <p className="text-lg font-medium">No tabs open</p>
-          <p className="text-sm mt-2">Navigate to any section to get started</p>
-        </div>
-      </div>
+      <Suspense fallback={null}>
+        <WelcomeScreen />
+      </Suspense>
     );
   }
 
   return (
     <div className="h-full relative">
       {tabs.map((tab) => (
-        <TabRenderer key={tab.id} tab={tab} isActive={tab.id === activeTabId} />
+        <div key={tab.id} className="absolute inset-0">
+          <TabRenderer tab={tab} isActive={tab.id === activeTabId} />
+        </div>
       ))}
     </div>
   );

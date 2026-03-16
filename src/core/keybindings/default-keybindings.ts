@@ -13,6 +13,14 @@ import { KeybindingSource } from "./types";
 
 const BUILTIN_KEYBINDINGS = [
   {
+    key: "ctrl+s",
+    commandId: "diagram.action.save",
+  },
+  {
+    key: "ctrl+n",
+    commandId: "diagram.action.newDiagram",
+  },
+  {
     key: "ctrl+shift+p",
     commandId: "workbench.action.showCommands",
   },

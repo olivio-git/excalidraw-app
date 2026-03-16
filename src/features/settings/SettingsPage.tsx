@@ -1,15 +1,27 @@
-import { Moon, Sun, Monitor, RotateCcw } from "lucide-react";
+import { Moon, Sun, Monitor, RotateCcw, Folder, FolderOpen, X } from "lucide-react";
 import { useState } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
 
 import { useAppearanceStore } from "@/stores/appearanceStore";
 import { useThemeStore } from "@/stores/themeStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import KeybindingsPanel from "./keybindings/KeybindingsPanel";
 import { cn } from "@/shared/lib/utils";
 
-type SettingsTab = "appearance" | "keybindings";
+type SettingsTab = "appearance" | "keybindings" | "workspace";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("appearance");
+
+  const workspaceDir = useWorkspaceStore((s) => s.workspaceDir);
+  const setWorkspaceDir = useWorkspaceStore((s) => s.setWorkspaceDir);
+
+  const handleChangeFolder = async () => {
+    const result = await open({ directory: true, multiple: false });
+    if (typeof result === "string") {
+      setWorkspaceDir(result);
+    }
+  };
 
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.setTheme);
@@ -44,6 +56,7 @@ export default function SettingsPage() {
             [
               { id: "appearance", label: "Appearance" },
               { id: "keybindings", label: "Keybindings" },
+              { id: "workspace", label: "Workspace" },
             ] as { id: SettingsTab; label: string }[]
           ).map(({ id, label }) => (
             <button
@@ -75,6 +88,56 @@ export default function SettingsPage() {
           </div>
           <KeybindingsPanel />
         </section>
+      )}
+
+      {/* Workspace tab */}
+      {activeTab === "workspace" && (
+        <div className="space-y-8">
+          <section className="space-y-3">
+            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+              Workspace Folder
+            </h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Select a local folder to use as your workspace. Diagrams will be read from and saved
+              to this directory.
+            </p>
+            <div className="flex items-center gap-3 rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 px-3 py-2.5">
+              {workspaceDir ? (
+                <FolderOpen className="size-4 shrink-0 text-zinc-500 dark:text-zinc-400" />
+              ) : (
+                <Folder className="size-4 shrink-0 text-zinc-400 dark:text-zinc-500" />
+              )}
+              <span
+                className={cn(
+                  "flex-1 text-sm truncate",
+                  workspaceDir
+                    ? "text-zinc-800 dark:text-zinc-200 font-mono"
+                    : "text-zinc-400 dark:text-zinc-500 italic"
+                )}
+              >
+                {workspaceDir ?? "No workspace selected"}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleChangeFolder}
+                className="inline-flex items-center gap-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 h-9 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <FolderOpen className="size-4" />
+                Cambiar carpeta
+              </button>
+              {workspaceDir && (
+                <button
+                  onClick={() => setWorkspaceDir(null)}
+                  className="inline-flex items-center gap-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 h-9 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 dark:hover:text-red-400 hover:border-red-200 dark:hover:border-red-800 transition-colors"
+                >
+                  <X className="size-4" />
+                  Quitar workspace
+                </button>
+              )}
+            </div>
+          </section>
+        </div>
       )}
 
       {/* Appearance tab */}

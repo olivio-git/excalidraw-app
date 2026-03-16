@@ -1,11 +1,24 @@
 import { lazy } from "react";
-import { LayoutDashboard, LucideView, Settings, PlugZap } from "lucide-react";
+import { LayoutDashboard, LucideView, Settings, PlugZap, PencilLine } from "lucide-react";
 import type { RouteConfig } from "./types";
 
 // Lazy-loaded feature components
-const HomePage = lazy(() => import("@/features/home/HomePage"));
 const SettingsPage = lazy(() => import("@/features/settings/SettingsPage"));
 const PluginAdminPage = lazy(() => import("@/features/plugins/PluginAdminPage"));
+const DiagramCanvas = lazy(() => import("@/features/diagram/DiagramCanvas"));
+
+export const diagramRoute: RouteConfig = {
+  id: "diagram",
+  path: "/diagram",
+  name: "Diagram",
+  type: "protected",
+  icon: PencilLine as unknown as React.ComponentType<{ className?: string }>,
+  component: DiagramCanvas,
+  security: { requiresAuth: false },
+  tabConfig: { singleton: false, closable: true, keepMounted: true },
+  showSidebar: false,
+  showInCommandPalette: false,
+};
 
 export const protectedRoutes: RouteConfig[] = [
   {
@@ -15,7 +28,6 @@ export const protectedRoutes: RouteConfig[] = [
     description: "Main dashboard",
     type: "protected",
     icon: LayoutDashboard as unknown as React.ComponentType<{ className?: string }>,
-    // component: HomePage,
     isHeader: true,
     security: {
       requiresAuth: true,
@@ -45,7 +57,6 @@ export const protectedRoutes: RouteConfig[] = [
         showSidebar: true,
         showInCommandPalette: true,
         icon: LucideView as unknown as React.ComponentType<{ className?: string }>,
-        component: HomePage,
       },
     ],
   },

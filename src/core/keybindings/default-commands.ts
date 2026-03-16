@@ -1,6 +1,9 @@
 import { PluginManager } from "@/plugins/plugin-manager";
 import { useTabStore } from "@/core/tabs/store/tab-store";
 import { RouteRegistry } from "@/core/routing/route-registry";
+import { useDiagramStore } from "@/core/diagram/store/diagram-store";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { diagramFileService } from "@/core/diagram/services/diagram-file.service";
 
 // ── Core command handlers ─────────────────────────────────────────────────────
 //
@@ -14,6 +17,34 @@ import { RouteRegistry } from "@/core/routing/route-registry";
 // Handlers access Zustand stores via .getState() — safe outside React components.
 // Navigation is handled by mutating the tab store's activeTabId (the TabRouter
 // component observes this and calls navigate() accordingly).
+
+async function saveActiveDiagramHandler(): Promise<void> {
+  const { activeTabId, getTab } = useTabStore.getState();
+  if (!activeTabId) return;
+
+  const tab = getTab(activeTabId);
+  if (!tab || tab.routeId !== "diagram" || !tab.instanceId) return;
+
+  await useDiagramStore.getState().saveDiagram(tab.instanceId);
+}
+
+async function newDiagramHandler(): Promise<void> {
+  const workspaceDir = useWorkspaceStore.getState().workspaceDir;
+  if (!workspaceDir) return;
+
+  const { addTab } = useTabStore.getState();
+  const name = `diagram-${Date.now()}`;
+  const filePath = await diagramFileService.createNewDiagram(workspaceDir, name);
+  const fileName = filePath.split("/").pop() ?? name;
+
+  addTab({
+    routeId: "diagram",
+    path: "/diagram",
+    title: fileName.replace(".excalidraw", ""),
+    instanceId: filePath,
+    metadata: { filePath },
+  });
+}
 
 function openSettingsHandler(): void {
   const { tabs, addTab, setActiveTab } = useTabStore.getState();
@@ -79,6 +110,9 @@ function previousTabHandler(): void {
  * local React state (the open/close toggle). See CommandPalette.tsx.
  */
 export function initializeCoreCommands(): void {
+  PluginManager.registerCommandHandler("diagram.action.save", saveActiveDiagramHandler);
+  PluginManager.registerCommandHandler("diagram.action.newDiagram", newDiagramHandler);
+
   PluginManager.registerCommandHandler("workbench.action.openSettings", openSettingsHandler);
 
   PluginManager.registerCommandHandler("workbench.action.closeActiveTab", closeActiveTabHandler);

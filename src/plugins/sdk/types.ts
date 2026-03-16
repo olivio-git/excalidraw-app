@@ -91,14 +91,41 @@ export interface PluginManifest {
 }
 
 // ---------------------------------------------------------------------------
+// Events
+// ---------------------------------------------------------------------------
+
+export type PluginEventHandler = (payload: unknown) => void | Promise<void>;
+
+// ---------------------------------------------------------------------------
+// Keybindings
+// ---------------------------------------------------------------------------
+
+export interface KeybindingDeclaration {
+  key: string;
+  commandId: string;
+  when?: string;
+}
+
+// ---------------------------------------------------------------------------
 // API expuesta al plugin
 // ---------------------------------------------------------------------------
 
 export interface PluginAPI {
+  // UI registration
   registerRoutes: (routes: RouteConfig[]) => void;
   registerSidebarSection: (section: SidebarSection) => void;
   registerSidebarFooterAction: (action: SidebarFooterAction) => void;
   registerCommand: (commandId: string, handler: CommandHandler) => void;
+
+  // Event bus (namespaced topics, e.g. "myPlugin.didSomething")
+  onEvent: (topic: string, handler: PluginEventHandler) => () => void;
+  emitEvent: (topic: string, payload?: unknown) => void;
+
+  // Keybindings
+  registerKeybinding: (declaration: KeybindingDeclaration) => void;
+  registerContext: (key: string, value: boolean | string | number) => void;
+
+  // App state
   getAuthState: () => { isAuthenticated: boolean; user: any };
 }
 

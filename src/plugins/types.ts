@@ -1,3 +1,4 @@
+import type React from "react";
 import type { RouteConfig } from "@/core/routing/types";
 import type { User } from "@/core/auth/types";
 import type { KeybindingDeclaration } from "@/core/keybindings/types";
@@ -51,12 +52,51 @@ export type PluginEventHandler = (payload: unknown) => void | Promise<void>;
  * This interface is intentionally small and stable; internal PluginManager
  * details stay private and are not exposed through this type.
  */
+export interface ActiveTabInfo {
+  tabId: string;
+  routeId: string;
+  title: string;
+  path: string;
+  instanceId?: string;
+  metadata?: Record<string, unknown>;
+}
+
 export interface PluginAPI {
   registerRoutes: (routes: RouteConfig[]) => void;
   registerSidebarSection: (section: SidebarSection) => void;
   registerCommand: (commandId: string, handler: CommandHandler) => void;
   getAuthState: () => { isAuthenticated: boolean; user: User | null };
+  /** Show a toast notification. */
+  notify: (message: string, options?: import("@/shared/lib/notify").NotifyOptions) => void;
+  /** Show a confirmation dialog. Returns true if confirmed, false if cancelled. */
+  confirm: (options?: import("@/shared/lib/confirm").ConfirmOptions) => Promise<boolean>;
+  /**
+   * Show a form dialog with one or more input fields.
+   * Returns a Record<fieldId, value> if confirmed, null if cancelled.
+   */
+  prompt: (
+    options: import("@/shared/lib/prompt").PromptOptions
+  ) => Promise<import("@/shared/lib/prompt").PromptResult>;
+  /** Returns the currently active tab, or null if none. */
+  getActiveTab: () => ActiveTabInfo | null;
+  /** Returns the current workspace directory, or null if not set. */
+  getWorkspaceDir: () => string | null;
+  /**
+   * Register a custom icon for a file extension.
+   * Example: api.registerFileIcon("md", MarkdownIcon)
+   */
+  registerFileIcon: (extension: string, icon: React.ComponentType<{ className?: string }>) => void;
+  /**
+   * Register a handler for a file extension.
+   * Determines which route opens the file and how new files are created.
+   * Example: api.registerFileHandler("md", { routeId: "markdown-editor", ... })
+   */
+  registerFileHandler: (
+    extension: string,
+    handler: import("@/core/shell/panels/file-handler-registry").FileHandler
+  ) => void;
   registerSettingsAction: (action: SidebarFooterAction) => void;
+  registerSidebarFooterAction: (action: SidebarFooterAction) => void;
 
   /**
    * Subscribe to a logical event topic.
@@ -81,6 +121,30 @@ export interface PluginAPI {
    * Set a context key that can be used in keybinding `when` expressions.
    */
   registerContext: (key: string, value: boolean | string | number) => void;
+
+  /**
+   * Open a file in a new tab.
+   * Uses the registered file handler for the extension, falls back to the default handler.
+   */
+  openFile: (filePath: string) => void;
+
+  /**
+   * Execute a registered command by ID.
+   * Can target built-in commands or commands from other plugins.
+   */
+  executeCommand: (commandId: string) => Promise<void>;
+
+  /**
+   * Subscribe to active tab changes.
+   * Handler is called immediately with the current tab, then on every change.
+   * Returns an unsubscribe function — call it in plugin deactivate().
+   */
+  onTabChange: (handler: (tab: ActiveTabInfo | null) => void) => () => void;
+
+  /**
+   * Returns the current resolved theme ("light" or "dark").
+   */
+  getTheme: () => "light" | "dark";
 }
 
 export interface SidebarSection {

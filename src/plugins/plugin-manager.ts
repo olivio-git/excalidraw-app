@@ -21,6 +21,7 @@ interface PluginEntry {
   registeredRouteIds: string[];
   registeredFooterActionIds: string[];
   registeredKeybindingKeys: Array<{ firstKey: NormalizedKey; commandId: string }>;
+  registeredTabChangeUnsubscribers: Array<() => void>;
 }
 
 type PluginManagerEventType = "plugin-activated" | "plugin-deactivated" | "plugins-changed";
@@ -83,6 +84,7 @@ export class PluginManagerClass {
       registeredRouteIds: [],
       registeredFooterActionIds: [],
       registeredKeybindingKeys: [],
+      registeredTabChangeUnsubscribers: [],
     });
   }
 
@@ -162,6 +164,10 @@ export class PluginManagerClass {
       pluginId,
       (firstKey: NormalizedKey, commandId: string) => {
         entry.registeredKeybindingKeys.push({ firstKey, commandId });
+      },
+      (commandId: string) => this.executeCommand(commandId),
+      (unsub: () => void) => {
+        entry.registeredTabChangeUnsubscribers.push(unsub);
       }
     );
 
@@ -235,6 +241,12 @@ export class PluginManagerClass {
         keybindingRegistry.unregister(firstKey, commandId);
       }
       entry.registeredKeybindingKeys = [];
+
+      // Clean up tab change subscriptions
+      for (const unsub of entry.registeredTabChangeUnsubscribers) {
+        unsub();
+      }
+      entry.registeredTabChangeUnsubscribers = [];
 
       // Remove all event listeners registered by this plugin
       for (const [topic, listeners] of this.pluginEventListeners) {

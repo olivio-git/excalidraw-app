@@ -2,6 +2,12 @@ import type React from "react";
 import type { RouteConfig } from "@/core/routing/types";
 import type { User } from "@/core/auth/types";
 import type { KeybindingDeclaration } from "@/core/keybindings/types";
+import type {
+  ExcalidrawImperativeAPI,
+  BinaryFileData,
+  AppState,
+} from "@excalidraw/excalidraw/types";
+import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 
 export interface PluginCommand {
   id: string;
@@ -45,6 +51,24 @@ export interface SidebarFooterAction {
  * The payload is intentionally untyped to keep the event bus generic.
  */
 export type PluginEventHandler = (payload: unknown) => void | Promise<void>;
+
+/**
+ * Diagram sub-API exposed through PluginAPI.diagram.
+ * Provides imperative access to the active Excalidraw canvas instance.
+ */
+export interface DiagramPluginAPI {
+  getElements(): readonly ExcalidrawElement[];
+  addElements(elements: ExcalidrawElement[]): void;
+  setElements(elements: ExcalidrawElement[]): void;
+  updateScene(sceneData: {
+    elements?: ExcalidrawElement[];
+    appState?: Partial<AppState>;
+    files?: Record<string, BinaryFileData>;
+  }): void;
+  scrollToContent(): void;
+  getApi(instanceId: string): ExcalidrawImperativeAPI | undefined;
+  waitForInstance(instanceId: string, timeoutMs?: number): Promise<ExcalidrawImperativeAPI>;
+}
 
 /**
  * Public API surface that the host exposes to plugins.
@@ -145,6 +169,12 @@ export interface PluginAPI {
    * Returns the current resolved theme ("light" or "dark").
    */
   getTheme: () => "light" | "dark";
+
+  /**
+   * Imperative API for the active Excalidraw diagram canvas.
+   * All methods operate on the currently active diagram tab instance.
+   */
+  diagram: DiagramPluginAPI;
 }
 
 export interface SidebarSection {

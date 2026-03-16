@@ -11,6 +11,7 @@ import {
   Sun,
   Moon,
   Monitor,
+  Bot,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
@@ -37,10 +38,11 @@ import {
 import { ExplorerPanel } from "./panels/ExplorerPanel";
 import { PluginsPanel } from "./panels/PluginsPanel";
 import { NavigationPanel } from "./panels/NavigationPanel";
+import { AIChatPanel } from "@/features/ai-chat/AIChatPanel";
 
 const COMPACT_THRESHOLD = 100;
 
-type Panel = "explorer" | "plugins" | "navigation";
+type Panel = "explorer" | "plugins" | "navigation" | "ai-chat";
 
 interface PanelTab {
   id: Panel;
@@ -52,6 +54,7 @@ const PANEL_TABS: PanelTab[] = [
   { id: "explorer", icon: Files, label: "Explorador" },
   { id: "plugins", icon: Blocks, label: "Plugins" },
   { id: "navigation", icon: Compass, label: "Navegación" },
+  { id: "ai-chat", icon: Bot, label: "AI Chat" },
 ];
 
 const DiagramSidebar = () => {
@@ -143,6 +146,7 @@ const DiagramSidebar = () => {
             {resolvedPanel === "explorer" && <ExplorerPanel />}
             {resolvedPanel === "plugins" && <PluginsPanel />}
             {resolvedPanel === "navigation" && <NavigationPanel />}
+            {resolvedPanel === "ai-chat" && <AIChatPanel />}
           </>
         )}
       </SidebarContent>

@@ -1,4 +1,5 @@
 import { RouteRegistry } from "@/core/routing/route-registry";
+import { DiagramController } from "@/core/diagram/DiagramController";
 import { useAuthStore } from "@/core/auth/store/auth-store";
 import { fileIconRegistry } from "@/core/shell/panels/file-icon-registry";
 import { fileHandlerRegistry } from "@/core/shell/panels/file-handler-registry";
@@ -183,6 +184,35 @@ export function createPluginAPI(
 
     getTheme: () => {
       return useThemeStore.getState().resolvedTheme;
+    },
+
+    diagram: {
+      getElements() {
+        const id = DiagramController.getActiveInstanceId();
+        return id ? DiagramController.getElements(id) : [];
+      },
+      addElements(elements) {
+        const id = DiagramController.getActiveInstanceId();
+        if (id) DiagramController.addElements(id, elements);
+      },
+      setElements(elements) {
+        const id = DiagramController.getActiveInstanceId();
+        if (id) DiagramController.setElements(id, elements);
+      },
+      updateScene(sceneData) {
+        const id = DiagramController.getActiveInstanceId();
+        if (id) DiagramController.updateScene(id, sceneData);
+      },
+      scrollToContent() {
+        const id = DiagramController.getActiveInstanceId();
+        if (id) DiagramController.scrollToContent(id);
+      },
+      getApi(instanceId) {
+        return DiagramController.getApi(instanceId);
+      },
+      waitForInstance(instanceId, timeoutMs) {
+        return DiagramController.waitForInstance(instanceId, timeoutMs);
+      },
     },
   };
 }

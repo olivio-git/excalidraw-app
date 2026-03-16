@@ -107,6 +107,37 @@ export interface KeybindingDeclaration {
 }
 
 // ---------------------------------------------------------------------------
+// Diagram API
+// ---------------------------------------------------------------------------
+
+/**
+ * Diagram sub-API exposed through PluginAPI.diagram.
+ * Provides imperative access to the active Excalidraw canvas instance.
+ * Types use `any` where Excalidraw's internal types are not re-exported by the package.
+ */
+export interface DiagramPluginAPI {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getElements(): readonly any[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  addElements(elements: any[]): void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  setElements(elements: any[]): void;
+  updateScene(sceneData: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    elements?: any[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    appState?: Record<string, any>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    files?: Record<string, any>;
+  }): void;
+  scrollToContent(): void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getApi(instanceId: string): any | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  waitForInstance(instanceId: string, timeoutMs?: number): Promise<any>;
+}
+
+// ---------------------------------------------------------------------------
 // API expuesta al plugin
 // ---------------------------------------------------------------------------
 
@@ -127,6 +158,9 @@ export interface PluginAPI {
 
   // App state
   getAuthState: () => { isAuthenticated: boolean; user: any };
+
+  // Diagram canvas access
+  diagram: DiagramPluginAPI;
 }
 
 // ---------------------------------------------------------------------------

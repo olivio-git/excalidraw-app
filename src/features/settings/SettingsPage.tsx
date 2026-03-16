@@ -6,9 +6,10 @@ import { useAppearanceStore } from "@/stores/appearanceStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import KeybindingsPanel from "./keybindings/KeybindingsPanel";
+import { AISettingsPanel } from "./ai/AISettingsPanel";
 import { cn } from "@/shared/lib/utils";
 
-type SettingsTab = "appearance" | "keybindings" | "workspace";
+type SettingsTab = "appearance" | "keybindings" | "workspace" | "ai";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("appearance");
@@ -57,6 +58,7 @@ export default function SettingsPage() {
               { id: "appearance", label: "Appearance" },
               { id: "keybindings", label: "Keybindings" },
               { id: "workspace", label: "Workspace" },
+              { id: "ai", label: "AI" },
             ] as { id: SettingsTab; label: string }[]
           ).map(({ id, label }) => (
             <button
@@ -138,6 +140,21 @@ export default function SettingsPage() {
             </div>
           </section>
         </div>
+      )}
+
+      {/* AI tab */}
+      {activeTab === "ai" && (
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+              AI Configuration
+            </h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
+              Configure AI providers and API keys for diagram assistance.
+            </p>
+          </div>
+          <AISettingsPanel />
+        </section>
       )}
 
       {/* Appearance tab */}

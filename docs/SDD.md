@@ -8,10 +8,10 @@
 
 ## Visión general
 
-App desktop estilo VSCode para editar diagramas Excalidraw (`.excalidraw`) con:
+App desktop para editar diagramas Excalidraw (`.excalidraw`) con una UI tipo editor creativo (Figma-style, no VSCode):
 
-- Tabs = documentos abiertos (igual que VSCode)
-- Sidebar = explorador de archivos del workspace
+- Tabs = documentos abiertos
+- Sidebar con panel switcher interno (tabs en el header del sidebar, estilo Figma)
 - Guardado automático en disco con debounce
 - Soporte multi-diagrama simultáneo
 
@@ -50,18 +50,56 @@ DiagramState = {
 - `onChange` de Excalidraw → debounce 1000ms → `updateDiagram()` → auto-save al disco
 - Al cerrar tab: confirmar si `isDirty` antes de remover del store
 
-### 3. Sidebar = Explorador de archivos
+### 3. Sidebar con panel switcher interno (Figma-style)
 
-Reemplaza el `AppSidebar` de navegación por un explorador de archivos:
+Reemplaza el `AppSidebar` de navegación. El nuevo sidebar tiene:
+
+#### Layout visual
+
+```
+┌──────────────────┐
+│ [📁] [⬡]    [+] │  ← SidebarHeader: icon tabs + acción contextual
+├──────────────────┤
+│  panel activo    │  ← SidebarBody: renderiza el panel seleccionado
+│  (file tree o    │
+│   plugin panel)  │
+├──────────────────┤
+│ [≡] [◑]         │  ← SidebarFooter: settings, theme
+└──────────────────┘
+```
+
+#### Iconos (Lucide)
+
+- `Files` → panel explorador de archivos
+- `Blocks` → panel de secciones de plugins
+- Footer: `SlidersHorizontal` (settings), `Sun`/`Moon` (theme)
+
+#### Panel 0 — Explorador de archivos (`ExplorerPanel`)
 
 - **Workspace folder** configurable (guardado en `workspaceStore` con `tauri-plugin-store`)
 - Lee el directorio con `readDir()` de `@tauri-apps/plugin-fs`
 - Watcher con `watch()` para auto-refrescar al crear/eliminar archivos externos
 - Click en archivo → `addTab({ routeId: "diagram", instanceId: filePath, ... })`
-- Botón "+" → crea archivo vacío `.excalidraw`, abre tab
+- Botón "+" en header → crea archivo vacío `.excalidraw`, abre tab
 - Context menu (right-click): Renombrar, Eliminar, Duplicar
 - Soporte de subcarpetas (árbol colapsable)
-- Hereda modo compacto (solo iconos) del sidebar base
+
+#### Panel 1 — Plugins (`PluginsPanel`)
+
+- Renderiza las `SidebarSection[]` registradas por plugins (sistema existente)
+- Solo visible si hay plugins con secciones registradas
+
+#### Estado del switcher
+
+```ts
+type SidebarPanel = "explorer" | "plugins";
+// en workspaceStore o estado local del sidebar
+const [activePanel, setActivePanel] = useState<SidebarPanel>("explorer");
+```
+
+#### Sin modo compacto de íconos
+
+El sidebar es colapsable (via `SidebarTrigger` existente en TitleBar). No hay modo "solo íconos" — se colapsa o se muestra completo.
 
 ### 4. Auth simplificado
 
@@ -120,7 +158,10 @@ src/
 │   ├── DiagramCanvas.tsx                  ← componente principal (Excalidraw wrapper)
 │   └── WelcomeScreen.tsx                  ← pantalla cuando no hay tabs abiertos
 ├── core/shell/
-│   ├── DiagramSidebar.tsx                 ← explorador de archivos (reemplaza Sidebar.tsx)
+│   ├── DiagramSidebar.tsx                 ← sidebar con panel switcher interno (reemplaza Sidebar.tsx)
+│   ├── panels/
+│   │   ├── ExplorerPanel.tsx              ← árbol de archivos .excalidraw
+│   │   └── PluginsPanel.tsx               ← secciones de plugins (sistema existente)
 │   └── useFileWatcher.ts                  ← hook wrapper de watch() de plugin-fs
 └── stores/
     └── workspaceStore.ts                  ← carpeta workspace (Zustand + persist)
@@ -128,16 +169,16 @@ src/
 
 ### Modificar
 
-| Archivo                                  | Cambio                                                                                    |
-| ---------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `src-tauri/Cargo.toml`                   | Agregar `tauri-plugin-fs = "2"`, `tauri-plugin-dialog = "2"`                              |
-| `src-tauri/src/lib.rs`                   | Registrar `.plugin(tauri_plugin_fs::init()).plugin(tauri_plugin_dialog::init())`          |
-| `src-tauri/capabilities/default.json`    | Agregar permisos: `fs:read-all`, `fs:write-all`, `fs:watch`, `dialog:open`, `dialog:save` |
-| `src/core/routing/route-config.ts`       | Agregar ruta `"diagram"`, simplificar `protectedRoutes`                                   |
-| `src/features/_registry.ts`              | Registrar ruta `diagram`                                                                  |
-| `src/App.tsx`                            | Quitar auth guards, ruta `/login`, renderizar `Shell` directo                             |
-| `src/core/shell/Shell.tsx`               | Reemplazar `<AppSidebar>` por `<DiagramSidebar>`                                          |
-| `src/features/settings/SettingsPage.tsx` | Agregar sección "Workspace" con selector de carpeta                                       |
+| Archivo                                  | Cambio                                                                                       |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `src-tauri/Cargo.toml`                   | Agregar `tauri-plugin-fs = "2"`, `tauri-plugin-dialog = "2"`                                 |
+| `src-tauri/src/lib.rs`                   | Registrar `.plugin(tauri_plugin_fs::init()).plugin(tauri_plugin_dialog::init())`             |
+| `src-tauri/capabilities/default.json`    | Agregar permisos: `fs:read-all`, `fs:write-all`, `fs:watch`, `dialog:open`, `dialog:save`    |
+| `src/core/routing/route-config.ts`       | Agregar ruta `"diagram"`, simplificar `protectedRoutes`                                      |
+| `src/features/_registry.ts`              | Registrar ruta `diagram`                                                                     |
+| `src/App.tsx`                            | Quitar auth guards, ruta `/login`, renderizar `Shell` directo                                |
+| `src/core/shell/Shell.tsx`               | Reemplazar `<AppSidebar>` por `<DiagramSidebar>` (no pasa `routes` — el sidebar es autónomo) |
+| `src/features/settings/SettingsPage.tsx` | Agregar sección "Workspace" con selector de carpeta                                          |
 
 ### Eliminar
 
@@ -195,19 +236,32 @@ src/plugins/internal/alerts-plugin/      ← limpiar
 
 9. Registrar ruta `"diagram"` en `route-config.ts` y `_registry.ts`
 
-### Fase 4 — DiagramSidebar
+### Fase 4 — DiagramSidebar (panel switcher + explorador)
 
 10. **`src/stores/workspaceStore.ts`**: Zustand persist → `workspaceDir: string | null`
 
 11. **`src/core/shell/DiagramSidebar.tsx`**:
-    - Sin `workspaceDir` → botón "Abrir carpeta" (dialog)
+    - Header: tabs de íconos (`Files`, `Blocks`) + acción contextual del panel activo
+    - `activePanel` state local (`"explorer"` por default)
+    - Renderiza `<ExplorerPanel>` o `<PluginsPanel>` según panel activo
+    - Footer: botón settings (abre tab `/settings`), botón theme toggle
+    - **Sin modo compacto de íconos** — solo colapsable vía trigger existente
+    - **No recibe `routes` como prop** — es autónomo
+
+12. **`src/core/shell/panels/ExplorerPanel.tsx`**:
+    - Sin `workspaceDir` → pantalla "Abrir carpeta" con botón (dialog)
     - `readDir(workspaceDir)` al montar + watcher
     - Filtrar solo `.excalidraw` y subdirectorios
-    - Botón "+" (nuevo diagrama)
+    - Botón "+" en header del DiagramSidebar → nuevo diagrama
     - Click en archivo → `addTab(...)`
     - Context menu: Renombrar, Eliminar, Duplicar
 
-12. **`src/core/shell/useFileWatcher.ts`**: wrapper de `watch()` de `@tauri-apps/plugin-fs`
+13. **`src/core/shell/panels/PluginsPanel.tsx`**:
+    - Consume `usePluginSidebarResources()` (hook existente)
+    - Si no hay secciones: mensaje vacío
+    - El tab `Blocks` en el header solo aparece si hay plugins con secciones
+
+14. **`src/core/shell/useFileWatcher.ts`**: wrapper de `watch()` de `@tauri-apps/plugin-fs`
 
 ### Fase 5 — Limpieza + Simplificación
 
@@ -223,6 +277,21 @@ src/plugins/internal/alerts-plugin/      ← limpiar
 18. **Keybinding `Ctrl+S`** → save active diagram (usar keybinding-service existente)
 19. **Keybinding `Ctrl+N`** → nuevo diagrama en workspace dir actual
 20. **WelcomeScreen** cuando no hay tabs: instrucciones de apertura
+
+---
+
+## Componentes compartidos — regla de uso
+
+Siempre usar los componentes de `@/shared/` antes de escribir HTML nativo.
+
+| Necesidad                  | Componente                                                                   |
+| -------------------------- | ---------------------------------------------------------------------------- |
+| Botón (cualquier variante) | `Button` (`variant="ghost"`, `size="icon"`, etc.) — **nunca `<button>` raw** |
+| Área scrolleable           | `ScrollArea` — **nunca `overflow-y-auto` nativo**                            |
+| Ícono con tooltip          | `TooltipWrapper` — **nunca `title` attr en botones de ícono**                |
+| Toggle de tema             | `ThemeToggle` — ya implementado, no reinventar                               |
+| Dropdown menu              | `DropdownMenu` + primitivos de `@/shared/components/ui/dropdown-menu`        |
+| Context menu               | `ContextMenu` + primitivos de `@/shared/components/ui/context-menu`          |
 
 ---
 

@@ -11,7 +11,7 @@ Documentación técnica resumida: qué está implementado, cómo se implementó,
 | **Auth**        | Zustand store persistido (Tauri Store). Login/logout, `hasRole`/`hasPermission`. Guards en rutas.                                                            |
 | **Tabs**        | Store con LRU, singleton/maxInstances por ruta, pin/unpin, reorder (dnd-kit). Sincronización URL ↔ store vía `TabRouter` + `useTabRouter`.                   |
 | **Routing**     | `RouteRegistry` (Map por id). Rutas con `RouteConfig` (security, tabConfig, metadata). Búsqueda por keywords. Lazy components.                               |
-| **Shell**       | Sidebar (Radix) colapsable, grupos expandibles, secciones de plugins. TitleBar + TabBar integrados.                                                          |
+| **Shell**       | Sidebar colapsable con panel switcher interno (Figma-style): header con icon-tabs, panels intercambiables (Explorer, Plugins). TitleBar + TabBar integrados. |
 | **Plugins**     | `PluginManager`: register → activate/deactivate. API: `registerRoutes`, `registerSidebarSection`, `registerCommand`, `getAuthState`. Limpieza en deactivate. |
 | **Storage**     | Adapter Zustand ↔ Tauri Store. Stores: auth, tabs, theme, appearance (archivos JSON separados).                                                              |
 | **Apariencia**  | themeStore (light/dark/system) + appearanceStore (font, radius, highContrast, reduceAnimations). Persistidos.                                                |
@@ -89,15 +89,15 @@ Implementación sugerida si se añade: módulo pequeño con `subscribe(event, ha
 
 ## 6. Referencia rápida de archivos clave
 
-| Responsabilidad           | Archivo(s)                                                               |
-| ------------------------- | ------------------------------------------------------------------------ |
-| Estado auth               | `core/auth/store/auth-store.ts`                                          |
-| Estado tabs               | `core/tabs/store/tab-store.ts`                                           |
-| Sincronización URL ↔ tabs | `core/routing/tab-router.tsx`                                            |
-| Definición rutas          | `core/routing/route-config.ts`, `core/routing/types.ts`                  |
-| Registro rutas            | `core/routing/route-registry.ts`                                         |
-| Plugins                   | `plugins/plugin-manager.ts`, `plugins/plugin-api.ts`, `plugins/types.ts` |
-| Storage Tauri             | `core/storage/tauri-storage.ts`                                          |
-| Shell + Sidebar           | `core/shell/Shell.tsx`, `core/shell/Sidebar.tsx`                         |
-| Tab bar / contenido       | `core/tabs/components/TabBar.tsx`, `TabContent.tsx`                      |
-| Tema / apariencia         | `stores/themeStore.ts`, `stores/appearanceStore.ts`                      |
+| Responsabilidad           | Archivo(s)                                                                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Estado auth               | `core/auth/store/auth-store.ts`                                                                                                      |
+| Estado tabs               | `core/tabs/store/tab-store.ts`                                                                                                       |
+| Sincronización URL ↔ tabs | `core/routing/tab-router.tsx`                                                                                                        |
+| Definición rutas          | `core/routing/route-config.ts`, `core/routing/types.ts`                                                                              |
+| Registro rutas            | `core/routing/route-registry.ts`                                                                                                     |
+| Plugins                   | `plugins/plugin-manager.ts`, `plugins/plugin-api.ts`, `plugins/types.ts`                                                             |
+| Storage Tauri             | `core/storage/tauri-storage.ts`                                                                                                      |
+| Shell + Sidebar           | `core/shell/Shell.tsx`, `core/shell/DiagramSidebar.tsx`, `core/shell/panels/ExplorerPanel.tsx`, `core/shell/panels/PluginsPanel.tsx` |
+| Tab bar / contenido       | `core/tabs/components/TabBar.tsx`, `TabContent.tsx`                                                                                  |
+| Tema / apariencia         | `stores/themeStore.ts`, `stores/appearanceStore.ts`                                                                                  |

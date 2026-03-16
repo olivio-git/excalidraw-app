@@ -1,0 +1,16 @@
+{
+  "name": "@tuapp/plugin-sdk",
+  "version": "1.0.0",
+  "description": "SDK para crear plugins externos",
+  "type": "module",
+  "main": "index.ts",
+  "types": "index.ts",
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "keywords": [
+    "plugin",
+    "sdk"
+  ],
+  "license": "MIT"
+}

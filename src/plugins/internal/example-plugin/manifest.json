@@ -1,0 +1,16 @@
+{
+  "id": "example-plugin",
+  "name": "Example Plugin",
+  "version": "1.0.0",
+  "description": "An example plugin to demonstrate the plugin system",
+  "author": "",
+  "dependencies": [],
+  "commands": [
+    {
+      "id": "example.command.write",
+      "name": "Example Command",
+      "description": "An example command that does something",
+      "category": "General"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "id": "mi-plugin",
+  "name": "Mi Plugin",
+  "version": "1.0.0",
+  "description": "Descripción de mi plugin",
+  "author": "Tu nombre",
+  "minAppVersion": "1.0.0",
+  "entryPoint": "index.js",
+  "permissions": ["sidebar", "commands"]
+}

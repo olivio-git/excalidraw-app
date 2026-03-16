@@ -32,6 +32,7 @@
     "log:allow-log",
     "fs:default",
     "fs:allow-read-text-file",
+    "fs:allow-read-file",
     "fs:allow-write-text-file",
     "fs:allow-read-dir",
     "fs:allow-create",

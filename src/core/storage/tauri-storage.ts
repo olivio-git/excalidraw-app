@@ -83,6 +83,7 @@ export const tauriAppearanceStorage = new TauriStorageAdapter("appearance-storag
 export const tauriThemeStorage = new TauriStorageAdapter("theme-storage.json");
 export const tauriTabStorage = new TauriStorageAdapter("tab-storage.json");
 export const tauriAuthStorage = new TauriStorageAdapter("auth-storage.json");
+export const tauriAISettingsStorage = new TauriStorageAdapter("ai-settings-storage.json");
 
 export const createTauriStorage = (storeName: string): StateStorage => {
   return new TauriStorageAdapter(storeName);

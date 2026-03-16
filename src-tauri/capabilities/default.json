@@ -27,6 +27,21 @@
     "store:allow-load",
     "store:allow-delete",
     "store:allow-clear",
-    "store:default"
+    "store:default",
+    "log:default",
+    "log:allow-log",
+    "fs:default",
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file",
+    "fs:allow-read-dir",
+    "fs:allow-create",
+    "fs:allow-remove",
+    "fs:allow-rename",
+    "fs:allow-watch",
+    "fs:allow-unwatch",
+    { "identifier": "fs:scope", "allow": [{ "path": "$HOME/**" }, { "path": "$HOME" }] },
+    "dialog:default",
+    "dialog:allow-open",
+    "dialog:allow-save"
   ]
 }

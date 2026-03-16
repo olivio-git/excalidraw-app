@@ -20,6 +20,8 @@ log = "0.4"
 tauri = { version = "2", features = [] }
 tauri-plugin-store = "2"
 tauri-plugin-log = "2.0.0-rc"
+tauri-plugin-fs = { version = "2", features = ["watch"] }
+tauri-plugin-dialog = "2"
 
 [profile.release]
 panic = "abort"

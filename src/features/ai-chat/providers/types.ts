@@ -1,4 +1,4 @@
-export type AIProviderName = "anthropic" | "groq" | "openai";
+export type AIProviderName = "anthropic" | "groq" | "openai" | "gemini";
 
 export type AIMessageRole = "user" | "assistant" | "tool";
 

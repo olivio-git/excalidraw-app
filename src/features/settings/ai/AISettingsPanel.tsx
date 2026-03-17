@@ -4,7 +4,6 @@ import { Eye, EyeOff, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { useAISettingsStore } from "./ai-settings-store";
 import { AIProviderFactory } from "@/features/ai-chat/providers/factory";
 import type { AIProviderName } from "@/features/ai-chat/providers/types";
-import { notify } from "@/shared/lib/notify";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
@@ -13,21 +12,32 @@ const PROVIDERS: { id: AIProviderName; label: string }[] = [
   { id: "anthropic", label: "Anthropic" },
   { id: "groq", label: "Groq" },
   { id: "openai", label: "OpenAI" },
+  { id: "gemini", label: "Gemini" },
 ];
 
 const PROVIDER_MODELS: Record<AIProviderName, string[]> = {
   anthropic: ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
   groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
   openai: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
+  gemini: [
+    "gemini-2.5-pro",
+    "gemini-2.5-pro-preview-06-05",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-preview-05-20",
+    "gemini-2.0-flash",
+    "gemini-1.5-pro",
+    "gemini-1.5-flash",
+  ],
 };
 
 const PROVIDER_KEY_PLACEHOLDER: Record<AIProviderName, string> = {
   anthropic: "sk-ant-...",
   groq: "gsk_...",
   openai: "sk-...",
+  gemini: "AIza...",
 };
 
-type ConnectionStatus =
+type InlineStatus =
   | { type: "idle" }
   | { type: "loading" }
   | { type: "success" }
@@ -44,11 +54,13 @@ export function AISettingsPanel() {
     anthropic: "",
     groq: "",
     openai: "",
+    gemini: "",
   });
   const [showKey, setShowKey] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({ type: "idle" });
+  const [saveStatus, setSaveStatus] = useState<InlineStatus>({ type: "idle" });
+  const [connectionStatus, setConnectionStatus] = useState<InlineStatus>({ type: "idle" });
 
-  const storedKey = providers[activeProvider].apiKey;
+  const storedKey = providers[activeProvider]?.apiKey ?? "";
   const maskedPreview =
     storedKey.length > 12
       ? storedKey.slice(0, 8) + "..." + storedKey.slice(-4)
@@ -59,6 +71,7 @@ export function AISettingsPanel() {
   const handleProviderChange = (provider: AIProviderName) => {
     setActiveProvider(provider);
     setConnectionStatus({ type: "idle" });
+    setSaveStatus({ type: "idle" });
     setShowKey(false);
   };
 
@@ -68,7 +81,8 @@ export function AISettingsPanel() {
       setProviderKey(activeProvider, keyToSave);
       setLocalKey((prev) => ({ ...prev, [activeProvider]: "" }));
     }
-    notify("AI settings saved", { type: "success" });
+    setSaveStatus({ type: "success" });
+    setTimeout(() => setSaveStatus({ type: "idle" }), 2000);
   };
 
   const handleTestConnection = async () => {
@@ -124,7 +138,7 @@ export function AISettingsPanel() {
         <p className="text-sm text-muted-foreground">
           Choose which AI provider to use for diagram assistance.
         </p>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {PROVIDERS.map(({ id, label }) => (
             <Button
               key={id}
@@ -147,7 +161,7 @@ export function AISettingsPanel() {
           </p>
         )}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">
+          <label className="text-sm font-medium">
             {PROVIDERS.find((p) => p.id === activeProvider)?.label} API Key
           </label>
           <div className="relative">
@@ -176,9 +190,9 @@ export function AISettingsPanel() {
       <section className="space-y-3">
         <h2 className="text-base font-semibold">Model</h2>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">Select Model</label>
+          <label className="text-sm font-medium">Select Model</label>
           <select
-            value={providers[activeProvider].model}
+            value={providers[activeProvider]?.model ?? ""}
             onChange={(e) => setProviderModel(activeProvider, e.target.value)}
             className={cn(
               "flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground",
@@ -197,9 +211,12 @@ export function AISettingsPanel() {
       {/* Actions */}
       <section className="space-y-3">
         <div className="flex items-center gap-3 flex-wrap">
-          <Button onClick={handleSave}>Save</Button>
+          <Button size="sm" onClick={handleSave}>
+            Save
+          </Button>
           <Button
             variant="outline"
+            size="sm"
             onClick={handleTestConnection}
             disabled={connectionStatus.type === "loading"}
           >
@@ -207,7 +224,14 @@ export function AISettingsPanel() {
             Test Connection
           </Button>
 
-          {connectionStatus.type === "success" && (
+          {saveStatus.type === "success" && (
+            <span className="inline-flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400">
+              <CheckCircle2 className="size-4" />
+              Saved
+            </span>
+          )}
+
+          {connectionStatus.type === "success" && saveStatus.type === "idle" && (
             <span className="inline-flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400">
               <CheckCircle2 className="size-4" />
               Connected

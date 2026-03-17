@@ -38,9 +38,7 @@ const TabRenderer = React.memo(
       <TabContext.Provider value={{ tabId: tab.id, isActive }}>
         <div
           className="h-full"
-          style={
-            !isActive && keepMounted ? { visibility: "hidden", pointerEvents: "none" } : undefined
-          }
+          style={!isActive && keepMounted ? { opacity: 0, pointerEvents: "none" } : undefined}
         >
           <ErrorBoundary fallback={ErrorFallback} name={`TabBoundary-${route?.name || tab.id}`}>
             <Suspense fallback={<TabSkeleton />}>
@@ -75,7 +73,11 @@ const TabContent: React.FC = () => {
   return (
     <div className="h-full relative">
       {tabs.map((tab) => (
-        <div key={tab.id} className="absolute inset-0">
+        <div
+          key={tab.id}
+          className="absolute inset-0"
+          style={{ zIndex: tab.id === activeTabId ? 1 : 0 }}
+        >
           <TabRenderer tab={tab} isActive={tab.id === activeTabId} />
         </div>
       ))}

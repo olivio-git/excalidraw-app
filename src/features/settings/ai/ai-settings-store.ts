@@ -26,6 +26,7 @@ export const useAISettingsStore = create<AISettingsState>()(
         anthropic: { apiKey: "", model: "claude-sonnet-4-5" },
         groq: { apiKey: "", model: "llama-3.3-70b-versatile" },
         openai: { apiKey: "", model: "gpt-4o" },
+        gemini: { apiKey: "", model: "gemini-2.5-pro" },
       },
 
       setActiveProvider: (provider: AIProviderName) => {
@@ -66,6 +67,16 @@ export const useAISettingsStore = create<AISettingsState>()(
         activeProvider: state.activeProvider,
         providers: state.providers,
       }),
+      // Deep-merge so new providers added in future updates get their defaults
+      // even when an older persisted state doesn't have them.
+      merge: (persisted, current) => {
+        const p = persisted as Partial<AISettingsState>;
+        return {
+          ...current,
+          ...p,
+          providers: { ...current.providers, ...p.providers },
+        };
+      },
     }
   )
 );

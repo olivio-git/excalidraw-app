@@ -200,6 +200,11 @@
   }
 }
 
+/* Hide Excalidraw zoom indicator (bottom-left) */
+.excalidraw .zoom-actions {
+  display: none !important;
+}
+
 /* Number input spinners removal */
 input[type="number"].no-spinners::-webkit-inner-spin-button,
 input[type="number"].no-spinners::-webkit-outer-spin-button {

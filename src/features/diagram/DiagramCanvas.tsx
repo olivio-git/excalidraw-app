@@ -9,13 +9,13 @@ import { fileHandlerRegistry } from "@/core/shell/panels/file-handler-registry";
 import { notify } from "@/shared/lib/notify";
 import { useThemeStore } from "@/stores/themeStore";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
-import type { AppState } from "@excalidraw/excalidraw/types";
+import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 const AUTOSAVE_DEBOUNCE_MS = 1000;
 
 const DiagramCanvas = () => {
-  const { tabId } = useTabContext();
+  const { tabId, isActive } = useTabContext();
   const tab = useTabStore((s) => s.getTab(tabId));
   const updateTab = useTabStore((s) => s.updateTab);
   const instanceId = tab?.instanceId;
@@ -23,17 +23,40 @@ const DiagramCanvas = () => {
 
   const diagram = useDiagramStore((s) => (instanceId ? s.diagrams[instanceId] : undefined));
   const loadDiagram = useDiagramStore((s) => s.loadDiagram);
-  const updateDiagram = useDiagramStore((s) => s.updateDiagram);
+  const markDirty = useDiagramStore((s) => s.markDirty);
   const saveDiagram = useDiagramStore((s) => s.saveDiagram);
 
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const filesRef = useRef<BinaryFiles>({});
   const [isDragging, setIsDragging] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Block Excalidraw's native HTML5 file drop handler via capture on the wrapper div.
+  // Tauri fires onDragDropEvent through IPC (independent of DOM events), so
+  // stopPropagation here only blocks Excalidraw — not our Tauri handler.
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const block = (e: DragEvent) => {
+      if (e.dataTransfer?.files.length || e.dataTransfer?.types.includes("Files")) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    el.addEventListener("dragover", block, true);
+    el.addEventListener("drop", block, true);
+    return () => {
+      el.removeEventListener("dragover", block, true);
+      el.removeEventListener("drop", block, true);
+    };
+  }, []);
 
   // OS drag-and-drop handler
   useEffect(() => {
     const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg"]);
     let unlisten: (() => void) | undefined;
+    let cancelled = false;
 
     getCurrentWindow()
       .onDragDropEvent((event) => {
@@ -45,6 +68,8 @@ const DiagramCanvas = () => {
           setIsDragging(false);
         } else if (type === "drop") {
           setIsDragging(false);
+          // Only the active tab handles the drop
+          if (DiagramController.getActiveInstanceId() !== instanceId) return;
           const paths = event.payload.paths;
 
           const excalidrawPaths = paths.filter((p) => p.endsWith(".excalidraw"));
@@ -87,10 +112,15 @@ const DiagramCanvas = () => {
         }
       })
       .then((fn) => {
-        unlisten = fn;
+        if (cancelled) {
+          fn();
+        } else {
+          unlisten = fn;
+        }
       });
 
     return () => {
+      cancelled = true;
       unlisten?.();
     };
   }, [instanceId]);
@@ -111,6 +141,22 @@ const DiagramCanvas = () => {
     };
   }, [instanceId]);
 
+  // Sync Excalidraw UI state when tab visibility changes
+  useEffect(() => {
+    if (!instanceId) return;
+    const api = DiagramController.getApi(instanceId);
+    if (!api) return;
+    if (!isActive) {
+      // Clear selection so Excalidraw's portal toolbar disappears when tab is hidden
+      api.updateScene({
+        appState: { selectedElementIds: {}, selectedGroupIds: {} } as Partial<AppState>,
+      });
+    } else {
+      // Force Excalidraw to re-sync its UI (zoom indicator, etc.) after becoming visible
+      api.refresh();
+    }
+  }, [isActive, instanceId]);
+
   // Load diagram on mount
   useEffect(() => {
     if (!instanceId || !filePath) return;
@@ -130,16 +176,22 @@ const DiagramCanvas = () => {
   }, [diagram?.isDirty, filePath, tab, tabId, updateTab]);
 
   const handleChange = useCallback(
-    (elements: readonly ExcalidrawElement[], appState: AppState) => {
+    (_elements: readonly ExcalidrawElement[], _appState: AppState, files: BinaryFiles) => {
       if (!instanceId) return;
-      updateDiagram(instanceId, elements, appState);
+      filesRef.current = files;
+      // Mark dirty WITHOUT storing elements/appState — keeps initialData stable
+      // and avoids feedback loops that freeze Excalidraw's zoom indicator.
+      // Live state is read from the API at save time.
+      markDirty(instanceId);
 
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
-        saveDiagram(instanceId);
+        const api = DiagramController.getApi(instanceId);
+        if (!api) return;
+        saveDiagram(instanceId, api.getSceneElements(), api.getAppState(), filesRef.current);
       }, AUTOSAVE_DEBOUNCE_MS);
     },
-    [instanceId, updateDiagram, saveDiagram]
+    [instanceId, markDirty, saveDiagram]
   );
 
   const diagramName = filePath
@@ -158,7 +210,7 @@ const DiagramCanvas = () => {
   }
 
   return (
-    <div className="relative h-full w-full">
+    <div ref={wrapperRef} className="relative h-full w-full">
       {isDragging && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-primary/10 border-2 border-dashed border-primary pointer-events-none rounded-sm">
           <p className="text-primary font-medium text-sm">Drop files here</p>
@@ -170,6 +222,7 @@ const DiagramCanvas = () => {
         initialData={{
           elements: diagram.elements as ExcalidrawElement[],
           appState: { ...diagram.appState, name: diagramName },
+          files: diagram.files,
         }}
         onChange={handleChange}
         theme={resolvedTheme}

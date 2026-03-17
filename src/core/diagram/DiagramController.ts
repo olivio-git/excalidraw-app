@@ -234,6 +234,10 @@ export class DiagramControllerClass implements DiagramControllerAPI {
 
     const existing = api.getSceneElements();
     api.updateScene({ elements: [...existing, ...imageElements] });
+    api.scrollToContent(imageElements as ExcalidrawElement[], {
+      fitToContent: true,
+      animate: false,
+    });
   }
 }
 

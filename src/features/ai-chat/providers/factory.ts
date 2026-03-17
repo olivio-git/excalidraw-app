@@ -15,6 +15,10 @@ export class AIProviderFactory {
         const { OpenAIAdapter } = await import("./openai-adapter");
         return new OpenAIAdapter();
       }
+      case "gemini": {
+        const { GeminiAdapter } = await import("./gemini-adapter");
+        return new GeminiAdapter();
+      }
       default:
         throw new Error(`Unknown AI provider: ${name}`);
     }

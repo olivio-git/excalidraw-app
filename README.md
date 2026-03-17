@@ -200,6 +200,10 @@ activate(api) {
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/SDD.md`](docs/SDD.md).
 
+## Acknowledgements
+
+This project is built on top of [Excalidraw](https://github.com/excalidraw/excalidraw) — the open-source virtual whiteboard that makes all of this possible. The canvas, the element format, the rendering engine, the export pipeline — it's all Excalidraw under the hood. Huge respect to the team and every contributor behind it.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

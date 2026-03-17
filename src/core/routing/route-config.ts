@@ -1,6 +1,7 @@
 import { lazy } from "react";
-import { LayoutDashboard, LucideView, Settings, PlugZap, PencilLine } from "lucide-react";
+import { LayoutDashboard, LucideView, Settings, PlugZap } from "lucide-react";
 import type { RouteConfig } from "./types";
+import { ExcalidrawFileIcon } from "@/shared/icons/ExcalidrawFileIcon";
 
 // Lazy-loaded feature components
 const SettingsPage = lazy(() => import("@/features/settings/SettingsPage"));
@@ -12,7 +13,7 @@ export const diagramRoute: RouteConfig = {
   path: "/diagram",
   name: "Diagram",
   type: "protected",
-  icon: PencilLine as unknown as React.ComponentType<{ className?: string }>,
+  icon: ExcalidrawFileIcon,
   component: DiagramCanvas,
   security: { requiresAuth: false },
   tabConfig: { singleton: false, closable: true, keepMounted: true },

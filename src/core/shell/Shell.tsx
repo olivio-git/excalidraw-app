@@ -11,6 +11,7 @@ import TabContent from "@/core/tabs/components/TabContent";
 import TitleBar from "./TitleBar";
 import DiagramSidebar from "./DiagramSidebar";
 import { useKeybindingBridge } from "@/core/keybindings/hooks/useKeybindingBridge";
+import { useMcpBridge } from "@/core/shell/hooks/useMcpBridge";
 import CommandPalette from "@/features/command-palette/CommandPalette";
 import { useThemeStore } from "@/stores/themeStore";
 import { ConfirmDialog } from "@/shared/lib/confirm";
@@ -18,6 +19,7 @@ import { PromptDialog } from "@/shared/lib/prompt";
 
 export default function Shell() {
   useKeybindingBridge();
+  useMcpBridge();
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
   return (

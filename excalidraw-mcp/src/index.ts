@@ -173,6 +173,102 @@ server.tool(
   }
 );
 
+// ─── list_workspace ───────────────────────────────────────────────────────────
+server.tool(
+  "list_workspace",
+  "List all files and folders in the current workspace directory. Returns a flat JSON array of objects with { path: string, name: string, isDir: boolean } relative to the workspace root.",
+  {},
+  async () => {
+    const res = await callBridge("list_workspace", {});
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── create_diagram ───────────────────────────────────────────────────────────
+server.tool(
+  "create_diagram",
+  "Create a new empty .excalidraw diagram file in the workspace and open it in a new tab. Fails if the file already exists.",
+  {
+    name: z
+      .string()
+      .describe("File name (with or without .excalidraw extension), relative to workspace root"),
+  },
+  async ({ name }) => {
+    const res = await callBridge("create_diagram", { name });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── save_diagram ─────────────────────────────────────────────────────────────
+server.tool(
+  "save_diagram",
+  "Persist the current in-memory state of an open diagram tab to disk. Returns bytes written.",
+  {
+    instanceId: z
+      .string()
+      .describe("The instanceId of the open diagram tab — equals the absolute file path"),
+  },
+  async ({ instanceId }) => {
+    const res = await callBridge("save_diagram", { instanceId });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── create_folder ────────────────────────────────────────────────────────────
+server.tool(
+  "create_folder",
+  "Create a new folder inside the workspace. Creates intermediate directories as needed.",
+  {
+    path: z
+      .string()
+      .describe("Relative path from workspace root for the new folder (e.g. 'subdir/nested')"),
+  },
+  async ({ path }) => {
+    const res = await callBridge("create_folder", { path });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── rename_file ──────────────────────────────────────────────────────────────
+server.tool(
+  "rename_file",
+  "Rename or move a file or folder within the workspace. If the file is open in a tab, the tab's instanceId and title are updated automatically.",
+  {
+    oldPath: z.string().describe("Current relative path from workspace root"),
+    newPath: z.string().describe("New relative path from workspace root"),
+  },
+  async ({ oldPath, newPath }) => {
+    const res = await callBridge("rename_file", { oldPath, newPath });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── delete_file ──────────────────────────────────────────────────────────────
+server.tool(
+  "delete_file",
+  "Permanently delete a file or folder from the workspace. Requires confirm: true. If the file is open in a tab, the tab is closed first.",
+  {
+    path: z.string().describe("Relative path from workspace root of the file or folder to delete"),
+    confirm: z.boolean().describe("Must be true to proceed — prevents accidental deletion"),
+  },
+  async ({ path, confirm }) => {
+    const res = await callBridge("delete_file", { path, confirm });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 const transport = new StdioServerTransport();
 await server.connect(transport);

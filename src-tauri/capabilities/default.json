@@ -36,6 +36,7 @@
     "fs:allow-write-text-file",
     "fs:allow-read-dir",
     "fs:allow-create",
+    "fs:allow-mkdir",
     "fs:allow-remove",
     "fs:allow-rename",
     "fs:allow-watch",

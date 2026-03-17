@@ -138,6 +138,8 @@ activate(api) {
 
 ## Architecture reference
 
+![Architecture](docs/architecture.svg)
+
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/SDD.md`](docs/SDD.md).
 
 ## License

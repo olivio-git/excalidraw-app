@@ -15,13 +15,17 @@ export async function executeAITool(
     };
   }
 
-  const api = DiagramController.getApi(instanceId);
+  let api = DiagramController.getApi(instanceId);
   if (!api) {
-    return {
-      toolCallId: "",
-      result: `Canvas not ready (instanceId: ${instanceId}). Try again in a moment.`,
-      isError: true,
-    };
+    try {
+      api = await DiagramController.waitForInstance(instanceId, 3000);
+    } catch {
+      return {
+        toolCallId: "",
+        result: `Canvas not ready (instanceId: ${instanceId}). Try again in a moment.`,
+        isError: true,
+      };
+    }
   }
 
   try {

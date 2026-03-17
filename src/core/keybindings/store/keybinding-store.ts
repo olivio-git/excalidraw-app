@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { createTauriStorage } from "../../storage/tauri-storage";
 import { keybindingRegistry } from "../keybinding-registry";
 import { KeybindingSource } from "../types";
+import type { NormalizedKey } from "../types";
 import type { KeybindingEntry } from "../types";
 
 // ── Store shape ───────────────────────────────────────────────────────────────
@@ -63,7 +64,7 @@ export const useKeybindingStore = create<KeybindingStore>()(
           ),
         }));
 
-        keybindingRegistry.unregister(firstKey as ReturnType<typeof String>, commandId);
+        keybindingRegistry.unregister(firstKey as NormalizedKey, commandId);
       },
 
       resetAll: () => {

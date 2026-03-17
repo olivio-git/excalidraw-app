@@ -1,4 +1,5 @@
 import { Button } from "@/shared/components/ui/button";
+import { TooltipWrapper } from "@/shared/common/TooltipWrapper";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -85,13 +86,15 @@ const Tab = React.memo(
               )}
             >
               {tab.isPinned ? (
-                <>
-                  {Icon ? (
-                    <Icon className="size-3 flex-shrink-0" />
-                  ) : (
-                    <Pin className="size-3 flex-shrink-0 rotate-45" />
-                  )}
-                </>
+                <TooltipWrapper tooltip={tab.title} side="bottom">
+                  <span className="flex items-center justify-center">
+                    {Icon ? (
+                      <Icon className="size-3 flex-shrink-0" />
+                    ) : (
+                      <Pin className="size-3 flex-shrink-0 rotate-45" />
+                    )}
+                  </span>
+                </TooltipWrapper>
               ) : (
                 <>
                   {Icon && <Icon className="size-3 flex-shrink-0" />}

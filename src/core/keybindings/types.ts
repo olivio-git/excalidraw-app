@@ -51,6 +51,13 @@ export interface KeybindingEntry {
 
   /** Where the binding was registered from. */
   source: KeybindingSource;
+
+  /**
+   * When true, the keybinding fires even when focus is inside an input,
+   * textarea, or contenteditable element.
+   * Use for workspace-level shortcuts that should always work (e.g. tab navigation).
+   */
+  allowInInput?: boolean;
 }
 
 /**

@@ -1,5 +1,6 @@
 import type React from "react";
-import { FileText, PencilLine, FileCode, FileImage, FileJson } from "lucide-react";
+import { FileText, FileCode, FileImage, FileJson } from "lucide-react";
+import { ExcalidrawFileIcon } from "@/shared/icons/ExcalidrawFileIcon";
 
 type IconComponent = React.ComponentType<{ className?: string }>;
 
@@ -19,7 +20,7 @@ class FileIconRegistryClass {
 export const fileIconRegistry = new FileIconRegistryClass();
 
 // Built-in defaults
-fileIconRegistry.register("excalidraw", PencilLine);
+fileIconRegistry.register("excalidraw", ExcalidrawFileIcon);
 fileIconRegistry.register("md", FileCode);
 fileIconRegistry.register("mdx", FileCode);
 fileIconRegistry.register("json", FileJson);

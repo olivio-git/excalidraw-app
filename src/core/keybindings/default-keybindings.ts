@@ -35,10 +35,26 @@ const BUILTIN_KEYBINDINGS = [
   {
     key: "ctrl+tab",
     commandId: "workbench.action.nextTab",
+    allowInInput: true,
   },
   {
+    key: "ctrl+pagedown",
+    commandId: "workbench.action.nextTab",
+    allowInInput: true,
+  },
+  {
+    // Note: ctrl+shift+tab is consumed by GTK/WebKitGTK on Linux before
+    // reaching JavaScript. Use ctrl+pageup as the cross-platform alternative.
+    key: "ctrl+pageup",
+    commandId: "workbench.action.previousTab",
+    allowInInput: true,
+  },
+  {
+    // Works on Windows/macOS. On Linux/GTK this is intercepted at OS level
+    // and never reaches JavaScript — use ctrl+pageup as fallback.
     key: "ctrl+shift+tab",
     commandId: "workbench.action.previousTab",
+    allowInInput: true,
   },
 ] as const;
 
@@ -57,6 +73,7 @@ export function registerDefaultKeybindings(): void {
       commandId: binding.commandId,
       chord: keyNormalizer.normalizeChord(binding.key),
       source: KeybindingSource.Builtin,
+      ...("allowInInput" in binding && { allowInInput: binding.allowInInput }),
     });
   }
 }

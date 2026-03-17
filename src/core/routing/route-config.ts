@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { LayoutDashboard, LucideView, Settings, PlugZap } from "lucide-react";
+import { LayoutDashboard, LucideView, Settings, PlugZap, BookOpen } from "lucide-react";
 import type { RouteConfig } from "./types";
 import { ExcalidrawFileIcon } from "@/shared/icons/ExcalidrawFileIcon";
 
@@ -7,6 +7,20 @@ import { ExcalidrawFileIcon } from "@/shared/icons/ExcalidrawFileIcon";
 const SettingsPage = lazy(() => import("@/features/settings/SettingsPage"));
 const PluginAdminPage = lazy(() => import("@/features/plugins/PluginAdminPage"));
 const DiagramCanvas = lazy(() => import("@/features/diagram/DiagramCanvas"));
+const LibraryDetailPage = lazy(() => import("@/features/library-browser/LibraryDetailPage"));
+
+export const libraryDetailRoute: RouteConfig = {
+  id: "library-detail",
+  path: "/library-detail",
+  name: "Library Detail",
+  type: "protected",
+  icon: BookOpen as unknown as React.ComponentType<{ className?: string }>,
+  component: LibraryDetailPage,
+  security: { requiresAuth: false },
+  tabConfig: { singleton: false, closable: true, keepMounted: false },
+  showSidebar: true,
+  showInCommandPalette: false,
+};
 
 export const diagramRoute: RouteConfig = {
   id: "diagram",

@@ -96,6 +96,10 @@ export class PluginManagerClass {
     this.commandHandlers.set(commandId, handler);
   }
 
+  unregisterCommandHandler(commandId: string): void {
+    this.commandHandlers.delete(commandId);
+  }
+
   async activate(pluginId: string): Promise<void> {
     const entry = this.plugins.get(pluginId);
     if (!entry) {
@@ -313,7 +317,7 @@ export class PluginManagerClass {
   }
 
   async loadExternalPlugins(): Promise<void> {
-    if (!(window as any).__TAURI_INTERNALS__) return;
+    if (!(window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__) return;
 
     const { invoke } = await import("@tauri-apps/api/core");
 

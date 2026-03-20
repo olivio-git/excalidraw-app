@@ -430,8 +430,8 @@ export const FileTreeNode = ({
                   ? ""
                   : isSelected
                     ? isActive
-                      ? "text-foreground font-medium"
-                      : "text-foreground"
+                      ? "text-primary font-medium"
+                      : "text-primary"
                     : isActive
                       ? "text-primary font-medium"
                       : "text-foreground/70",

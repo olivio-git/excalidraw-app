@@ -143,6 +143,9 @@ export function useKeyboardNav(
         case "Escape": {
           e.preventDefault();
           cancelAction();
+          // Clear selection and focus when no inline input is active
+          options.setSelectedPaths?.(new Set());
+          setFocusedPath(null);
           break;
         }
       }

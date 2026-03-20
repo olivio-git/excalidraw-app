@@ -68,7 +68,7 @@ function openSettingsHandler(): void {
 
   addTab({
     routeId: route.id,
-    path: route.path,
+    path: route.path ?? "/settings",
     title: route.name,
     icon: route.icon,
   });

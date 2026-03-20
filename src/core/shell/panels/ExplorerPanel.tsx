@@ -515,6 +515,10 @@ export const ExplorerPanel = () => {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "p") {
+        // Don't intercept if Excalidraw canvas has focus
+        const active = document.activeElement;
+        if (active && active.tagName === "CANVAS") return;
+        if (active && (active as HTMLElement).closest?.(".excalidraw")) return;
         e.preventDefault();
         setQuickOpenOpen(true);
       }
@@ -714,7 +718,7 @@ export const ExplorerPanel = () => {
     >
       <div
         ref={containerRef}
-        className="flex flex-col h-full overflow-hidden"
+        className="flex flex-col h-full overflow-hidden focus:outline-none"
         tabIndex={-1}
         onMouseDown={() => {
           // Clear selection when clicking empty space (panel background)

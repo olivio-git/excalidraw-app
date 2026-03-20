@@ -90,7 +90,9 @@ const DiagramSidebar = () => {
   return (
     <SidebarPrimitive
       collapsible="offcanvas"
-      className="h-full bg-background border-r border-border/50"
+      className="h-full bg-background border-r border-border/50 outline-none focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring/40"
+      data-panel="sidebar"
+      tabIndex={-1}
     >
       {/* Header: UN solo flex container, sin anidación de dirección */}
       <div

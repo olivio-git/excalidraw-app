@@ -52,6 +52,115 @@ export interface SidebarFooterAction {
  */
 export type PluginEventHandler = (payload: unknown) => void | Promise<void>;
 
+// ---------------------------------------------------------------------------
+// Files sub-API
+// ---------------------------------------------------------------------------
+
+export interface FileStat {
+  path: string;
+  name: string;
+  isFile: boolean;
+  isDir: boolean;
+  size: number;
+  mtime: number | null;
+}
+
+export interface FileListEntry {
+  path: string;
+  name: string;
+  isDir: boolean;
+  size?: number;
+  mtime?: number | null;
+}
+
+/**
+ * File-system operations sub-API exposed through PluginAPI.files.
+ */
+export interface PluginFilesAPI {
+  /** Stat a single path and return normalized metadata. */
+  stat(path: string): Promise<FileStat>;
+  /** List directory contents. Optionally recursive or including dotfiles. */
+  list(
+    dirPath: string,
+    options?: { recursive?: boolean; showDotfiles?: boolean }
+  ): Promise<FileListEntry[]>;
+  /** Copy a file or folder. Set overwrite to replace existing destinations. */
+  copy(srcPath: string, destPath: string, options?: { overwrite?: boolean }): Promise<void>;
+  /** Move (rename path) a file or folder and update any open tabs. */
+  move(srcPath: string, destPath: string): Promise<void>;
+  /** Delete a file or folder. Set recursive: true to remove directories. */
+  delete(path: string, options?: { recursive?: boolean }): Promise<void>;
+  /**
+   * Rename a file or folder (within the same parent directory).
+   * Returns the new full absolute path.
+   */
+  rename(oldPath: string, newName: string): Promise<string>;
+  /** Create a directory (including parents). */
+  createFolder(dirPath: string): Promise<void>;
+  /**
+   * Create a new file using the registered handler for the extension.
+   * Returns the absolute path of the created file.
+   */
+  createFile(dirPath: string, name: string): Promise<string>;
+  /** Read the full text content of a file. */
+  readText(path: string): Promise<string>;
+  /** Write text content to a file (overwrites). */
+  writeText(path: string, content: string): Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
+// Tabs sub-API
+// ---------------------------------------------------------------------------
+
+export interface TabInfo {
+  id: string;
+  title: string;
+  filePath?: string;
+  isDirty: boolean;
+  isPinned: boolean;
+  routeId: string;
+}
+
+/**
+ * Tab-management sub-API exposed through PluginAPI.tabs.
+ */
+export interface PluginTabsAPI {
+  /** Returns the currently active tab, or null if none. */
+  getActive(): TabInfo | null;
+  /** Returns all open tabs. */
+  list(): TabInfo[];
+  /** Open a file in a new tab (or focus if already open). */
+  open(filePath: string): void;
+  /**
+   * Close a tab by id.
+   * Respects the pinned/closable constraints unless force is true.
+   * Returns true if the tab was actually closed.
+   */
+  close(tabId: string, options?: { force?: boolean }): boolean;
+  /**
+   * Activate (focus) a tab by id.
+   * Returns true if the tab was found.
+   */
+  activate(tabId: string): boolean;
+  /**
+   * Save a specific tab (by tabId) or the active tab if omitted.
+   * Only works for diagram tabs — returns false for non-diagram tabs.
+   */
+  save(tabId?: string): Promise<boolean>;
+  /** Save all dirty diagram tabs. Returns a summary of how many succeeded or failed. */
+  saveAll(): Promise<{ saved: number; failed: number }>;
+  /**
+   * Subscribe to active-tab changes.
+   * The handler is called immediately with the current tab, then on every change.
+   * Returns an unsubscribe function — call it in plugin deactivate().
+   */
+  onChange(handler: (tab: TabInfo | null) => void): () => void;
+}
+
+// ---------------------------------------------------------------------------
+// Diagram sub-API
+// ---------------------------------------------------------------------------
+
 /**
  * Diagram sub-API exposed through PluginAPI.diagram.
  * Provides imperative access to the active Excalidraw canvas instance.
@@ -175,6 +284,22 @@ export interface PluginAPI {
    * All methods operate on the currently active diagram tab instance.
    */
   diagram: DiagramPluginAPI;
+
+  /**
+   * File-system operations sub-API.
+   * Provides stat, list, copy, move, delete, rename, createFolder, createFile,
+   * readText, and writeText helpers backed by Tauri plugin-fs.
+   */
+  files: PluginFilesAPI;
+
+  /**
+   * Tab-management sub-API.
+   * Provides getActive, list, open, close, activate, save, saveAll, and onChange.
+   *
+   * Note: getActiveTab() and onTabChange() at the root PluginAPI level are
+   * kept for backwards compatibility and remain fully functional.
+   */
+  tabs: PluginTabsAPI;
 }
 
 export interface SidebarSection {

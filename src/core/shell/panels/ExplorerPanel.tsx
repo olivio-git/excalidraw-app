@@ -1,72 +1,65 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo, startTransition } from "react";
-import { readDir, rename, remove, mkdir } from "@tauri-apps/plugin-fs";
+import { useState, useEffect, useMemo, startTransition, useRef, useCallback } from "react";
+import { readDir, mkdir, remove } from "@tauri-apps/plugin-fs";
+import { rename } from "@tauri-apps/plugin-fs";
 import { open } from "@tauri-apps/plugin-dialog";
 import { join } from "@tauri-apps/api/path";
+import { FolderOpen, FolderClosed, File } from "lucide-react";
 import {
-  FolderOpen,
-  FolderClosed,
-  Plus,
-  RefreshCw,
-  ChevronsUpDown,
-  FolderPlus,
-  ChevronRight,
-  ChevronDown,
-} from "lucide-react";
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  type DragEndEvent,
+  type DragStartEvent,
+  type DragOverEvent,
+} from "@dnd-kit/core";
 import { Button } from "@/shared/components/ui/button";
 import { ScrollArea } from "@/shared/components/ui/scroll-area";
 import { TooltipWrapper } from "@/shared/common/TooltipWrapper";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useTabStore } from "@/core/tabs/store/tab-store";
+import { useExplorerStore } from "@/stores/explorerStore";
 import { useFileWatcher } from "@/core/shell/useFileWatcher";
-import { diagramFileService } from "@/core/diagram/services/diagram-file.service";
-import { fileIconRegistry } from "./file-icon-registry";
 import { fileHandlerRegistry } from "./file-handler-registry";
 import { confirm } from "@/shared/lib/confirm";
 import { notify } from "@/shared/lib/notify";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/shared/components/ui/context-menu";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface FileEntry {
-  name: string;
-  path: string;
-  isDir: boolean;
-  children?: FileEntry[];
-}
-
-interface CreatingState {
-  parentPath: string;
-  type: "file" | "folder";
-}
+import { cn } from "@/shared/lib/utils";
+import { ExplorerToolbar } from "./ExplorerToolbar";
+import { ExplorerBreadcrumb } from "./ExplorerBreadcrumb";
+import { FileTreeNode } from "./FileTreeNode";
+import { InlineInput } from "./InlineInput";
+import { QuickOpenDialog } from "./QuickOpenDialog";
+import { updateTabsAfterRename, closeTabsForDeletedPath } from "./explorer-tab-sync";
+import { sortTree, flattenVisible, filterTree, getFilteredExpandedPaths } from "./explorer-utils";
+import { useDragAndDrop } from "@/core/shell/hooks/useDragAndDrop";
+import { useMultiSelect } from "@/core/shell/hooks/useMultiSelect";
+import { useExplorerSelectionStore } from "@/stores/explorerStore";
+import { useKeyboardNav } from "@/core/shell/hooks/useKeyboardNav";
+import { useFileClipboard } from "@/core/shell/hooks/useFileClipboard";
+import type { FileEntry, CreatingState, DragData } from "./explorer-types";
+import { ChevronRight, ChevronDown } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const buildTree = async (dir: string): Promise<FileEntry[]> => {
+const buildTree = async (dir: string, showDotfiles: boolean): Promise<FileEntry[]> => {
   const entries = await readDir(dir);
   const result: FileEntry[] = [];
 
   for (const entry of entries) {
-    if (!entry.name || entry.name.startsWith(".")) continue;
+    if (!entry.name) continue;
+    if (!showDotfiles && entry.name.startsWith(".")) continue;
     const fullPath = await join(dir, entry.name);
 
     if (entry.isDirectory) {
-      const children = await buildTree(fullPath);
+      const children = await buildTree(fullPath, showDotfiles);
       result.push({ name: entry.name, path: fullPath, isDir: true, children });
     } else {
       result.push({ name: entry.name, path: fullPath, isDir: false });
     }
   }
 
+  // Default sort (type-first) — will be re-sorted via sortTree in display useMemo
   return result.sort((a, b) => {
     if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
     return a.name.localeCompare(b.name);
@@ -86,281 +79,21 @@ const getAncestorPaths = (filePath: string, workspaceDir: string): string[] => {
 };
 
 // ---------------------------------------------------------------------------
-// InlineInput — used for both create and rename
-// ---------------------------------------------------------------------------
-
-const InlineInput = ({
-  defaultValue = "",
-  depth,
-  onCommit,
-  onCancel,
-}: {
-  defaultValue?: string;
-  depth: number;
-  onCommit: (name: string) => void;
-  onCancel: () => void;
-}) => {
-  const [value, setValue] = useState(defaultValue);
-  const ref = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    ref.current?.focus();
-    // Select name without extension for rename UX
-    const dot = defaultValue.lastIndexOf(".");
-    if (dot > 0) {
-      ref.current?.setSelectionRange(0, dot);
-    } else {
-      ref.current?.select();
-    }
-  }, [defaultValue]);
-
-  const commit = () => {
-    const trimmed = value.trim();
-    if (trimmed) onCommit(trimmed);
-    else onCancel();
-  };
-
-  return (
-    <div className="py-0.5 pr-2" style={{ paddingLeft: 8 + depth * 12 }}>
-      <input
-        ref={ref}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            commit();
-          }
-          if (e.key === "Escape") {
-            e.preventDefault();
-            onCancel();
-          }
-        }}
-        onBlur={commit}
-        className="w-full h-6 px-1.5 text-xs bg-background border border-ring rounded outline-none"
-      />
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// FileNode
-// ---------------------------------------------------------------------------
-
-interface FileNodeProps {
-  entry: FileEntry;
-  depth: number;
-  expandedPaths: Set<string>;
-  activeFilePath?: string;
-  renamingPath: string | null;
-  creating: CreatingState | null;
-  workspaceDir: string;
-  onToggle: (path: string) => void;
-  onOpen: (path: string, name: string) => void;
-  onDelete: (path: string, isDir: boolean) => void;
-  onStartRename: (path: string) => void;
-  onCommitRename: (oldPath: string, newName: string) => void;
-  onCancelAction: () => void;
-  onCopyPath: (path: string) => void;
-  onCopyRelativePath: (path: string, workspaceDir: string) => void;
-  onNewFile: (parentPath: string) => void;
-  onNewFolder: (parentPath: string) => void;
-  onCommitCreate: (parentPath: string, name: string, type: "file" | "folder") => void;
-}
-
-const FileNode = ({
-  entry,
-  depth,
-  expandedPaths,
-  activeFilePath,
-  renamingPath,
-  creating,
-  workspaceDir,
-  onToggle,
-  onOpen,
-  onDelete,
-  onStartRename,
-  onCommitRename,
-  onCancelAction,
-  onCopyPath,
-  onCopyRelativePath,
-  onNewFile,
-  onNewFolder,
-  onCommitCreate,
-}: FileNodeProps) => {
-  const pl = 8 + depth * 12;
-  const isExpanded = expandedPaths.has(entry.path);
-  const isActive = !entry.isDir && entry.path === activeFilePath;
-  const isRenaming = renamingPath === entry.path;
-  const showCreatingHere = entry.isDir && isExpanded && creating?.parentPath === entry.path;
-
-  const fileIcon = fileIconRegistry.resolve(entry.name);
-  const hasHandler = fileHandlerRegistry.resolve(entry.name) !== null;
-
-  if (entry.isDir) {
-    return (
-      <div>
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
-            <button
-              onClick={() => onToggle(entry.path)}
-              className="flex items-center gap-1 w-full text-left h-7 pr-2 rounded hover:bg-accent text-foreground/80 text-xs"
-              style={{ paddingLeft: pl }}
-            >
-              <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground">
-                {isExpanded ? (
-                  <ChevronDown className="size-3" />
-                ) : (
-                  <ChevronRight className="size-3" />
-                )}
-              </span>
-              {isExpanded ? (
-                <FolderOpen className="size-3.5 shrink-0 text-yellow-400/80" />
-              ) : (
-                <FolderClosed className="size-3.5 shrink-0 text-yellow-400/80" />
-              )}
-              {isRenaming ? (
-                <InlineInput
-                  defaultValue={entry.name}
-                  depth={0}
-                  onCommit={(n) => onCommitRename(entry.path, n)}
-                  onCancel={onCancelAction}
-                />
-              ) : (
-                <span className="truncate">{entry.name}</span>
-              )}
-            </button>
-          </ContextMenuTrigger>
-          <ContextMenuContent>
-            <ContextMenuItem onClick={() => onNewFile(entry.path)}>
-              Nuevo archivo aquí
-            </ContextMenuItem>
-            <ContextMenuItem onClick={() => onNewFolder(entry.path)}>
-              Nueva carpeta aquí
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem onClick={() => onStartRename(entry.path)}>Renombrar</ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem onClick={() => onCopyPath(entry.path)}>Copiar ruta</ContextMenuItem>
-            <ContextMenuItem onClick={() => onCopyRelativePath(entry.path, workspaceDir)}>
-              Copiar ruta relativa
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem
-              onClick={() => onDelete(entry.path, true)}
-              className="text-destructive focus:text-destructive"
-            >
-              Eliminar carpeta
-            </ContextMenuItem>
-          </ContextMenuContent>
-        </ContextMenu>
-
-        {isExpanded && (
-          <div>
-            {showCreatingHere && (
-              <InlineInput
-                depth={depth + 1}
-                onCommit={(n) => onCommitCreate(entry.path, n, creating!.type)}
-                onCancel={onCancelAction}
-              />
-            )}
-            {entry.children?.map((child) => (
-              <FileNode
-                key={child.path}
-                entry={child}
-                depth={depth + 1}
-                expandedPaths={expandedPaths}
-                activeFilePath={activeFilePath}
-                renamingPath={renamingPath}
-                creating={creating}
-                workspaceDir={workspaceDir}
-                onToggle={onToggle}
-                onOpen={onOpen}
-                onDelete={onDelete}
-                onStartRename={onStartRename}
-                onCommitRename={onCommitRename}
-                onCancelAction={onCancelAction}
-                onCopyPath={onCopyPath}
-                onCopyRelativePath={onCopyRelativePath}
-                onNewFile={onNewFile}
-                onNewFolder={onNewFolder}
-                onCommitCreate={onCommitCreate}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // File node
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <button
-          onClick={() => hasHandler && onOpen(entry.path, entry.name)}
-          disabled={!hasHandler}
-          title={!hasHandler ? "No hay visor registrado para este tipo de archivo" : undefined}
-          className={`flex items-center gap-1.5 w-full text-left h-7 pr-2 rounded text-xs ${
-            !hasHandler
-              ? "opacity-40 cursor-default"
-              : isActive
-                ? "bg-accent text-accent-foreground"
-                : "hover:bg-accent/60 text-foreground/90"
-          }`}
-          style={{ paddingLeft: pl }}
-          data-active={isActive}
-        >
-          {React.createElement(fileIcon, {
-            className: "size-3.5 shrink-0 text-muted-foreground/70",
-          })}
-          {isRenaming ? (
-            <InlineInput
-              defaultValue={entry.name}
-              depth={0}
-              onCommit={(n) => onCommitRename(entry.path, n)}
-              onCancel={onCancelAction}
-            />
-          ) : (
-            <span className="truncate">
-              {fileHandlerRegistry.resolveOrDefault(entry.name).displayName?.(entry.name) ??
-                entry.name}
-            </span>
-          )}
-        </button>
-      </ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem onClick={() => onOpen(entry.path, entry.name)}>Abrir</ContextMenuItem>
-        <ContextMenuItem onClick={() => onStartRename(entry.path)}>Renombrar</ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem onClick={() => onCopyPath(entry.path)}>Copiar ruta</ContextMenuItem>
-        <ContextMenuItem onClick={() => onCopyRelativePath(entry.path, workspaceDir)}>
-          Copiar ruta relativa
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          onClick={() => onDelete(entry.path, false)}
-          className="text-destructive focus:text-destructive"
-        >
-          Eliminar
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// ExplorerPanel
+// ExplorerPanel — container component
+// All async Tauri calls live here. Presentational children receive callbacks.
 // ---------------------------------------------------------------------------
 
 export const ExplorerPanel = () => {
+  // --- Store subscriptions ---
   const workspaceDir = useWorkspaceStore((s) => s.workspaceDir);
   const setWorkspaceDir = useWorkspaceStore((s) => s.setWorkspaceDir);
   const addTab = useTabStore((s) => s.addTab);
   const tabs = useTabStore((s) => s.tabs);
   const activeTabId = useTabStore((s) => s.activeTabId);
-  const updateTab = useTabStore((s) => s.updateTab);
+  const sortOrder = useExplorerStore((s) => s.sortOrder);
+  const showDotfiles = useExplorerStore((s) => s.showDotfiles);
 
+  // --- Tree state ---
   const [tree, setTree] = useState<FileEntry[]>([]);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(
     () => new Set(workspaceDir ? [workspaceDir] : [])
@@ -368,7 +101,61 @@ export const ExplorerPanel = () => {
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [creating, setCreating] = useState<CreatingState | null>(null);
 
-  // Expand root when workspace changes
+  // --- Phase 1: selection + focus ---
+  const [focusedPath, setFocusedPath] = useState<string | null>(null);
+
+  // --- Phase 2: inline filter ---
+  const [filterQuery, setFilterQuery] = useState("");
+
+  // --- Phase 2: quick open ---
+  const [quickOpenOpen, setQuickOpenOpen] = useState(false);
+
+  // --- Ref for keyboard nav focus detection ---
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // --- Phase 1: multi-select (must be declared early — used by handleBatchDelete) ---
+  const { selectedPaths, setSelectedPaths, handleNodeClick, clearSelection } = useMultiSelect();
+
+  // --- Derived: sorted display tree ---
+  const sortedTree = useMemo(() => {
+    return sortTree(tree, sortOrder);
+  }, [tree, sortOrder]);
+
+  // --- Phase 2: filtered tree (applies when filterQuery is non-empty) ---
+  const displayTree = useMemo(() => {
+    if (!filterQuery.trim()) return sortedTree;
+    return filterTree(sortedTree, filterQuery);
+  }, [sortedTree, filterQuery]);
+
+  // --- Phase 2: filter result count (total nodes in filtered tree) ---
+  const filterResultCount = useMemo(() => {
+    if (!filterQuery.trim()) return undefined;
+    let count = 0;
+    function countNodes(entries: FileEntry[]) {
+      for (const e of entries) {
+        count++;
+        if (e.isDir && e.children) countNodes(e.children);
+      }
+    }
+    countNodes(displayTree);
+    return count;
+  }, [displayTree, filterQuery]);
+
+  // --- Phase 2: auto-expand paths that contain filter matches ---
+  const filterExpandedPaths = useMemo(() => {
+    if (!filterQuery.trim()) return null;
+    return getFilteredExpandedPaths(sortedTree, filterQuery);
+  }, [sortedTree, filterQuery]);
+
+  // --- Flat nodes for keyboard nav + multi-select range ---
+  const flatNodes = useMemo(() => {
+    // When filtering, use filter-expanded paths so all matching nodes are visible
+    const effectiveExpanded = filterExpandedPaths
+      ? new Set([...expandedPaths, ...filterExpandedPaths])
+      : expandedPaths;
+    return flattenVisible(displayTree, effectiveExpanded);
+  }, [displayTree, expandedPaths, filterExpandedPaths]);
+
   useEffect(() => {
     if (workspaceDir) {
       startTransition(() => {
@@ -388,9 +175,9 @@ export const ExplorerPanel = () => {
 
   const refresh = useCallback(async () => {
     if (!workspaceDir) return;
-    const entries = await buildTree(workspaceDir);
+    const entries = await buildTree(workspaceDir, showDotfiles);
     setTree(entries);
-  }, [workspaceDir]);
+  }, [workspaceDir, showDotfiles]);
 
   useEffect(() => {
     startTransition(() => {
@@ -426,6 +213,27 @@ export const ExplorerPanel = () => {
   };
 
   // -------------------------------------------------------------------------
+  // Resolve best target folder for toolbar create buttons
+  // Prefers: focused folder > focused file's parent > single selected folder >
+  //          single selected file's parent > workspace root
+  // -------------------------------------------------------------------------
+
+  const getCreateTarget = useCallback(() => {
+    if (focusedPath) {
+      const node = flatNodes.find((n) => n.path === focusedPath);
+      if (node?.isDir) return focusedPath;
+      return focusedPath.substring(0, focusedPath.lastIndexOf("/"));
+    }
+    if (selectedPaths.size === 1) {
+      const [p] = Array.from(selectedPaths);
+      const node = flatNodes.find((n) => n.path === p);
+      if (node?.isDir) return p;
+      return p.substring(0, p.lastIndexOf("/"));
+    }
+    return workspaceDir ?? "";
+  }, [focusedPath, selectedPaths, flatNodes, workspaceDir]);
+
+  // -------------------------------------------------------------------------
   // Tree toggle / collapse all
   // -------------------------------------------------------------------------
 
@@ -440,6 +248,17 @@ export const ExplorerPanel = () => {
 
   const handleCollapseAll = () => setExpandedPaths(new Set());
 
+  // Task 3.4: Breadcrumb — expand given paths in the tree
+  const handleExpandPaths = useCallback((paths: string[]) => {
+    startTransition(() => {
+      setExpandedPaths((prev) => {
+        const next = new Set(prev);
+        paths.forEach((p) => next.add(p));
+        return next;
+      });
+    });
+  }, []);
+
   // -------------------------------------------------------------------------
   // Open file
   // -------------------------------------------------------------------------
@@ -447,7 +266,7 @@ export const ExplorerPanel = () => {
   const handleOpenFile = useCallback(
     (filePath: string, name: string) => {
       const handler = fileHandlerRegistry.resolve(name);
-      if (!handler) return; // no handler registered for this extension
+      if (!handler) return;
       const title = handler.displayName ? handler.displayName(name) : name;
       addTab({
         routeId: handler.routeId,
@@ -482,9 +301,7 @@ export const ExplorerPanel = () => {
         await mkdir(folderPath);
         await refresh();
       } else {
-        // If user typed an extension, only create if there's a registered handler
         if (name.includes(".") && !fileHandlerRegistry.resolve(name)) return;
-
         const handler = fileHandlerRegistry.getDefault();
         const finalName = name.includes(".") ? name : `${name}.${handler.defaultExtension}`;
         const filePath = await handler.create(parentPath, finalName);
@@ -503,7 +320,7 @@ export const ExplorerPanel = () => {
   );
 
   // -------------------------------------------------------------------------
-  // Rename
+  // Rename — uses explorer-tab-sync instead of inline tab iteration
   // -------------------------------------------------------------------------
 
   const handleCommitRename = useCallback(
@@ -514,27 +331,14 @@ export const ExplorerPanel = () => {
       const resolvedName = newName.includes(".") ? newName : `${newName}.${oldExt}`;
       const newPath = await join(dir, resolvedName);
       await rename(oldPath, newPath);
-
-      // Update any open tabs that reference the old path
-      tabs.forEach((tab) => {
-        if (tab.metadata?.filePath === oldPath) {
-          const handler = fileHandlerRegistry.resolveOrDefault(resolvedName);
-          const title = handler.displayName ? handler.displayName(resolvedName) : resolvedName;
-          updateTab(tab.id, {
-            title,
-            instanceId: newPath,
-            metadata: { ...tab.metadata, filePath: newPath },
-          });
-        }
-      });
-
+      updateTabsAfterRename(oldPath, newPath);
       await refresh();
     },
-    [tabs, updateTab, refresh]
+    [refresh]
   );
 
   // -------------------------------------------------------------------------
-  // Delete
+  // Delete — uses explorer-tab-sync instead of inline tab iteration
   // -------------------------------------------------------------------------
 
   const handleDelete = useCallback(
@@ -548,10 +352,56 @@ export const ExplorerPanel = () => {
       });
       if (!ok) return;
       await remove(filePath, { recursive: isDir });
+      closeTabsForDeletedPath(filePath);
       notify(`"${name}" eliminado`, { type: "success" });
       await refresh();
     },
     [refresh]
+  );
+
+  // -------------------------------------------------------------------------
+  // Task 1.5 — Batch delete
+  // -------------------------------------------------------------------------
+
+  const handleBatchDelete = useCallback(
+    async (paths: string[]) => {
+      if (paths.length === 0) return;
+
+      const names = paths.map((p) => p.split("/").pop() ?? p);
+      const listPreview = names
+        .slice(0, 5)
+        .map((n) => `• ${n}`)
+        .join("\n");
+      const extra = paths.length > 5 ? `\ny ${paths.length - 5} más...` : "";
+
+      const ok = await confirm({
+        title: `Eliminar ${paths.length} elementos`,
+        description: `¿Eliminar los siguientes elementos? Esta acción no se puede deshacer.\n\n${listPreview}${extra}`,
+        confirmLabel: "Eliminar todo",
+        variant: "destructive",
+      });
+      if (!ok) return;
+
+      for (const filePath of paths) {
+        try {
+          // Determine if it's a directory by checking the flat nodes
+          const node = flatNodes.find((n) => n.path === filePath);
+          const isDir = node?.isDir ?? false;
+          await remove(filePath, { recursive: isDir });
+          closeTabsForDeletedPath(filePath);
+        } catch (err) {
+          const name = filePath.split("/").pop() ?? filePath;
+          const msg = err instanceof Error ? err.message : String(err);
+          notify(`Error al eliminar "${name}": ${msg}`, { type: "error" });
+        }
+      }
+
+      clearSelection();
+      setFocusedPath(null);
+      notify(`${paths.length} elementos eliminados`, { type: "success" });
+      await refresh();
+    },
+    [flatNodes, refresh, clearSelection]
   );
 
   // -------------------------------------------------------------------------
@@ -577,7 +427,77 @@ export const ExplorerPanel = () => {
   }, []);
 
   // -------------------------------------------------------------------------
-  // Keyboard: Escape to cancel
+  // Clipboard — useFileClipboard hook
+  // -------------------------------------------------------------------------
+
+  const {
+    clipboardState,
+    cut: handleCut,
+    copy: handleCopy,
+    paste: handlePaste,
+  } = useFileClipboard(refresh);
+
+  // -------------------------------------------------------------------------
+  // Phase 1 — Click handler (multi-select)
+  // -------------------------------------------------------------------------
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent, path: string) => {
+      handleNodeClick(e, path, flatNodes, focusedPath, setFocusedPath);
+    },
+    [handleNodeClick, flatNodes, focusedPath]
+  );
+
+  // -------------------------------------------------------------------------
+  // Phase 1 — Keyboard nav hook
+  // -------------------------------------------------------------------------
+
+  useKeyboardNav(
+    containerRef,
+    {
+      flatNodes,
+      expandedPaths,
+      onOpen: handleOpenFile,
+      onStartRename: setRenamingPath,
+      onDelete: handleDelete,
+      onToggle: handleToggle,
+      selectedPaths,
+      setSelectedPaths,
+    },
+    focusedPath,
+    setFocusedPath,
+    renamingPath,
+    creating !== null,
+    handleCancelAction
+  );
+
+  // -------------------------------------------------------------------------
+  // Phase 1 — Drag and drop hook
+  // -------------------------------------------------------------------------
+
+  const dnd = useDragAndDrop();
+
+  const handleDragStart = (event: DragStartEvent) => {
+    dnd.handleDragStart(event);
+    // If the dragged item is not in the current selection, clear and select it
+    const data = event.active.data.current as DragData | undefined;
+    if (data && !selectedPaths.has(data.path)) {
+      clearSelection();
+      setFocusedPath(data.path);
+    }
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const overId = (event.over?.id as string | null) ?? null;
+    dnd.handleDragOver(overId);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    await dnd.handleDragEnd(event, refresh);
+  };
+
+  // -------------------------------------------------------------------------
+  // Escape key to cancel (global — existing behavior preserved)
   // -------------------------------------------------------------------------
 
   useEffect(() => {
@@ -587,6 +507,147 @@ export const ExplorerPanel = () => {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [handleCancelAction]);
+
+  // -------------------------------------------------------------------------
+  // Phase 2 — Ctrl+P: Quick Open (window-level, no portal needed)
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "p") {
+        // Don't intercept if Excalidraw canvas has focus
+        const active = document.activeElement;
+        if (active && active.tagName === "CANVAS") return;
+        if (active && (active as HTMLElement).closest?.(".excalidraw")) return;
+        e.preventDefault();
+        setQuickOpenOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // -------------------------------------------------------------------------
+  // MCP bridge — toggle_folder event
+  // Receives explorer:toggle-folder { folderPath, expand? } and delegates to
+  // handleToggle (or explicit expand/collapse).
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { folderPath, expand } = (e as CustomEvent<{ folderPath: string; expand?: boolean }>)
+        .detail;
+      if (expand === undefined) {
+        handleToggle(folderPath);
+      } else {
+        setExpandedPaths((prev) => {
+          const next = new Set(prev);
+          if (expand) next.add(folderPath);
+          else next.delete(folderPath);
+          return next;
+        });
+      }
+    };
+    window.addEventListener("explorer:toggle-folder", handler);
+    return () => window.removeEventListener("explorer:toggle-folder", handler);
+  }, [handleToggle]);
+
+  // -------------------------------------------------------------------------
+  // MCP bridge — set_selected_files event
+  // Receives explorer:set-selection { paths } and syncs local Set state +
+  // external store.
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { paths } = (e as CustomEvent<{ paths: string[] }>).detail;
+      const next = new Set<string>(paths);
+      setSelectedPaths(next);
+      // Also sync focused path to first item for keyboard nav coherence
+      if (paths.length > 0) setFocusedPath(paths[0]);
+      else setFocusedPath(null);
+      // Keep external store in sync (setSelectedPaths already calls syncToStore
+      // via the wrapped setter in useMultiSelect, but store may also be set
+      // directly by the MCP handler — this ensures the local state matches)
+      useExplorerSelectionStore.getState().setSelectedPaths(paths);
+    };
+    window.addEventListener("explorer:set-selection", handler);
+    return () => window.removeEventListener("explorer:set-selection", handler);
+  }, [setSelectedPaths]);
+
+  // -------------------------------------------------------------------------
+  // Phase 2 — Clipboard keyboard shortcuts (gated on explorer focus)
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handler = (e: KeyboardEvent) => {
+      // Gate: only when explorer panel has focus
+      if (!container.contains(document.activeElement)) return;
+      // Skip if an inline input is active (rename / create)
+      if (renamingPath !== null || creating !== null) return;
+
+      const isMod = e.ctrlKey || e.metaKey;
+      if (!isMod) return;
+
+      switch (e.key.toLowerCase()) {
+        case "c": {
+          e.preventDefault();
+          const paths =
+            selectedPaths.size > 0 ? Array.from(selectedPaths) : focusedPath ? [focusedPath] : [];
+          if (paths.length > 0) handleCopy(paths);
+          break;
+        }
+        case "x": {
+          e.preventDefault();
+          const paths =
+            selectedPaths.size > 0 ? Array.from(selectedPaths) : focusedPath ? [focusedPath] : [];
+          if (paths.length > 0) handleCut(paths);
+          break;
+        }
+        case "v": {
+          e.preventDefault();
+          if (!clipboardState) return;
+          // Paste into: focused folder OR parent of focused file OR workspace root
+          let targetDir = workspaceDir ?? "";
+          if (focusedPath) {
+            const node = flatNodes.find((n) => n.path === focusedPath);
+            if (node?.isDir) {
+              targetDir = focusedPath;
+            } else if (node?.parentPath) {
+              targetDir = node.parentPath;
+            }
+          } else if (selectedPaths.size === 1) {
+            const [selPath] = Array.from(selectedPaths);
+            const node = flatNodes.find((n) => n.path === selPath);
+            if (node?.isDir) {
+              targetDir = selPath;
+            } else if (node?.parentPath) {
+              targetDir = node.parentPath;
+            }
+          }
+          void handlePaste(targetDir);
+          break;
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [
+    renamingPath,
+    creating,
+    selectedPaths,
+    focusedPath,
+    flatNodes,
+    clipboardState,
+    workspaceDir,
+    handleCopy,
+    handleCut,
+    handlePaste,
+  ]);
 
   // -------------------------------------------------------------------------
   // Render: no workspace
@@ -605,18 +666,25 @@ export const ExplorerPanel = () => {
   }
 
   const dirName = workspaceDir.split("/").pop() ?? workspaceDir;
-  const isRootExpanded = expandedPaths.has(workspaceDir);
 
-  // -------------------------------------------------------------------------
-  // Render: explorer
-  // -------------------------------------------------------------------------
+  // When filter is active, merge filter-expanded paths so matched nodes are visible
+  const effectiveExpandedPaths = filterExpandedPaths
+    ? new Set([...expandedPaths, ...filterExpandedPaths])
+    : expandedPaths;
+
+  const isRootExpanded = effectiveExpandedPaths.has(workspaceDir);
 
   const sharedNodeProps = {
-    expandedPaths,
+    expandedPaths: effectiveExpandedPaths,
     activeFilePath,
     renamingPath,
     creating,
     workspaceDir,
+    selectedPaths,
+    focusedPath,
+    clipboardState,
+    draggingPath: dnd.draggingPath,
+    overFolderPath: dnd.overFolderPath,
     onToggle: handleToggle,
     onOpen: handleOpenFile,
     onDelete: handleDelete,
@@ -628,99 +696,142 @@ export const ExplorerPanel = () => {
     onNewFile: handleNewFile,
     onNewFolder: handleNewFolder,
     onCommitCreate: handleCommitCreate,
+    onCut: handleCut,
+    onCopy: handleCopy,
+    onPaste: handlePaste,
+    onClick: handleClick,
+    onBatchDelete: handleBatchDelete,
   };
 
+  // -------------------------------------------------------------------------
+  // Render: explorer
+  // -------------------------------------------------------------------------
+
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Toolbar — solo acciones, sin nombre de carpeta */}
-      <div className="flex items-center justify-end px-2 py-1 border-b border-border/50 shrink-0 gap-0.5">
-        <TooltipWrapper tooltip="Nuevo archivo" side="top">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleNewFile(workspaceDir)}
-            className="size-6 text-muted-foreground hover:text-foreground"
+    <DndContext
+      sensors={dnd.sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+      onDragCancel={dnd.handleDragCancel}
+    >
+      <div
+        ref={containerRef}
+        className="flex flex-col h-full overflow-hidden focus:outline-none"
+        tabIndex={-1}
+        onMouseDown={() => {
+          // Clear selection when clicking empty space (panel background)
+        }}
+      >
+        <ExplorerToolbar
+          onNewFile={() => handleNewFile(getCreateTarget())}
+          onNewFolder={() => handleNewFolder(getCreateTarget())}
+          onRefresh={refresh}
+          onCollapseAll={handleCollapseAll}
+          filterQuery={filterQuery}
+          onFilterChange={setFilterQuery}
+          filterResultCount={filterResultCount}
+        />
+
+        <ExplorerBreadcrumb
+          activeFilePath={activeFilePath}
+          workspaceDir={workspaceDir}
+          onExpandPaths={handleExpandPaths}
+        />
+
+        <ScrollArea className="flex-1">
+          <div
+            className="py-1"
+            onClick={(e) => {
+              // Clear selection when clicking empty space (not on a node button)
+              if (e.target === e.currentTarget) {
+                clearSelection();
+                setFocusedPath(null);
+              }
+            }}
           >
-            <Plus className="size-3.5" />
-          </Button>
-        </TooltipWrapper>
-        <TooltipWrapper tooltip="Nueva carpeta" side="top">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleNewFolder(workspaceDir)}
-            className="size-6 text-muted-foreground hover:text-foreground"
-          >
-            <FolderPlus className="size-3.5" />
-          </Button>
-        </TooltipWrapper>
-        <TooltipWrapper tooltip="Refrescar" side="top">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={refresh}
-            className="size-6 text-muted-foreground hover:text-foreground"
-          >
-            <RefreshCw className="size-3.5" />
-          </Button>
-        </TooltipWrapper>
-        <TooltipWrapper tooltip="Colapsar todo" side="top">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleCollapseAll}
-            className="size-6 text-muted-foreground hover:text-foreground"
-          >
-            <ChevronsUpDown className="size-3.5" />
-          </Button>
-        </TooltipWrapper>
+            {/* Root workspace node */}
+            <TooltipWrapper tooltip={workspaceDir} side="right">
+              <button
+                onClick={() => handleToggle(workspaceDir)}
+                className="flex items-center gap-1 w-full text-left h-7 px-2 hover:bg-accent rounded text-foreground/90"
+              >
+                <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/60">
+                  {isRootExpanded ? (
+                    <ChevronDown className="size-3" />
+                  ) : (
+                    <ChevronRight className="size-3" />
+                  )}
+                </span>
+                <span className="truncate uppercase tracking-wide text-[10px] font-semibold">
+                  {dirName}
+                </span>
+              </button>
+            </TooltipWrapper>
+
+            {/* Children of root */}
+            {isRootExpanded && (
+              <div>
+                {creating?.parentPath === workspaceDir && (
+                  <InlineInput
+                    depth={1}
+                    onCommit={(n) => handleCommitCreate(workspaceDir, n, creating.type)}
+                    onCancel={handleCancelAction}
+                  />
+                )}
+                {displayTree.length === 0 && !creating ? (
+                  <p className={cn("text-xs text-muted-foreground text-center pt-4 px-4")}>
+                    {filterQuery.trim()
+                      ? `Sin resultados para "${filterQuery}"`
+                      : "No hay archivos en esta carpeta"}
+                  </p>
+                ) : (
+                  displayTree.map((entry) => (
+                    <FileTreeNode key={entry.path} entry={entry} depth={1} {...sharedNodeProps} />
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+
+        {/* Phase 2: Quick Open Dialog */}
+        <QuickOpenDialog
+          open={quickOpenOpen}
+          onClose={() => setQuickOpenOpen(false)}
+          tree={tree}
+          workspaceDir={workspaceDir}
+          onOpenFile={handleOpenFile}
+        />
       </div>
 
-      {/* File tree */}
-      <ScrollArea className="flex-1">
-        <div className="py-1">
-          {/* Root workspace node — VSCode style */}
-          <TooltipWrapper tooltip={workspaceDir} side="right">
-            <button
-              onClick={() => handleToggle(workspaceDir)}
-              className="flex items-center gap-1 w-full text-left h-7 px-2 hover:bg-accent rounded text-foreground/90"
-            >
-              <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground">
-                {isRootExpanded ? (
-                  <ChevronDown className="size-3" />
-                ) : (
-                  <ChevronRight className="size-3" />
-                )}
-              </span>
-              <span className="truncate uppercase tracking-wide text-[10px] font-semibold">
-                {dirName}
-              </span>
-            </button>
-          </TooltipWrapper>
-
-          {/* Children of root */}
-          {isRootExpanded && (
-            <div>
-              {creating?.parentPath === workspaceDir && (
-                <InlineInput
-                  depth={1}
-                  onCommit={(n) => handleCommitCreate(workspaceDir, n, creating.type)}
-                  onCancel={handleCancelAction}
-                />
-              )}
-              {tree.length === 0 && !creating ? (
-                <p className="text-xs text-muted-foreground text-center pt-4 px-4">
-                  No hay archivos en esta carpeta
-                </p>
-              ) : (
-                tree.map((entry) => (
-                  <FileNode key={entry.path} entry={entry} depth={1} {...sharedNodeProps} />
-                ))
-              )}
-            </div>
-          )}
-        </div>
-      </ScrollArea>
-    </div>
+      {/* DragOverlay: file/folder name pill that follows the cursor while dragging */}
+      <DragOverlay dropAnimation={null}>
+        {dnd.draggingPath
+          ? (() => {
+              const draggingEntry = flatNodes.find((n) => n.path === dnd.draggingPath);
+              const dragCount =
+                selectedPaths.size > 1 && dnd.draggingPath && selectedPaths.has(dnd.draggingPath)
+                  ? selectedPaths.size
+                  : 1;
+              return (
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-background border border-border rounded-md shadow-lg text-xs pointer-events-none select-none opacity-95">
+                  {draggingEntry?.isDir ? (
+                    <FolderClosed className="size-3.5 shrink-0 text-amber-500/80" />
+                  ) : (
+                    <File className="size-3.5 shrink-0 text-muted-foreground" />
+                  )}
+                  <span className="max-w-[200px] truncate text-foreground/90">
+                    {dragCount > 1
+                      ? `${dragCount} elementos`
+                      : (draggingEntry?.name ?? dnd.draggingPath?.split("/").pop() ?? "")}
+                  </span>
+                </div>
+              );
+            })()
+          : null}
+      </DragOverlay>
+    </DndContext>
   );
 };

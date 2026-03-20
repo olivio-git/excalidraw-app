@@ -12,6 +12,7 @@ import {
   Moon,
   Monitor,
   Bot,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
@@ -39,10 +40,11 @@ import { ExplorerPanel } from "./panels/ExplorerPanel";
 import { PluginsPanel } from "./panels/PluginsPanel";
 import { NavigationPanel } from "./panels/NavigationPanel";
 import { AIChatPanel } from "@/features/ai-chat/AIChatPanel";
+import { LibraryBrowserPanel } from "@/features/library-browser/LibraryBrowserPanel";
 
 const COMPACT_THRESHOLD = 100;
 
-type Panel = "explorer" | "plugins" | "navigation" | "ai-chat";
+type Panel = "explorer" | "plugins" | "navigation" | "ai-chat" | "library";
 
 interface PanelTab {
   id: Panel;
@@ -55,6 +57,7 @@ const PANEL_TABS: PanelTab[] = [
   { id: "plugins", icon: Blocks, label: "Plugins" },
   { id: "navigation", icon: Compass, label: "Navegación" },
   { id: "ai-chat", icon: Bot, label: "AI Chat" },
+  { id: "library", icon: BookOpen, label: "Libraries" },
 ];
 
 const DiagramSidebar = () => {
@@ -87,7 +90,9 @@ const DiagramSidebar = () => {
   return (
     <SidebarPrimitive
       collapsible="offcanvas"
-      className="h-full bg-background border-r border-border/50"
+      className="h-full bg-background border-r border-border/50 outline-none focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring/40"
+      data-panel="sidebar"
+      tabIndex={-1}
     >
       {/* Header: UN solo flex container, sin anidación de dirección */}
       <div
@@ -147,6 +152,7 @@ const DiagramSidebar = () => {
             {resolvedPanel === "plugins" && <PluginsPanel />}
             {resolvedPanel === "navigation" && <NavigationPanel />}
             {resolvedPanel === "ai-chat" && <AIChatPanel />}
+            {resolvedPanel === "library" && <LibraryBrowserPanel />}
           </>
         )}
       </SidebarContent>

@@ -364,6 +364,143 @@ server.tool(
   }
 );
 
+// ─── stat_file ────────────────────────────────────────────────────────────────
+server.tool(
+  "stat_file",
+  "Get metadata for a file or directory: name, isFile, isDir, size (bytes), mtime (Unix ms timestamp or null).",
+  {
+    filePath: z.string().describe("Absolute path to the file or directory"),
+  },
+  async ({ filePath }) => {
+    const res = await callBridge("stat_file", { filePath });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── copy_file ────────────────────────────────────────────────────────────────
+server.tool(
+  "copy_file",
+  "Copy a file or directory to a new path. For directories, copies recursively. If destPath already exists and overwrite is false (default), returns an error.",
+  {
+    srcPath: z.string().describe("Absolute source path"),
+    destPath: z.string().describe("Absolute destination path"),
+    overwrite: z
+      .boolean()
+      .optional()
+      .describe("Overwrite destination if it exists (default: false)"),
+  },
+  async ({ srcPath, destPath, overwrite }) => {
+    const res = await callBridge("copy_file", { srcPath, destPath, overwrite });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── list_directory ───────────────────────────────────────────────────────────
+server.tool(
+  "list_directory",
+  "List the contents of a directory. More powerful than list_workspace: supports absolute paths, recursive mode, and dotfile visibility. dirPath defaults to the workspace root.",
+  {
+    dirPath: z
+      .string()
+      .optional()
+      .describe("Absolute path of the directory to list. Defaults to workspace root."),
+    recursive: z.boolean().optional().describe("Recurse into subdirectories (default: false)"),
+    showDotfiles: z
+      .boolean()
+      .optional()
+      .describe("Include entries whose names start with '.' (default: false)"),
+  },
+  async ({ dirPath, recursive, showDotfiles }) => {
+    const res = await callBridge("list_directory", { dirPath, recursive, showDotfiles });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── get_explorer_state ───────────────────────────────────────────────────────
+server.tool(
+  "get_explorer_state",
+  "Get the current state of the file explorer: sortOrder, showDotfiles setting, and currently selected paths.",
+  {},
+  async () => {
+    const res = await callBridge("get_explorer_state", {});
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── set_explorer_state ───────────────────────────────────────────────────────
+server.tool(
+  "set_explorer_state",
+  "Update explorer display settings. All fields are optional — only provided fields are changed.",
+  {
+    sortOrder: z
+      .enum(["type-first", "name-asc", "name-desc"])
+      .optional()
+      .describe("File sort order"),
+    showDotfiles: z
+      .boolean()
+      .optional()
+      .describe("Show files and folders whose names start with '.'"),
+  },
+  async ({ sortOrder, showDotfiles }) => {
+    const res = await callBridge("set_explorer_state", { sortOrder, showDotfiles });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── toggle_folder ────────────────────────────────────────────────────────────
+server.tool(
+  "toggle_folder",
+  "Expand or collapse a folder node in the explorer tree. If expand is omitted, the current state is toggled.",
+  {
+    folderPath: z.string().describe("Absolute path of the folder to expand or collapse"),
+    expand: z.boolean().optional().describe("true = expand, false = collapse, omit = toggle"),
+  },
+  async ({ folderPath, expand }) => {
+    const res = await callBridge("toggle_folder", { folderPath, expand });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── get_selected_files ───────────────────────────────────────────────────────
+server.tool(
+  "get_selected_files",
+  "Get the list of currently selected file/folder paths in the explorer.",
+  {},
+  async () => {
+    const res = await callBridge("get_selected_files", {});
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── set_selected_files ───────────────────────────────────────────────────────
+server.tool(
+  "set_selected_files",
+  "Programmatically set the selection in the file explorer. Replaces the current selection entirely.",
+  {
+    paths: z.array(z.string()).describe("Array of absolute paths to select in the explorer"),
+  },
+  async ({ paths }) => {
+    const res = await callBridge("set_selected_files", { paths });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 const transport = new StdioServerTransport();
 await server.connect(transport);

@@ -17,3 +17,21 @@ export const useExplorerStore = create<ExplorerStore>()(
     }
   )
 );
+
+// ---------------------------------------------------------------------------
+// explorerSelectionStore — ephemeral, NOT persisted
+// Holds the current multi-select state so MCP and other external consumers
+// can read/write it without prop-drilling into ExplorerPanel.
+// ---------------------------------------------------------------------------
+
+interface ExplorerSelectionState {
+  selectedPaths: string[];
+  setSelectedPaths: (paths: string[]) => void;
+  clearSelection: () => void;
+}
+
+export const useExplorerSelectionStore = create<ExplorerSelectionState>()((set) => ({
+  selectedPaths: [],
+  setSelectedPaths: (paths) => set({ selectedPaths: paths }),
+  clearSelection: () => set({ selectedPaths: [] }),
+}));

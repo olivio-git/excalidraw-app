@@ -9,8 +9,11 @@ import { useDiagramStore } from "@/core/diagram/store/diagram-store";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { fileHandlerRegistry } from "@/core/shell/panels/file-handler-registry";
 import { diagramFileService } from "@/core/diagram/services/diagram-file.service";
-import { readDir, readTextFile, remove, rename, mkdir } from "@tauri-apps/plugin-fs";
+import { readDir, readTextFile, remove, rename, mkdir, stat } from "@tauri-apps/plugin-fs";
 import { join } from "@tauri-apps/api/path";
+import { getFileStat, copyPath } from "@/core/shell/services/file.service";
+import { useExplorerStore, useExplorerSelectionStore } from "@/stores/explorerStore";
+import type { SortOrder } from "@/core/shell/panels/explorer-types";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { AppState } from "@excalidraw/excalidraw/types";
 
@@ -446,6 +449,144 @@ export async function dispatchMcpTool(
         };
         if (Object.keys(errors).length > 0) payload.errors = errors;
         return { result: JSON.stringify(payload), error: null };
+      }
+
+      case "stat_file": {
+        const filePath = input.filePath as string | undefined;
+        if (!filePath) return { result: null, error: "filePath is required." };
+        const fileStat = await getFileStat(filePath);
+        return { result: JSON.stringify(fileStat), error: null };
+      }
+
+      case "copy_file": {
+        const srcPath = input.srcPath as string | undefined;
+        const destPath = input.destPath as string | undefined;
+        const overwrite = input.overwrite as boolean | undefined;
+        if (!srcPath) return { result: null, error: "srcPath is required." };
+        if (!destPath) return { result: null, error: "destPath is required." };
+        try {
+          await copyPath(srcPath, destPath, overwrite ?? false);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg === "EXISTS") {
+            return {
+              result: null,
+              error: "Destination already exists. Set overwrite: true to replace it.",
+            };
+          }
+          throw err;
+        }
+        return { result: JSON.stringify({ copied: true, path: destPath }), error: null };
+      }
+
+      case "list_directory": {
+        const dirPath = input.dirPath as string | undefined;
+        const recursive = (input.recursive as boolean | undefined) ?? false;
+        const showDotfiles = (input.showDotfiles as boolean | undefined) ?? false;
+
+        const targetDir = dirPath ?? useWorkspaceStore.getState().workspaceDir ?? null;
+        if (!targetDir)
+          return { result: null, error: "No directory provided and no workspace set." };
+
+        interface DirEntry {
+          path: string;
+          name: string;
+          isDir: boolean;
+          size?: number;
+          mtime?: number | null;
+        }
+
+        const listDir = async (dir: string): Promise<DirEntry[]> => {
+          const entries = await readDir(dir);
+          const result: DirEntry[] = [];
+          for (const entry of entries) {
+            if (!entry.name) continue;
+            if (!showDotfiles && entry.name.startsWith(".")) continue;
+            const entryPath = await join(dir, entry.name);
+            let size: number | undefined;
+            let mtime: number | null | undefined;
+            try {
+              const info = await stat(entryPath);
+              size = info.size ?? 0;
+              mtime =
+                info.mtime instanceof Date
+                  ? info.mtime.getTime()
+                  : typeof info.mtime === "number"
+                    ? info.mtime
+                    : null;
+            } catch {
+              // stat failed — omit size/mtime
+            }
+            result.push({
+              path: entryPath,
+              name: entry.name,
+              isDir: entry.isDirectory,
+              size,
+              mtime,
+            });
+            if (recursive && entry.isDirectory) {
+              const children = await listDir(entryPath);
+              result.push(...children);
+            }
+          }
+          return result;
+        };
+
+        const entries = await listDir(targetDir);
+        return { result: JSON.stringify(entries), error: null };
+      }
+
+      case "get_explorer_state": {
+        const { sortOrder, showDotfiles } = useExplorerStore.getState();
+        const { selectedPaths } = useExplorerSelectionStore.getState();
+        return {
+          result: JSON.stringify({ sortOrder, showDotfiles, selectedPaths }),
+          error: null,
+        };
+      }
+
+      case "set_explorer_state": {
+        const sortOrder = input.sortOrder as SortOrder | undefined;
+        const showDotfiles = input.showDotfiles as boolean | undefined;
+        if (sortOrder !== undefined) {
+          useExplorerStore.getState().setSortOrder(sortOrder);
+        }
+        if (showDotfiles !== undefined) {
+          useExplorerStore.getState().setShowDotfiles(showDotfiles);
+        }
+        return { result: JSON.stringify({ updated: true }), error: null };
+      }
+
+      case "toggle_folder": {
+        const folderPath = input.folderPath as string | undefined;
+        const expand = input.expand as boolean | undefined;
+        if (!folderPath) return { result: null, error: "folderPath is required." };
+        // Emit a DOM event — ExplorerPanel listens and calls handleToggle
+        const event = new CustomEvent("explorer:toggle-folder", {
+          detail: { folderPath, expand },
+        });
+        window.dispatchEvent(event);
+        // We can't synchronously read the resulting state since it lives in
+        // ExplorerPanel's local useState. Return the requested state as-is.
+        const expanded = expand !== undefined ? expand : "toggled";
+        return { result: JSON.stringify({ expanded }), error: null };
+      }
+
+      case "get_selected_files": {
+        const { selectedPaths } = useExplorerSelectionStore.getState();
+        return {
+          result: JSON.stringify({ selectedPaths, count: selectedPaths.length }),
+          error: null,
+        };
+      }
+
+      case "set_selected_files": {
+        const paths = input.paths as string[] | undefined;
+        if (!Array.isArray(paths)) return { result: null, error: "paths must be an array." };
+        useExplorerSelectionStore.getState().setSelectedPaths(paths);
+        // Also emit a DOM event so ExplorerPanel can sync local Set state
+        window.dispatchEvent(new CustomEvent("explorer:set-selection", { detail: { paths } }));
+        return { result: JSON.stringify({ selected: paths.length }), error: null };
       }
 
       default:

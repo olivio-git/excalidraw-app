@@ -32,6 +32,7 @@ import { updateTabsAfterRename, closeTabsForDeletedPath } from "./explorer-tab-s
 import { sortTree, flattenVisible, filterTree, getFilteredExpandedPaths } from "./explorer-utils";
 import { useDragAndDrop } from "@/core/shell/hooks/useDragAndDrop";
 import { useMultiSelect } from "@/core/shell/hooks/useMultiSelect";
+import { useExplorerSelectionStore } from "@/stores/explorerStore";
 import { useKeyboardNav } from "@/core/shell/hooks/useKeyboardNav";
 import { useFileClipboard } from "@/core/shell/hooks/useFileClipboard";
 import type { FileEntry, CreatingState, DragData } from "./explorer-types";
@@ -521,6 +522,54 @@ export const ExplorerPanel = () => {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  // -------------------------------------------------------------------------
+  // MCP bridge — toggle_folder event
+  // Receives explorer:toggle-folder { folderPath, expand? } and delegates to
+  // handleToggle (or explicit expand/collapse).
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { folderPath, expand } = (e as CustomEvent<{ folderPath: string; expand?: boolean }>)
+        .detail;
+      if (expand === undefined) {
+        handleToggle(folderPath);
+      } else {
+        setExpandedPaths((prev) => {
+          const next = new Set(prev);
+          if (expand) next.add(folderPath);
+          else next.delete(folderPath);
+          return next;
+        });
+      }
+    };
+    window.addEventListener("explorer:toggle-folder", handler);
+    return () => window.removeEventListener("explorer:toggle-folder", handler);
+  }, [handleToggle]);
+
+  // -------------------------------------------------------------------------
+  // MCP bridge — set_selected_files event
+  // Receives explorer:set-selection { paths } and syncs local Set state +
+  // external store.
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { paths } = (e as CustomEvent<{ paths: string[] }>).detail;
+      const next = new Set<string>(paths);
+      setSelectedPaths(next);
+      // Also sync focused path to first item for keyboard nav coherence
+      if (paths.length > 0) setFocusedPath(paths[0]);
+      else setFocusedPath(null);
+      // Keep external store in sync (setSelectedPaths already calls syncToStore
+      // via the wrapped setter in useMultiSelect, but store may also be set
+      // directly by the MCP handler — this ensures the local state matches)
+      useExplorerSelectionStore.getState().setSelectedPaths(paths);
+    };
+    window.addEventListener("explorer:set-selection", handler);
+    return () => window.removeEventListener("explorer:set-selection", handler);
+  }, [setSelectedPaths]);
 
   // -------------------------------------------------------------------------
   // Phase 2 — Clipboard keyboard shortcuts (gated on explorer focus)

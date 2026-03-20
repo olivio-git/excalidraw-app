@@ -99,7 +99,7 @@ export const FileTreeNode = ({
   draggingPath,
   overFolderPath,
 }: FileTreeNodeProps) => {
-  const pl = 8 + depth * 12;
+  const pl = 8 + depth * 16;
   const isExpanded = expandedPaths.has(entry.path);
   const isActive = !entry.isDir && entry.path === activeFilePath;
   const isRenaming = renamingPath === entry.path;

@@ -33,6 +33,26 @@ const BUILTIN_KEYBINDINGS = [
     commandId: "workbench.action.closeActiveTab",
   },
   {
+    key: "ctrl+b",
+    commandId: "workbench.action.toggleSidebar",
+  },
+  {
+    key: "ctrl+h",
+    commandId: "workbench.action.focusSidebar",
+  },
+  {
+    key: "ctrl+l",
+    commandId: "workbench.action.focusEditor",
+  },
+  {
+    key: "ctrl+f",
+    commandId: "workbench.action.focusSidebarSearch",
+  },
+  {
+    key: "ctrl+p",
+    commandId: "workbench.action.openQuickOpen",
+  },
+  {
     key: "ctrl+tab",
     commandId: "workbench.action.nextTab",
     allowInInput: true,

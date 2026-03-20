@@ -4,6 +4,7 @@ import { RouteRegistry } from "@/core/routing/route-registry";
 import { useDiagramStore } from "@/core/diagram/store/diagram-store";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { diagramFileService } from "@/core/diagram/services/diagram-file.service";
+import { DiagramController } from "@/core/diagram/DiagramController";
 
 // ── Core command handlers ─────────────────────────────────────────────────────
 //
@@ -25,7 +26,12 @@ async function saveActiveDiagramHandler(): Promise<void> {
   const tab = getTab(activeTabId);
   if (!tab || tab.routeId !== "diagram" || !tab.instanceId) return;
 
-  await useDiagramStore.getState().saveDiagram(tab.instanceId);
+  const instanceId = tab.instanceId;
+  const elements = DiagramController.getElements(instanceId);
+  const appState = DiagramController.getAppState(instanceId);
+  const files = DiagramController.getFiles(instanceId);
+
+  await useDiagramStore.getState().saveDiagram(instanceId, elements, appState, files);
 }
 
 async function newDiagramHandler(): Promise<void> {
@@ -62,7 +68,7 @@ function openSettingsHandler(): void {
 
   addTab({
     routeId: route.id,
-    path: route.path,
+    path: route.path ?? "/settings",
     title: route.name,
     icon: route.icon,
   });
@@ -97,6 +103,27 @@ function previousTabHandler(): void {
   setActiveTab(tabs[prevIndex].id);
 }
 
+function focusSidebarHandler(): void {
+  const sidebar = document.querySelector<HTMLElement>("[data-panel='sidebar']");
+  const explorerContainer = sidebar?.querySelector<HTMLElement>(
+    ".flex.flex-col.h-full.overflow-hidden[tabindex='-1']"
+  );
+  (explorerContainer ?? sidebar)?.focus();
+}
+
+function focusEditorHandler(): void {
+  document.querySelector<HTMLElement>("[data-panel='main']")?.focus();
+}
+
+function focusSidebarSearchHandler(): void {
+  const sidebar = document.querySelector<HTMLElement>("[data-panel='sidebar']");
+  const search = sidebar?.querySelector<HTMLInputElement>("[data-panel-search]");
+  if (search) {
+    search.focus();
+    search.select();
+  }
+}
+
 // ── Public initializer ────────────────────────────────────────────────────────
 
 /**
@@ -120,4 +147,13 @@ export function initializeCoreCommands(): void {
   PluginManager.registerCommandHandler("workbench.action.nextTab", nextTabHandler);
 
   PluginManager.registerCommandHandler("workbench.action.previousTab", previousTabHandler);
+
+  PluginManager.registerCommandHandler("workbench.action.focusSidebar", focusSidebarHandler);
+
+  PluginManager.registerCommandHandler("workbench.action.focusEditor", focusEditorHandler);
+
+  PluginManager.registerCommandHandler(
+    "workbench.action.focusSidebarSearch",
+    focusSidebarSearchHandler
+  );
 }

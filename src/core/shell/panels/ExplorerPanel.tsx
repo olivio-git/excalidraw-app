@@ -28,6 +28,7 @@ import { ExplorerBreadcrumb } from "./ExplorerBreadcrumb";
 import { FileTreeNode } from "./FileTreeNode";
 import { InlineInput } from "./InlineInput";
 import { QuickOpenDialog } from "./QuickOpenDialog";
+import { PluginManager } from "@/plugins/plugin-manager";
 import { updateTabsAfterRename, closeTabsForDeletedPath } from "./explorer-tab-sync";
 import { sortTree, flattenVisible, filterTree, getFilteredExpandedPaths } from "./explorer-utils";
 import { useDragAndDrop } from "@/core/shell/hooks/useDragAndDrop";
@@ -109,9 +110,11 @@ export const ExplorerPanel = () => {
 
   // --- Phase 2: quick open ---
   const [quickOpenOpen, setQuickOpenOpen] = useState(false);
+  const setQuickOpenOpenRef = useRef(setQuickOpenOpen);
 
   // --- Ref for keyboard nav focus detection ---
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
 
   // --- Phase 1: multi-select (must be declared early — used by handleBatchDelete) ---
   const { selectedPaths, setSelectedPaths, handleNodeClick, clearSelection } = useMultiSelect();
@@ -509,22 +512,20 @@ export const ExplorerPanel = () => {
   }, [handleCancelAction]);
 
   // -------------------------------------------------------------------------
-  // Phase 2 — Ctrl+P: Quick Open (window-level, no portal needed)
+  // Phase 2 — workbench.action.openQuickOpen: registered via formal command system
   // -------------------------------------------------------------------------
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "p") {
-        // Don't intercept if Excalidraw canvas has focus
-        const active = document.activeElement;
-        if (active && active.tagName === "CANVAS") return;
-        if (active && (active as HTMLElement).closest?.(".excalidraw")) return;
-        e.preventDefault();
-        setQuickOpenOpen(true);
-      }
+    PluginManager.registerCommandHandler("workbench.action.openQuickOpen", () => {
+      // Don't intercept if Excalidraw canvas has focus
+      const active = document.activeElement;
+      if (active && active.tagName === "CANVAS") return;
+      if (active && (active as HTMLElement).closest?.(".excalidraw")) return;
+      setQuickOpenOpenRef.current(true);
+    });
+    return () => {
+      PluginManager.unregisterCommandHandler("workbench.action.openQuickOpen");
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
   }, []);
 
   // -------------------------------------------------------------------------
@@ -732,6 +733,7 @@ export const ExplorerPanel = () => {
           filterQuery={filterQuery}
           onFilterChange={setFilterQuery}
           filterResultCount={filterResultCount}
+          searchRef={searchRef}
         />
 
         <ExplorerBreadcrumb

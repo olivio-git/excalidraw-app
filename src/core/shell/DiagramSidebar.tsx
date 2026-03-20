@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useLocation, matchPath } from "react-router";
 import {
   Files,
@@ -36,6 +36,7 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/shared/components/ui/sidebar";
+import { PluginManager } from "@/plugins/plugin-manager";
 import { ExplorerPanel } from "./panels/ExplorerPanel";
 import { PluginsPanel } from "./panels/PluginsPanel";
 import { NavigationPanel } from "./panels/NavigationPanel";
@@ -64,7 +65,23 @@ const DiagramSidebar = () => {
   const [activePanel, setActivePanel] = useState<Panel>("explorer");
   const prevWidthRef = useRef<number | null>(null);
 
-  const { sidebarWidth, setSidebarWidth } = useSidebar();
+  const { sidebarWidth, setSidebarWidth, toggleSidebar } = useSidebar();
+
+  // Register workbench.action.toggleSidebar via the formal command system.
+  // Uses a ref so the handler always calls the latest toggleSidebar without re-registering.
+  const toggleSidebarRef = useRef(toggleSidebar);
+  useEffect(() => {
+    toggleSidebarRef.current = toggleSidebar;
+  }, [toggleSidebar]);
+
+  useEffect(() => {
+    PluginManager.registerCommandHandler("workbench.action.toggleSidebar", () => {
+      toggleSidebarRef.current();
+    });
+    return () => {
+      PluginManager.unregisterCommandHandler("workbench.action.toggleSidebar");
+    };
+  }, []);
   const isCompact = sidebarWidth < COMPACT_THRESHOLD;
 
   const navigate = useNavigate();
@@ -90,7 +107,7 @@ const DiagramSidebar = () => {
   return (
     <SidebarPrimitive
       collapsible="offcanvas"
-      className="h-full bg-background border-r border-border/50 outline-none focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring/40"
+      className="h-full bg-background border-r border-border/50 outline-none focus-within:ring-1 focus-within:ring-inset focus-within:ring-muted-foreground/40"
       data-panel="sidebar"
       tabIndex={-1}
     >

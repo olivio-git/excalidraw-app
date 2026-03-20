@@ -4,7 +4,7 @@ import { fetch } from "@tauri-apps/plugin-http";
 import { loadLibraryFromBlob } from "@excalidraw/excalidraw";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Button } from "@/shared/components/ui/button";
-import { Input } from "@/shared/components/ui/input";
+import { PanelSearch } from "@/shared/common/PanelSearch";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { useTabStore } from "@/core/tabs/store/tab-store";
 import { DiagramController } from "@/core/diagram/DiagramController";
@@ -39,6 +39,7 @@ export const LibraryBrowserPanel = memo(function LibraryBrowserPanel() {
   const [columns, setColumns] = useState(1);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const tabs = useTabStore((s) => s.tabs);
   const activeTabId = useTabStore((s) => s.activeTabId);
@@ -192,11 +193,11 @@ export const LibraryBrowserPanel = memo(function LibraryBrowserPanel() {
 
       {/* Search */}
       <div className="px-3 py-2 shrink-0">
-        <Input
-          type="search"
-          placeholder="Search libraries…"
+        <PanelSearch
+          ref={searchRef}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={setQuery}
+          placeholder="Search libraries…"
         />
       </div>
 

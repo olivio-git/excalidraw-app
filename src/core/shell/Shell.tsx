@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import {
   SidebarInset,
   SidebarProvider,
@@ -23,33 +22,6 @@ export default function Shell() {
   useMcpBridge();
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
-  // -------------------------------------------------------------------------
-  // Ctrl+H / Ctrl+L — Vim-style directional focus between sidebar and canvas
-  // -------------------------------------------------------------------------
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey)) return;
-
-      const sidebar = document.querySelector<HTMLElement>("[data-panel='sidebar']");
-      const main = document.querySelector<HTMLElement>("[data-panel='main']");
-
-      if (e.key === "h") {
-        // Ctrl+H → focus sidebar (explorer container preferred)
-        e.preventDefault();
-        const explorerContainer = sidebar?.querySelector<HTMLElement>(
-          ".flex.flex-col.h-full.overflow-hidden[tabindex='-1']"
-        );
-        (explorerContainer ?? sidebar)?.focus();
-      } else if (e.key === "l") {
-        // Ctrl+L → focus main canvas
-        e.preventDefault();
-        main?.focus();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
-
   return (
     <SidebarProvider className="h-full w-full flex flex-col overflow-hidden relative min-h-0">
       <Toaster position="bottom-right" theme={resolvedTheme} richColors />
@@ -73,7 +45,7 @@ export default function Shell() {
         <SidebarInset
           data-panel="main"
           tabIndex={-1}
-          className="flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden outline-none focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring/40"
+          className="flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden outline-none focus-within:ring-1 focus-within:ring-inset focus-within:ring-muted-foreground/40"
         >
           <div className="bg-secondary flex-1 min-h-0 overflow-hidden">
             <TabContent />

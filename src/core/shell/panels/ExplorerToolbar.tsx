@@ -8,9 +8,8 @@ import {
   Layers,
   Eye,
   EyeOff,
-  X,
-  Search,
 } from "lucide-react";
+import type { RefObject } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { TooltipWrapper } from "@/shared/common/TooltipWrapper";
 import {
@@ -22,6 +21,7 @@ import {
 } from "@/shared/components/ui/dropdown-menu";
 import { cn } from "@/shared/lib/utils";
 import { useExplorerStore } from "@/stores/explorerStore";
+import { PanelSearch } from "@/shared/common/PanelSearch";
 import type { SortOrder } from "./explorer-types";
 
 // ---------------------------------------------------------------------------
@@ -33,11 +33,10 @@ interface ExplorerToolbarProps {
   onNewFolder: () => void;
   onRefresh: () => void;
   onCollapseAll: () => void;
-  /** Inline search filter query */
   filterQuery: string;
   onFilterChange: (query: string) => void;
-  /** Number of visible nodes when filter is active (undefined = not filtering) */
   filterResultCount?: number;
+  searchRef?: RefObject<HTMLInputElement | null>;
 }
 
 const SORT_LABELS: Record<SortOrder, string> = {
@@ -60,6 +59,7 @@ export const ExplorerToolbar = ({
   filterQuery,
   onFilterChange,
   filterResultCount,
+  searchRef,
 }: ExplorerToolbarProps) => {
   const sortOrder = useExplorerStore((s) => s.sortOrder);
   const setSortOrder = useExplorerStore((s) => s.setSortOrder);
@@ -173,28 +173,14 @@ export const ExplorerToolbar = ({
       </div>
 
       {/* Inline search row */}
-      <div className="flex items-center gap-1.5 px-2 pb-1.5">
-        <Search className="size-3 text-muted-foreground shrink-0" />
-        <input
+      <div className="px-2 pb-1.5">
+        <PanelSearch
+          ref={searchRef}
           value={filterQuery}
-          onChange={(e) => onFilterChange(e.target.value)}
+          onChange={onFilterChange}
           placeholder="Filtrar archivos..."
-          className="flex-1 min-w-0 bg-transparent text-xs outline-none placeholder:text-muted-foreground/60"
+          resultCount={filterResultCount}
         />
-        {isFiltering && (
-          <>
-            <span className="text-[10px] text-muted-foreground shrink-0">
-              {filterResultCount ?? 0}
-            </span>
-            <button
-              onClick={() => onFilterChange("")}
-              className="size-3.5 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground shrink-0"
-              title="Limpiar filtro"
-            >
-              <X className="size-2.5" />
-            </button>
-          </>
-        )}
       </div>
     </div>
   );

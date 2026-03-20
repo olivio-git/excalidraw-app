@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import {
   SidebarInset,
   SidebarProvider,
@@ -22,44 +21,6 @@ export default function Shell() {
   useKeybindingBridge();
   useMcpBridge();
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
-
-  // -------------------------------------------------------------------------
-  // Ctrl+H / Ctrl+L — Vim-style directional focus between sidebar and canvas
-  // -------------------------------------------------------------------------
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey)) return;
-
-      const sidebar = document.querySelector<HTMLElement>("[data-panel='sidebar']");
-      const main = document.querySelector<HTMLElement>("[data-panel='main']");
-
-      if (e.key === "f") {
-        // Ctrl+F → focus the search input of the active sidebar panel
-        const search = sidebar?.querySelector<HTMLInputElement>("[data-panel-search]");
-        if (search) {
-          e.preventDefault();
-          search.focus();
-          search.select();
-        }
-        return;
-      }
-
-      if (e.key === "h") {
-        // Ctrl+H → focus sidebar (explorer container preferred)
-        e.preventDefault();
-        const explorerContainer = sidebar?.querySelector<HTMLElement>(
-          ".flex.flex-col.h-full.overflow-hidden[tabindex='-1']"
-        );
-        (explorerContainer ?? sidebar)?.focus();
-      } else if (e.key === "l") {
-        // Ctrl+L → focus main canvas
-        e.preventDefault();
-        main?.focus();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
 
   return (
     <SidebarProvider className="h-full w-full flex flex-col overflow-hidden relative min-h-0">

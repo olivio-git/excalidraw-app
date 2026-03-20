@@ -97,6 +97,27 @@ function previousTabHandler(): void {
   setActiveTab(tabs[prevIndex].id);
 }
 
+function focusSidebarHandler(): void {
+  const sidebar = document.querySelector<HTMLElement>("[data-panel='sidebar']");
+  const explorerContainer = sidebar?.querySelector<HTMLElement>(
+    ".flex.flex-col.h-full.overflow-hidden[tabindex='-1']"
+  );
+  (explorerContainer ?? sidebar)?.focus();
+}
+
+function focusEditorHandler(): void {
+  document.querySelector<HTMLElement>("[data-panel='main']")?.focus();
+}
+
+function focusSidebarSearchHandler(): void {
+  const sidebar = document.querySelector<HTMLElement>("[data-panel='sidebar']");
+  const search = sidebar?.querySelector<HTMLInputElement>("[data-panel-search]");
+  if (search) {
+    search.focus();
+    search.select();
+  }
+}
+
 // ── Public initializer ────────────────────────────────────────────────────────
 
 /**
@@ -120,4 +141,13 @@ export function initializeCoreCommands(): void {
   PluginManager.registerCommandHandler("workbench.action.nextTab", nextTabHandler);
 
   PluginManager.registerCommandHandler("workbench.action.previousTab", previousTabHandler);
+
+  PluginManager.registerCommandHandler("workbench.action.focusSidebar", focusSidebarHandler);
+
+  PluginManager.registerCommandHandler("workbench.action.focusEditor", focusEditorHandler);
+
+  PluginManager.registerCommandHandler(
+    "workbench.action.focusSidebarSearch",
+    focusSidebarSearchHandler
+  );
 }

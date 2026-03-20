@@ -425,11 +425,16 @@ export const FileTreeNode = ({
               title={!hasHandler ? "No hay visor registrado para este tipo de archivo" : undefined}
               className={cn(
                 "flex items-center gap-1.5 w-full text-left h-7 pr-2 rounded text-xs",
+                !hasHandler ? "opacity-40 cursor-default" : "hover:bg-accent",
                 !hasHandler
-                  ? "opacity-40 cursor-default"
-                  : isActive
-                    ? "text-primary font-medium hover:bg-accent"
-                    : "hover:bg-accent text-foreground/90",
+                  ? ""
+                  : isSelected
+                    ? isActive
+                      ? "text-foreground font-medium"
+                      : "text-foreground"
+                    : isActive
+                      ? "text-primary font-medium"
+                      : "text-foreground/70",
                 isSelected && "bg-accent",
                 isFocused && !isSelected && "ring-1 ring-border ring-inset",
                 isCut && "opacity-50",

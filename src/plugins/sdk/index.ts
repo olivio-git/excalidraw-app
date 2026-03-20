@@ -1,13 +1,30 @@
+// Re-export from canonical sources — sdk/types.ts is kept only for
+// SDK-specific helpers (RouteConfig, KeybindingDeclaration) that live
+// outside src/plugins/types.ts.
 export type {
   Plugin,
   PluginAPI,
   PluginManifest,
   PluginCommand,
   CommandHandler,
-  RouteConfig,
   SidebarSection,
   SidebarFooterAction,
-} from "./types";
+  SidebarFooterActionItem,
+  PluginEventHandler,
+  DiagramPluginAPI,
+  ActiveTabInfo,
+  // files sub-API
+  FileStat,
+  FileListEntry,
+  PluginFilesAPI,
+  // tabs sub-API
+  TabInfo,
+  PluginTabsAPI,
+} from "@/plugins/types";
+
+// These types live outside src/plugins/types.ts — re-export for plugin convenience
+export type { RouteConfig } from "@/core/routing/types";
+export type { KeybindingDeclaration } from "@/core/keybindings/types";
 
 /**
  * Helper para definir un plugin con autocompletado completo.

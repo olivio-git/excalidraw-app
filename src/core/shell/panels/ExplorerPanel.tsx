@@ -1,9 +1,16 @@
-import { useState, useCallback, useEffect, useMemo, startTransition } from "react";
-import { readDir, mkdir } from "@tauri-apps/plugin-fs";
-import { rename, remove } from "@tauri-apps/plugin-fs";
+import { useState, useEffect, useMemo, startTransition, useRef, useCallback } from "react";
+import { readDir, mkdir, remove } from "@tauri-apps/plugin-fs";
+import { rename } from "@tauri-apps/plugin-fs";
 import { open } from "@tauri-apps/plugin-dialog";
 import { join } from "@tauri-apps/api/path";
 import { FolderOpen } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  type DragEndEvent,
+  type DragStartEvent,
+  type DragOverEvent,
+} from "@dnd-kit/core";
 import { Button } from "@/shared/components/ui/button";
 import { ScrollArea } from "@/shared/components/ui/scroll-area";
 import { TooltipWrapper } from "@/shared/common/TooltipWrapper";
@@ -19,8 +26,11 @@ import { ExplorerToolbar } from "./ExplorerToolbar";
 import { FileTreeNode } from "./FileTreeNode";
 import { InlineInput } from "./InlineInput";
 import { updateTabsAfterRename, closeTabsForDeletedPath } from "./explorer-tab-sync";
-import { sortTree } from "./explorer-utils";
-import type { FileEntry, CreatingState, ClipboardState } from "./explorer-types";
+import { sortTree, flattenVisible } from "./explorer-utils";
+import { useDragAndDrop } from "@/core/shell/hooks/useDragAndDrop";
+import { useMultiSelect } from "@/core/shell/hooks/useMultiSelect";
+import { useKeyboardNav } from "@/core/shell/hooks/useKeyboardNav";
+import type { FileEntry, CreatingState, ClipboardState, DragData } from "./explorer-types";
 import { ChevronRight, ChevronDown } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -86,19 +96,25 @@ export const ExplorerPanel = () => {
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [creating, setCreating] = useState<CreatingState | null>(null);
 
-  // --- Phase 0: new local state (wired in Phase 1) ---
-  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(() => new Set());
+  // --- Phase 1: selection + focus ---
   const [focusedPath, setFocusedPath] = useState<string | null>(null);
   const [clipboardState, setClipboardState] = useState<ClipboardState>(null);
-  const [searchQuery] = useState<string>("");
 
-  // --- Derived: sorted + filtered display tree ---
+  // --- Ref for keyboard nav focus detection ---
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // --- Phase 1: multi-select (must be declared early — used by handleBatchDelete) ---
+  const { selectedPaths, setSelectedPaths, handleNodeClick, clearSelection } = useMultiSelect();
+
+  // --- Derived: sorted display tree ---
   const displayTree = useMemo(() => {
     return sortTree(tree, sortOrder);
   }, [tree, sortOrder]);
 
-  // Suppress searchQuery unused warning — will be used in Phase 2
-  void searchQuery;
+  // --- Flat nodes for keyboard nav + multi-select range ---
+  const flatNodes = useMemo(() => {
+    return flattenVisible(displayTree, expandedPaths);
+  }, [displayTree, expandedPaths]);
 
   useEffect(() => {
     if (workspaceDir) {
@@ -272,6 +288,51 @@ export const ExplorerPanel = () => {
   );
 
   // -------------------------------------------------------------------------
+  // Task 1.5 — Batch delete
+  // -------------------------------------------------------------------------
+
+  const handleBatchDelete = useCallback(
+    async (paths: string[]) => {
+      if (paths.length === 0) return;
+
+      const names = paths.map((p) => p.split("/").pop() ?? p);
+      const listPreview = names
+        .slice(0, 5)
+        .map((n) => `• ${n}`)
+        .join("\n");
+      const extra = paths.length > 5 ? `\ny ${paths.length - 5} más...` : "";
+
+      const ok = await confirm({
+        title: `Eliminar ${paths.length} elementos`,
+        description: `¿Eliminar los siguientes elementos? Esta acción no se puede deshacer.\n\n${listPreview}${extra}`,
+        confirmLabel: "Eliminar todo",
+        variant: "destructive",
+      });
+      if (!ok) return;
+
+      for (const filePath of paths) {
+        try {
+          // Determine if it's a directory by checking the flat nodes
+          const node = flatNodes.find((n) => n.path === filePath);
+          const isDir = node?.isDir ?? false;
+          await remove(filePath, { recursive: isDir });
+          closeTabsForDeletedPath(filePath);
+        } catch (err) {
+          const name = filePath.split("/").pop() ?? filePath;
+          const msg = err instanceof Error ? err.message : String(err);
+          notify(`Error al eliminar "${name}": ${msg}`, { type: "error" });
+        }
+      }
+
+      clearSelection();
+      setFocusedPath(null);
+      notify(`${paths.length} elementos eliminados`, { type: "success" });
+      await refresh();
+    },
+    [flatNodes, refresh, clearSelection]
+  );
+
+  // -------------------------------------------------------------------------
   // Copy path
   // -------------------------------------------------------------------------
 
@@ -294,20 +355,7 @@ export const ExplorerPanel = () => {
   }, []);
 
   // -------------------------------------------------------------------------
-  // Keyboard: Escape to cancel
-  // -------------------------------------------------------------------------
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleCancelAction();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [handleCancelAction]);
-
-  // -------------------------------------------------------------------------
-  // Placeholder handlers for Phase 1 (wired in task 1.4)
-  // These allow FileTreeNode to render clipboard menu items when provided
+  // Clipboard
   // -------------------------------------------------------------------------
 
   const handleCut = useCallback((paths: string[]) => {
@@ -318,12 +366,76 @@ export const ExplorerPanel = () => {
     setClipboardState({ op: "copy", paths });
   }, []);
 
-  // Suppress setFocusedPath + setSelectedPaths unused warning — used in Phase 1
-  void setFocusedPath;
-  void setSelectedPaths;
-  void handleCut;
-  void handleCopy;
-  void clipboardState;
+  // -------------------------------------------------------------------------
+  // Phase 1 — Click handler (multi-select)
+  // -------------------------------------------------------------------------
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent, path: string) => {
+      handleNodeClick(e, path, flatNodes, focusedPath, setFocusedPath);
+    },
+    [handleNodeClick, flatNodes, focusedPath]
+  );
+
+  // -------------------------------------------------------------------------
+  // Phase 1 — Keyboard nav hook
+  // -------------------------------------------------------------------------
+
+  useKeyboardNav(
+    containerRef,
+    {
+      flatNodes,
+      expandedPaths,
+      onOpen: handleOpenFile,
+      onStartRename: setRenamingPath,
+      onDelete: handleDelete,
+      onToggle: handleToggle,
+      selectedPaths,
+      setSelectedPaths,
+    },
+    focusedPath,
+    setFocusedPath,
+    renamingPath,
+    creating !== null,
+    handleCancelAction
+  );
+
+  // -------------------------------------------------------------------------
+  // Phase 1 — Drag and drop hook
+  // -------------------------------------------------------------------------
+
+  const dnd = useDragAndDrop();
+
+  const handleDragStart = (event: DragStartEvent) => {
+    dnd.handleDragStart(event);
+    // If the dragged item is not in the current selection, clear and select it
+    const data = event.active.data.current as DragData | undefined;
+    if (data && !selectedPaths.has(data.path)) {
+      clearSelection();
+      setFocusedPath(data.path);
+    }
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const overId = (event.over?.id as string | null) ?? null;
+    dnd.handleDragOver(overId);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    await dnd.handleDragEnd(event, refresh);
+  };
+
+  // -------------------------------------------------------------------------
+  // Escape key to cancel (global — existing behavior preserved)
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") handleCancelAction();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleCancelAction]);
 
   // -------------------------------------------------------------------------
   // Render: no workspace
@@ -353,6 +465,8 @@ export const ExplorerPanel = () => {
     selectedPaths,
     focusedPath,
     clipboardState,
+    draggingPath: dnd.draggingPath,
+    overFolderPath: dnd.overFolderPath,
     onToggle: handleToggle,
     onOpen: handleOpenFile,
     onDelete: handleDelete,
@@ -364,6 +478,10 @@ export const ExplorerPanel = () => {
     onNewFile: handleNewFile,
     onNewFolder: handleNewFolder,
     onCommitCreate: handleCommitCreate,
+    onCut: handleCut,
+    onCopy: handleCopy,
+    onClick: handleClick,
+    onBatchDelete: handleBatchDelete,
   };
 
   // -------------------------------------------------------------------------
@@ -371,58 +489,83 @@ export const ExplorerPanel = () => {
   // -------------------------------------------------------------------------
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <ExplorerToolbar
-        onNewFile={() => handleNewFile(workspaceDir)}
-        onNewFolder={() => handleNewFolder(workspaceDir)}
-        onRefresh={refresh}
-        onCollapseAll={handleCollapseAll}
-      />
+    <DndContext
+      sensors={dnd.sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+      onDragCancel={dnd.handleDragCancel}
+    >
+      <div
+        ref={containerRef}
+        className="flex flex-col h-full overflow-hidden"
+        tabIndex={-1}
+        onMouseDown={() => {
+          // Clear selection when clicking empty space (panel background)
+        }}
+      >
+        <ExplorerToolbar
+          onNewFile={() => handleNewFile(workspaceDir)}
+          onNewFolder={() => handleNewFolder(workspaceDir)}
+          onRefresh={refresh}
+          onCollapseAll={handleCollapseAll}
+        />
 
-      <ScrollArea className="flex-1">
-        <div className="py-1">
-          {/* Root workspace node */}
-          <TooltipWrapper tooltip={workspaceDir} side="right">
-            <button
-              onClick={() => handleToggle(workspaceDir)}
-              className="flex items-center gap-1 w-full text-left h-7 px-2 hover:bg-accent rounded text-foreground/90"
-            >
-              <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/60">
-                {isRootExpanded ? (
-                  <ChevronDown className="size-3" />
-                ) : (
-                  <ChevronRight className="size-3" />
+        <ScrollArea className="flex-1">
+          <div
+            className="py-1"
+            onClick={(e) => {
+              // Clear selection when clicking empty space (not on a node button)
+              if (e.target === e.currentTarget) {
+                clearSelection();
+                setFocusedPath(null);
+              }
+            }}
+          >
+            {/* Root workspace node */}
+            <TooltipWrapper tooltip={workspaceDir} side="right">
+              <button
+                onClick={() => handleToggle(workspaceDir)}
+                className="flex items-center gap-1 w-full text-left h-7 px-2 hover:bg-accent rounded text-foreground/90"
+              >
+                <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/60">
+                  {isRootExpanded ? (
+                    <ChevronDown className="size-3" />
+                  ) : (
+                    <ChevronRight className="size-3" />
+                  )}
+                </span>
+                <span className="truncate uppercase tracking-wide text-[10px] font-semibold">
+                  {dirName}
+                </span>
+              </button>
+            </TooltipWrapper>
+
+            {/* Children of root */}
+            {isRootExpanded && (
+              <div>
+                {creating?.parentPath === workspaceDir && (
+                  <InlineInput
+                    depth={1}
+                    onCommit={(n) => handleCommitCreate(workspaceDir, n, creating.type)}
+                    onCancel={handleCancelAction}
+                  />
                 )}
-              </span>
-              <span className="truncate uppercase tracking-wide text-[10px] font-semibold">
-                {dirName}
-              </span>
-            </button>
-          </TooltipWrapper>
-
-          {/* Children of root */}
-          {isRootExpanded && (
-            <div>
-              {creating?.parentPath === workspaceDir && (
-                <InlineInput
-                  depth={1}
-                  onCommit={(n) => handleCommitCreate(workspaceDir, n, creating.type)}
-                  onCancel={handleCancelAction}
-                />
-              )}
-              {displayTree.length === 0 && !creating ? (
-                <p className={cn("text-xs text-muted-foreground text-center pt-4 px-4")}>
-                  No hay archivos en esta carpeta
-                </p>
-              ) : (
-                displayTree.map((entry) => (
-                  <FileTreeNode key={entry.path} entry={entry} depth={1} {...sharedNodeProps} />
-                ))
-              )}
-            </div>
-          )}
-        </div>
-      </ScrollArea>
-    </div>
+                {displayTree.length === 0 && !creating ? (
+                  <p className={cn("text-xs text-muted-foreground text-center pt-4 px-4")}>
+                    No hay archivos en esta carpeta
+                  </p>
+                ) : (
+                  displayTree.map((entry) => (
+                    <FileTreeNode key={entry.path} entry={entry} depth={1} {...sharedNodeProps} />
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+    </DndContext>
   );
 };

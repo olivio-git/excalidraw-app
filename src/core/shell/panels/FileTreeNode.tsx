@@ -6,6 +6,7 @@ import {
   ChevronRight,
   ChevronDown,
 } from "lucide-react";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { cn } from "@/shared/lib/utils";
 import {
   ContextMenu,
@@ -17,7 +18,7 @@ import {
 import { InlineInput } from "./InlineInput";
 import { fileIconRegistry } from "./file-icon-registry";
 import { fileHandlerRegistry } from "./file-handler-registry";
-import type { FileEntry, CreatingState, ClipboardState } from "./explorer-types";
+import type { FileEntry, CreatingState, ClipboardState, DragData } from "./explorer-types";
 
 // ---------------------------------------------------------------------------
 // FileTreeNode — recursive component representing a single file or folder row
@@ -56,6 +57,11 @@ export interface FileTreeNodeProps {
   onCopy?: (paths: string[]) => void;
   onPaste?: (targetDir: string) => void;
   onClick?: (e: React.MouseEvent, path: string) => void;
+  onBatchDelete?: (paths: string[]) => void;
+
+  // DnD state from useDragAndDrop
+  draggingPath?: string | null;
+  overFolderPath?: string | null;
 }
 
 export const FileTreeNode = ({
@@ -85,6 +91,9 @@ export const FileTreeNode = ({
   onCopy,
   onPaste,
   onClick,
+  onBatchDelete,
+  draggingPath,
+  overFolderPath,
 }: FileTreeNodeProps) => {
   const pl = 8 + depth * 12;
   const isExpanded = expandedPaths.has(entry.path);
@@ -104,6 +113,40 @@ export const FileTreeNode = ({
     selectedPaths && selectedPaths.has(entry.path) && selectedPaths.size > 1
       ? Array.from(selectedPaths)
       : [entry.path];
+
+  const multiSelectCount = selectedPaths?.size ?? 0;
+  const isMultiSelected = isSelected && multiSelectCount > 1;
+
+  // ---------------------------------------------------------------------------
+  // DnD: draggable (all nodes) + droppable (folders only)
+  // ---------------------------------------------------------------------------
+
+  const dragData: DragData = {
+    type: "explorer-node",
+    path: entry.path,
+    isDir: entry.isDir,
+    selectedPaths: selectedPaths ? Array.from(selectedPaths) : [entry.path],
+  };
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDraggableRef,
+    isDragging,
+  } = useDraggable({
+    id: entry.path,
+    data: dragData,
+  });
+
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id: entry.path,
+    disabled: !entry.isDir,
+  });
+
+  // isDragging from hook vs external draggingPath (for opacity on non-active draggable items)
+  const isDraggedItem = draggingPath === entry.path || isDragging;
+  // isDropTarget: folder is hovered by drag, or is tracked in overFolderPath
+  const isDropTarget = entry.isDir && (isOver || overFolderPath === entry.path);
 
   const sharedChildProps: Omit<FileTreeNodeProps, "entry" | "depth"> = {
     expandedPaths,
@@ -129,6 +172,9 @@ export const FileTreeNode = ({
     onCopy,
     onPaste,
     onClick,
+    onBatchDelete,
+    draggingPath,
+    overFolderPath,
   };
 
   // The guide line x aligns with the center of THIS folder's chevron
@@ -136,12 +182,15 @@ export const FileTreeNode = ({
 
   if (entry.isDir) {
     return (
-      <div>
+      <div ref={setDroppableRef}>
         {/* Folder row */}
         <div className="relative group/row">
           <ContextMenu>
             <ContextMenuTrigger asChild>
               <button
+                ref={setDraggableRef}
+                {...listeners}
+                {...attributes}
                 onClick={(e) => {
                   onClick?.(e, entry.path);
                   onToggle(entry.path);
@@ -151,7 +200,9 @@ export const FileTreeNode = ({
                   "hover:bg-accent",
                   isSelected && "bg-primary/15",
                   isFocused && "ring-1 ring-ring ring-inset",
-                  isCut && "opacity-50"
+                  isCut && "opacity-50",
+                  isDraggedItem && "opacity-50",
+                  isDropTarget && "ring-1 ring-primary ring-inset bg-primary/10"
                 )}
                 style={{ paddingLeft: pl }}
               >
@@ -208,12 +259,21 @@ export const FileTreeNode = ({
                 Copiar ruta relativa
               </ContextMenuItem>
               <ContextMenuSeparator />
-              <ContextMenuItem
-                onClick={() => onDelete(entry.path, true)}
-                className="text-destructive focus:text-destructive"
-              >
-                Eliminar carpeta
-              </ContextMenuItem>
+              {isMultiSelected && onBatchDelete ? (
+                <ContextMenuItem
+                  onClick={() => onBatchDelete(effectiveSelectedPaths)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  Eliminar {multiSelectCount} elementos
+                </ContextMenuItem>
+              ) : (
+                <ContextMenuItem
+                  onClick={() => onDelete(entry.path, true)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  Eliminar carpeta
+                </ContextMenuItem>
+              )}
             </ContextMenuContent>
           </ContextMenu>
 
@@ -283,7 +343,7 @@ export const FileTreeNode = ({
   // File node
   // ---------------------------------------------------------------------------
   return (
-    <div className="relative">
+    <div className="relative" ref={setDraggableRef} {...listeners} {...attributes}>
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <button
@@ -309,7 +369,8 @@ export const FileTreeNode = ({
                   : "hover:bg-accent/50 text-foreground/90",
               isSelected && "bg-primary/15",
               isFocused && "ring-1 ring-ring ring-inset",
-              isCut && "opacity-50"
+              isCut && "opacity-50",
+              isDraggedItem && "opacity-50"
             )}
             style={{ paddingLeft: pl }}
             data-active={isActive}
@@ -346,12 +407,21 @@ export const FileTreeNode = ({
             Copiar ruta relativa
           </ContextMenuItem>
           <ContextMenuSeparator />
-          <ContextMenuItem
-            onClick={() => onDelete(entry.path, false)}
-            className="text-destructive focus:text-destructive"
-          >
-            Eliminar
-          </ContextMenuItem>
+          {isMultiSelected && onBatchDelete ? (
+            <ContextMenuItem
+              onClick={() => onBatchDelete(effectiveSelectedPaths)}
+              className="text-destructive focus:text-destructive"
+            >
+              Eliminar {multiSelectCount} elementos
+            </ContextMenuItem>
+          ) : (
+            <ContextMenuItem
+              onClick={() => onDelete(entry.path, false)}
+              className="text-destructive focus:text-destructive"
+            >
+              Eliminar
+            </ContextMenuItem>
+          )}
         </ContextMenuContent>
       </ContextMenu>
     </div>

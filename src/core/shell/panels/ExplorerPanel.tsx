@@ -25,12 +25,14 @@ import { cn } from "@/shared/lib/utils";
 import { ExplorerToolbar } from "./ExplorerToolbar";
 import { FileTreeNode } from "./FileTreeNode";
 import { InlineInput } from "./InlineInput";
+import { QuickOpenDialog } from "./QuickOpenDialog";
 import { updateTabsAfterRename, closeTabsForDeletedPath } from "./explorer-tab-sync";
-import { sortTree, flattenVisible } from "./explorer-utils";
+import { sortTree, flattenVisible, filterTree, getFilteredExpandedPaths } from "./explorer-utils";
 import { useDragAndDrop } from "@/core/shell/hooks/useDragAndDrop";
 import { useMultiSelect } from "@/core/shell/hooks/useMultiSelect";
 import { useKeyboardNav } from "@/core/shell/hooks/useKeyboardNav";
-import type { FileEntry, CreatingState, ClipboardState, DragData } from "./explorer-types";
+import { useFileClipboard } from "@/core/shell/hooks/useFileClipboard";
+import type { FileEntry, CreatingState, DragData } from "./explorer-types";
 import { ChevronRight, ChevronDown } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -98,7 +100,12 @@ export const ExplorerPanel = () => {
 
   // --- Phase 1: selection + focus ---
   const [focusedPath, setFocusedPath] = useState<string | null>(null);
-  const [clipboardState, setClipboardState] = useState<ClipboardState>(null);
+
+  // --- Phase 2: inline filter ---
+  const [filterQuery, setFilterQuery] = useState("");
+
+  // --- Phase 2: quick open ---
+  const [quickOpenOpen, setQuickOpenOpen] = useState(false);
 
   // --- Ref for keyboard nav focus detection ---
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -107,14 +114,44 @@ export const ExplorerPanel = () => {
   const { selectedPaths, setSelectedPaths, handleNodeClick, clearSelection } = useMultiSelect();
 
   // --- Derived: sorted display tree ---
-  const displayTree = useMemo(() => {
+  const sortedTree = useMemo(() => {
     return sortTree(tree, sortOrder);
   }, [tree, sortOrder]);
 
+  // --- Phase 2: filtered tree (applies when filterQuery is non-empty) ---
+  const displayTree = useMemo(() => {
+    if (!filterQuery.trim()) return sortedTree;
+    return filterTree(sortedTree, filterQuery);
+  }, [sortedTree, filterQuery]);
+
+  // --- Phase 2: filter result count (total nodes in filtered tree) ---
+  const filterResultCount = useMemo(() => {
+    if (!filterQuery.trim()) return undefined;
+    let count = 0;
+    function countNodes(entries: FileEntry[]) {
+      for (const e of entries) {
+        count++;
+        if (e.isDir && e.children) countNodes(e.children);
+      }
+    }
+    countNodes(displayTree);
+    return count;
+  }, [displayTree, filterQuery]);
+
+  // --- Phase 2: auto-expand paths that contain filter matches ---
+  const filterExpandedPaths = useMemo(() => {
+    if (!filterQuery.trim()) return null;
+    return getFilteredExpandedPaths(sortedTree, filterQuery);
+  }, [sortedTree, filterQuery]);
+
   // --- Flat nodes for keyboard nav + multi-select range ---
   const flatNodes = useMemo(() => {
-    return flattenVisible(displayTree, expandedPaths);
-  }, [displayTree, expandedPaths]);
+    // When filtering, use filter-expanded paths so all matching nodes are visible
+    const effectiveExpanded = filterExpandedPaths
+      ? new Set([...expandedPaths, ...filterExpandedPaths])
+      : expandedPaths;
+    return flattenVisible(displayTree, effectiveExpanded);
+  }, [displayTree, expandedPaths, filterExpandedPaths]);
 
   useEffect(() => {
     if (workspaceDir) {
@@ -355,16 +392,15 @@ export const ExplorerPanel = () => {
   }, []);
 
   // -------------------------------------------------------------------------
-  // Clipboard
+  // Clipboard — useFileClipboard hook
   // -------------------------------------------------------------------------
 
-  const handleCut = useCallback((paths: string[]) => {
-    setClipboardState({ op: "cut", paths });
-  }, []);
-
-  const handleCopy = useCallback((paths: string[]) => {
-    setClipboardState({ op: "copy", paths });
-  }, []);
+  const {
+    clipboardState,
+    cut: handleCut,
+    copy: handleCopy,
+    paste: handlePaste,
+  } = useFileClipboard(refresh);
 
   // -------------------------------------------------------------------------
   // Phase 1 — Click handler (multi-select)
@@ -438,6 +474,95 @@ export const ExplorerPanel = () => {
   }, [handleCancelAction]);
 
   // -------------------------------------------------------------------------
+  // Phase 2 — Ctrl+P: Quick Open (window-level, no portal needed)
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "p") {
+        e.preventDefault();
+        setQuickOpenOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // -------------------------------------------------------------------------
+  // Phase 2 — Clipboard keyboard shortcuts (gated on explorer focus)
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handler = (e: KeyboardEvent) => {
+      // Gate: only when explorer panel has focus
+      if (!container.contains(document.activeElement)) return;
+      // Skip if an inline input is active (rename / create)
+      if (renamingPath !== null || creating !== null) return;
+
+      const isMod = e.ctrlKey || e.metaKey;
+      if (!isMod) return;
+
+      switch (e.key.toLowerCase()) {
+        case "c": {
+          e.preventDefault();
+          const paths =
+            selectedPaths.size > 0 ? Array.from(selectedPaths) : focusedPath ? [focusedPath] : [];
+          if (paths.length > 0) handleCopy(paths);
+          break;
+        }
+        case "x": {
+          e.preventDefault();
+          const paths =
+            selectedPaths.size > 0 ? Array.from(selectedPaths) : focusedPath ? [focusedPath] : [];
+          if (paths.length > 0) handleCut(paths);
+          break;
+        }
+        case "v": {
+          e.preventDefault();
+          if (!clipboardState) return;
+          // Paste into: focused folder OR parent of focused file OR workspace root
+          let targetDir = workspaceDir ?? "";
+          if (focusedPath) {
+            const node = flatNodes.find((n) => n.path === focusedPath);
+            if (node?.isDir) {
+              targetDir = focusedPath;
+            } else if (node?.parentPath) {
+              targetDir = node.parentPath;
+            }
+          } else if (selectedPaths.size === 1) {
+            const [selPath] = Array.from(selectedPaths);
+            const node = flatNodes.find((n) => n.path === selPath);
+            if (node?.isDir) {
+              targetDir = selPath;
+            } else if (node?.parentPath) {
+              targetDir = node.parentPath;
+            }
+          }
+          void handlePaste(targetDir);
+          break;
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [
+    renamingPath,
+    creating,
+    selectedPaths,
+    focusedPath,
+    flatNodes,
+    clipboardState,
+    workspaceDir,
+    handleCopy,
+    handleCut,
+    handlePaste,
+  ]);
+
+  // -------------------------------------------------------------------------
   // Render: no workspace
   // -------------------------------------------------------------------------
 
@@ -454,10 +579,16 @@ export const ExplorerPanel = () => {
   }
 
   const dirName = workspaceDir.split("/").pop() ?? workspaceDir;
-  const isRootExpanded = expandedPaths.has(workspaceDir);
+
+  // When filter is active, merge filter-expanded paths so matched nodes are visible
+  const effectiveExpandedPaths = filterExpandedPaths
+    ? new Set([...expandedPaths, ...filterExpandedPaths])
+    : expandedPaths;
+
+  const isRootExpanded = effectiveExpandedPaths.has(workspaceDir);
 
   const sharedNodeProps = {
-    expandedPaths,
+    expandedPaths: effectiveExpandedPaths,
     activeFilePath,
     renamingPath,
     creating,
@@ -480,6 +611,7 @@ export const ExplorerPanel = () => {
     onCommitCreate: handleCommitCreate,
     onCut: handleCut,
     onCopy: handleCopy,
+    onPaste: handlePaste,
     onClick: handleClick,
     onBatchDelete: handleBatchDelete,
   };
@@ -510,6 +642,9 @@ export const ExplorerPanel = () => {
           onNewFolder={() => handleNewFolder(workspaceDir)}
           onRefresh={refresh}
           onCollapseAll={handleCollapseAll}
+          filterQuery={filterQuery}
+          onFilterChange={setFilterQuery}
+          filterResultCount={filterResultCount}
         />
 
         <ScrollArea className="flex-1">
@@ -554,7 +689,9 @@ export const ExplorerPanel = () => {
                 )}
                 {displayTree.length === 0 && !creating ? (
                   <p className={cn("text-xs text-muted-foreground text-center pt-4 px-4")}>
-                    No hay archivos en esta carpeta
+                    {filterQuery.trim()
+                      ? `Sin resultados para "${filterQuery}"`
+                      : "No hay archivos en esta carpeta"}
                   </p>
                 ) : (
                   displayTree.map((entry) => (
@@ -565,6 +702,15 @@ export const ExplorerPanel = () => {
             )}
           </div>
         </ScrollArea>
+
+        {/* Phase 2: Quick Open Dialog */}
+        <QuickOpenDialog
+          open={quickOpenOpen}
+          onClose={() => setQuickOpenOpen(false)}
+          tree={tree}
+          workspaceDir={workspaceDir}
+          onOpenFile={handleOpenFile}
+        />
       </div>
     </DndContext>
   );

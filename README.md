@@ -48,17 +48,32 @@ The app ships an `excalidraw-mcp` Node.js server that bridges external agents to
 
 **Available tools:**
 
-| Tool                | Description                                       |
-| ------------------- | ------------------------------------------------- |
-| `get_elements`      | Read all elements from the active canvas          |
-| `draw_elements`     | Add elements using the Excalidraw skeleton format |
-| `set_elements`      | Replace the entire canvas content                 |
-| `update_element`    | Patch a specific element by id                    |
-| `clear_canvas`      | Clear all elements (requires `confirm: true`)     |
-| `export_svg`        | Export the current diagram as an SVG string       |
-| `open_file`         | Open a `.excalidraw` file in a new tab            |
-| `get_active_tab`    | Get metadata about the active tab                 |
-| `get_workspace_dir` | Get the configured workspace directory path       |
+| Tool                | Description                                            |
+| ------------------- | ------------------------------------------------------ |
+| `get_elements`      | Read all elements from the active canvas               |
+| `draw_elements`     | Add elements using the Excalidraw skeleton format      |
+| `set_elements`      | Replace the entire canvas content                      |
+| `update_element`    | Patch a specific element by id                         |
+| `clear_canvas`      | Clear all elements (requires `confirm: true`)          |
+| `export_svg`        | Export the current diagram as an SVG string            |
+| `create_diagram`    | Create a new `.excalidraw` file and open it            |
+| `save_diagram`      | Save the active diagram to disk                        |
+| `open_file`         | Open a `.excalidraw` file as a tab (no duplicates)     |
+| `get_active_tab`    | Get metadata about the active tab                      |
+| `list_tabs`         | List all open tabs                                     |
+| `focus_tab`         | Switch to a tab by id or file path                     |
+| `close_tab`         | Close a tab by id                                      |
+| `get_workspace_dir` | Get the configured workspace directory path            |
+| `list_workspace`    | List files and folders in the workspace                |
+| `delete_file`       | Delete a file from the workspace                       |
+| `rename_file`       | Rename or move a file                                  |
+| `create_folder`     | Create a folder in the workspace                       |
+| `file_stat`         | Get metadata (size, modified) for a file               |
+| `copy_file`         | Copy a file within the workspace                       |
+| `explorer_state`    | Get the current file explorer state (expanded, active) |
+| `get_selection`     | Get currently selected files in the explorer           |
+| `set_selection`     | Set the file explorer selection programmatically       |
+| `toggle_folder`     | Expand or collapse a folder in the explorer            |
 
 The server is registered automatically for Claude Code via `.mcp.json`. For Claude Desktop, add it to your `claude_desktop_config.json`:
 
@@ -167,9 +182,7 @@ src/
 src-tauri/                  # Rust backend + axum HTTP bridge (MCP)
 excalidraw-mcp/             # Standalone MCP server (Node.js)
 docs/
-├── architecture.svg        # Architecture diagram (generated via MCP)
-├── ARCHITECTURE.md
-└── SDD.md
+└── architecture.svg        # Architecture diagram (generated via MCP)
 ```
 
 ---
@@ -195,10 +208,6 @@ activate(api) {
 ```
 
 ---
-
-## Architecture reference
-
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/SDD.md`](docs/SDD.md).
 
 ## Acknowledgements
 

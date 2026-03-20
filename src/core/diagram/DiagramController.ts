@@ -3,9 +3,13 @@
 import { exportToSvg } from "@excalidraw/excalidraw";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { useTabStore } from "@/core/tabs/store/tab-store";
-import type { ExcalidrawImperativeAPI, BinaryFileData } from "@excalidraw/excalidraw/types";
+import type {
+  ExcalidrawImperativeAPI,
+  BinaryFileData,
+  BinaryFiles,
+  AppState,
+} from "@excalidraw/excalidraw/types";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
-import type { AppState } from "@excalidraw/excalidraw/types";
 
 export interface DiagramControllerAPI {
   register(instanceId: string, api: ExcalidrawImperativeAPI): void;
@@ -14,6 +18,8 @@ export interface DiagramControllerAPI {
   waitForInstance(instanceId: string, timeoutMs?: number): Promise<ExcalidrawImperativeAPI>;
   getActiveInstanceId(): string | undefined;
   getElements(instanceId: string | undefined): readonly ExcalidrawElement[];
+  getAppState(instanceId: string | undefined): Partial<AppState>;
+  getFiles(instanceId: string | undefined): BinaryFiles;
   setElements(instanceId: string | undefined, elements: ExcalidrawElement[]): void;
   addElements(instanceId: string | undefined, elements: ExcalidrawElement[]): void;
   updateScene(
@@ -98,6 +104,20 @@ export class DiagramControllerClass implements DiagramControllerAPI {
     const api = this.instances.get(instanceId);
     if (!api) return [];
     return api.getSceneElements();
+  }
+
+  getAppState(instanceId: string | undefined): Partial<AppState> {
+    if (!instanceId) return {};
+    const api = this.instances.get(instanceId);
+    if (!api) return {};
+    return api.getAppState();
+  }
+
+  getFiles(instanceId: string | undefined): BinaryFiles {
+    if (!instanceId) return {};
+    const api = this.instances.get(instanceId);
+    if (!api) return {};
+    return api.getFiles();
   }
 
   setElements(instanceId: string | undefined, elements: ExcalidrawElement[]): void {

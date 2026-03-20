@@ -4,6 +4,7 @@ import { RouteRegistry } from "@/core/routing/route-registry";
 import { useDiagramStore } from "@/core/diagram/store/diagram-store";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { diagramFileService } from "@/core/diagram/services/diagram-file.service";
+import { DiagramController } from "@/core/diagram/DiagramController";
 
 // ── Core command handlers ─────────────────────────────────────────────────────
 //
@@ -25,7 +26,12 @@ async function saveActiveDiagramHandler(): Promise<void> {
   const tab = getTab(activeTabId);
   if (!tab || tab.routeId !== "diagram" || !tab.instanceId) return;
 
-  await useDiagramStore.getState().saveDiagram(tab.instanceId);
+  const instanceId = tab.instanceId;
+  const elements = DiagramController.getElements(instanceId);
+  const appState = DiagramController.getAppState(instanceId);
+  const files = DiagramController.getFiles(instanceId);
+
+  await useDiagramStore.getState().saveDiagram(instanceId, elements, appState, files);
 }
 
 async function newDiagramHandler(): Promise<void> {

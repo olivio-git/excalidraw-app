@@ -269,6 +269,101 @@ server.tool(
   }
 );
 
+// ─── open_file_or_focus ───────────────────────────────────────────────────────
+server.tool(
+  "open_file_or_focus",
+  "Open a file in a new tab, or focus it if already open",
+  {
+    filePath: z.string().describe("Absolute path to the file"),
+  },
+  async ({ filePath }) => {
+    const res = await callBridge("open_file_or_focus", { filePath });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── list_open_diagrams ───────────────────────────────────────────────────────
+server.tool(
+  "list_open_diagrams",
+  "List all currently open diagram tabs with their state",
+  {},
+  async () => {
+    const res = await callBridge("list_open_diagrams", {});
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── activate_tab ─────────────────────────────────────────────────────────────
+server.tool(
+  "activate_tab",
+  "Switch focus to an already-open tab by file path or tab ID. At least one of filePath or tabId must be provided.",
+  {
+    filePath: z.string().optional().describe("Absolute path of the file whose tab to activate"),
+    tabId: z.string().optional().describe("The tab ID to activate"),
+  },
+  async ({ filePath, tabId }) => {
+    const res = await callBridge("activate_tab", { filePath, tabId });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── close_tab ────────────────────────────────────────────────────────────────
+server.tool(
+  "close_tab",
+  "Close an open tab. Pinned tabs cannot be closed. Use force=true to close tabs with unsaved changes.",
+  {
+    filePath: z.string().optional().describe("Absolute path of the file whose tab to close"),
+    tabId: z.string().optional().describe("The tab ID to close"),
+    force: z.boolean().optional().describe("Force close even if there are unsaved changes"),
+  },
+  async ({ filePath, tabId, force }) => {
+    const res = await callBridge("close_tab", { filePath, tabId, force });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── get_tab_metadata ─────────────────────────────────────────────────────────
+server.tool(
+  "get_tab_metadata",
+  "Get metadata for a specific open tab including dirty state",
+  {
+    filePath: z.string().optional().describe("Absolute path of the file to get metadata for"),
+    tabId: z.string().optional().describe("The tab ID to get metadata for"),
+  },
+  async ({ filePath, tabId }) => {
+    const res = await callBridge("get_tab_metadata", { filePath, tabId });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── save_all_diagrams ────────────────────────────────────────────────────────
+server.tool(
+  "save_all_diagrams",
+  "Save all dirty open diagrams to disk, or a specific subset by instanceId",
+  {
+    instanceIds: z
+      .array(z.string())
+      .optional()
+      .describe("Specific instance IDs to save. If omitted, saves all dirty diagrams."),
+  },
+  async ({ instanceIds }) => {
+    const res = await callBridge("save_all_diagrams", { instanceIds });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 const transport = new StdioServerTransport();
 await server.connect(transport);

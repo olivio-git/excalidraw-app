@@ -754,7 +754,7 @@ export const ExplorerPanel = () => {
       </div>
 
       {/* DragOverlay: file/folder name pill that follows the cursor while dragging */}
-      <DragOverlay>
+      <DragOverlay dropAnimation={null}>
         {dnd.draggingPath
           ? (() => {
               const draggingEntry = flatNodes.find((n) => n.path === dnd.draggingPath);

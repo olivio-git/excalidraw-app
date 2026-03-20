@@ -146,7 +146,8 @@ export class DiagramControllerClass implements DiagramControllerAPI {
     if (!instanceId) return;
     const api = this.instances.get(instanceId);
     if (!api) return;
-    api.updateScene(sceneData);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    api.updateScene(sceneData as any);
   }
 
   scrollToContent(instanceId: string | undefined): void {

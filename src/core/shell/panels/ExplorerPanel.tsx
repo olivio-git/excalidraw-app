@@ -18,11 +18,11 @@ import { TooltipWrapper } from "@/shared/common/TooltipWrapper";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useTabStore } from "@/core/tabs/store/tab-store";
 import { useFileWatcher } from "@/core/shell/useFileWatcher";
-import { diagramFileService } from "@/core/diagram/services/diagram-file.service";
 import { fileIconRegistry } from "./file-icon-registry";
 import { fileHandlerRegistry } from "./file-handler-registry";
 import { confirm } from "@/shared/lib/confirm";
 import { notify } from "@/shared/lib/notify";
+import { cn } from "@/shared/lib/utils";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -105,7 +105,6 @@ const InlineInput = ({
 
   useEffect(() => {
     ref.current?.focus();
-    // Select name without extension for rename UX
     const dot = defaultValue.lastIndexOf(".");
     if (dot > 0) {
       ref.current?.setSelectionRange(0, dot);
@@ -194,69 +193,133 @@ const FileNode = ({
   const isRenaming = renamingPath === entry.path;
   const showCreatingHere = entry.isDir && isExpanded && creating?.parentPath === entry.path;
 
-  const fileIcon = fileIconRegistry.resolve(entry.name);
+  const { icon: FileIcon, colorClass } = fileIconRegistry.resolve(entry.name);
   const hasHandler = fileHandlerRegistry.resolve(entry.name) !== null;
+
+  const sharedChildProps = {
+    expandedPaths,
+    activeFilePath,
+    renamingPath,
+    creating,
+    workspaceDir,
+    onToggle,
+    onOpen,
+    onDelete,
+    onStartRename,
+    onCommitRename,
+    onCancelAction,
+    onCopyPath,
+    onCopyRelativePath,
+    onNewFile,
+    onNewFolder,
+    onCommitCreate,
+  };
+
+  // The guide line x for the children of THIS folder:
+  // aligns with the center of THIS folder's chevron
+  const guideX = pl + 7; // paddingLeft + half of size-3.5 (14px)
 
   if (entry.isDir) {
     return (
       <div>
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
-            <button
-              onClick={() => onToggle(entry.path)}
-              className="flex items-center gap-1 w-full text-left h-7 pr-2 rounded hover:bg-accent text-foreground/80 text-xs"
-              style={{ paddingLeft: pl }}
-            >
-              <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground">
+        {/* Folder row */}
+        <div className="relative group/row">
+          <ContextMenu>
+            <ContextMenuTrigger asChild>
+              <button
+                onClick={() => onToggle(entry.path)}
+                className="flex items-center gap-1 w-full text-left h-7 pr-1 rounded hover:bg-accent text-foreground/80 text-xs"
+                style={{ paddingLeft: pl }}
+              >
+                <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/60">
+                  {isExpanded ? (
+                    <ChevronDown className="size-3" />
+                  ) : (
+                    <ChevronRight className="size-3" />
+                  )}
+                </span>
                 {isExpanded ? (
-                  <ChevronDown className="size-3" />
+                  <FolderOpen className="size-3.5 shrink-0 text-amber-400/90" />
                 ) : (
-                  <ChevronRight className="size-3" />
+                  <FolderClosed className="size-3.5 shrink-0 text-amber-500/80" />
                 )}
-              </span>
-              {isExpanded ? (
-                <FolderOpen className="size-3.5 shrink-0 text-yellow-400/80" />
-              ) : (
-                <FolderClosed className="size-3.5 shrink-0 text-yellow-400/80" />
-              )}
-              {isRenaming ? (
-                <InlineInput
-                  defaultValue={entry.name}
-                  depth={0}
-                  onCommit={(n) => onCommitRename(entry.path, n)}
-                  onCancel={onCancelAction}
-                />
-              ) : (
-                <span className="truncate">{entry.name}</span>
-              )}
-            </button>
-          </ContextMenuTrigger>
-          <ContextMenuContent>
-            <ContextMenuItem onClick={() => onNewFile(entry.path)}>
-              Nuevo archivo aquí
-            </ContextMenuItem>
-            <ContextMenuItem onClick={() => onNewFolder(entry.path)}>
-              Nueva carpeta aquí
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem onClick={() => onStartRename(entry.path)}>Renombrar</ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem onClick={() => onCopyPath(entry.path)}>Copiar ruta</ContextMenuItem>
-            <ContextMenuItem onClick={() => onCopyRelativePath(entry.path, workspaceDir)}>
-              Copiar ruta relativa
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem
-              onClick={() => onDelete(entry.path, true)}
-              className="text-destructive focus:text-destructive"
-            >
-              Eliminar carpeta
-            </ContextMenuItem>
-          </ContextMenuContent>
-        </ContextMenu>
+                {isRenaming ? (
+                  <InlineInput
+                    defaultValue={entry.name}
+                    depth={0}
+                    onCommit={(n) => onCommitRename(entry.path, n)}
+                    onCancel={onCancelAction}
+                  />
+                ) : (
+                  <span className="truncate flex-1 min-w-0">{entry.name}</span>
+                )}
+              </button>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem onClick={() => onNewFile(entry.path)}>
+                Nuevo archivo aquí
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => onNewFolder(entry.path)}>
+                Nueva carpeta aquí
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem onClick={() => onStartRename(entry.path)}>Renombrar</ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem onClick={() => onCopyPath(entry.path)}>Copiar ruta</ContextMenuItem>
+              <ContextMenuItem onClick={() => onCopyRelativePath(entry.path, workspaceDir)}>
+                Copiar ruta relativa
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                onClick={() => onDelete(entry.path, true)}
+                className="text-destructive focus:text-destructive"
+              >
+                Eliminar carpeta
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
 
+          {/* Hover action buttons */}
+          {!isRenaming && (
+            <div className="absolute right-1 top-1/2 -translate-y-1/2 hidden group-hover/row:flex items-center gap-px bg-accent rounded px-0.5 z-10">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNewFile(entry.path);
+                }}
+                className="size-4 flex items-center justify-center rounded hover:bg-foreground/10 text-muted-foreground hover:text-foreground"
+                title="Nuevo archivo"
+              >
+                <Plus className="size-3" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNewFolder(entry.path);
+                }}
+                className="size-4 flex items-center justify-center rounded hover:bg-foreground/10 text-muted-foreground hover:text-foreground"
+                title="Nueva carpeta"
+              >
+                <FolderPlus className="size-3" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Expanded children — single continuous guide line */}
         {isExpanded && (
-          <div>
+          <div className="relative">
+            <div
+              style={{
+                position: "absolute",
+                left: guideX,
+                top: 0,
+                bottom: 0,
+                width: 1,
+                backgroundColor: "rgba(128,128,128,0.35)",
+                pointerEvents: "none",
+              }}
+            />
             {showCreatingHere && (
               <InlineInput
                 depth={depth + 1}
@@ -265,27 +328,7 @@ const FileNode = ({
               />
             )}
             {entry.children?.map((child) => (
-              <FileNode
-                key={child.path}
-                entry={child}
-                depth={depth + 1}
-                expandedPaths={expandedPaths}
-                activeFilePath={activeFilePath}
-                renamingPath={renamingPath}
-                creating={creating}
-                workspaceDir={workspaceDir}
-                onToggle={onToggle}
-                onOpen={onOpen}
-                onDelete={onDelete}
-                onStartRename={onStartRename}
-                onCommitRename={onCommitRename}
-                onCancelAction={onCancelAction}
-                onCopyPath={onCopyPath}
-                onCopyRelativePath={onCopyRelativePath}
-                onNewFile={onNewFile}
-                onNewFolder={onNewFolder}
-                onCommitCreate={onCommitCreate}
-              />
+              <FileNode key={child.path} entry={child} depth={depth + 1} {...sharedChildProps} />
             ))}
           </div>
         )}
@@ -295,57 +338,58 @@ const FileNode = ({
 
   // File node
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <button
-          onClick={() => hasHandler && onOpen(entry.path, entry.name)}
-          disabled={!hasHandler}
-          title={!hasHandler ? "No hay visor registrado para este tipo de archivo" : undefined}
-          className={`flex items-center gap-1.5 w-full text-left h-7 pr-2 rounded text-xs ${
-            !hasHandler
-              ? "opacity-40 cursor-default"
-              : isActive
-                ? "bg-accent text-accent-foreground"
-                : "hover:bg-accent/60 text-foreground/90"
-          }`}
-          style={{ paddingLeft: pl }}
-          data-active={isActive}
-        >
-          {React.createElement(fileIcon, {
-            className: "size-3.5 shrink-0 text-muted-foreground/70",
-          })}
-          {isRenaming ? (
-            <InlineInput
-              defaultValue={entry.name}
-              depth={0}
-              onCommit={(n) => onCommitRename(entry.path, n)}
-              onCancel={onCancelAction}
-            />
-          ) : (
-            <span className="truncate">
-              {fileHandlerRegistry.resolveOrDefault(entry.name).displayName?.(entry.name) ??
-                entry.name}
-            </span>
-          )}
-        </button>
-      </ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem onClick={() => onOpen(entry.path, entry.name)}>Abrir</ContextMenuItem>
-        <ContextMenuItem onClick={() => onStartRename(entry.path)}>Renombrar</ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem onClick={() => onCopyPath(entry.path)}>Copiar ruta</ContextMenuItem>
-        <ContextMenuItem onClick={() => onCopyRelativePath(entry.path, workspaceDir)}>
-          Copiar ruta relativa
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          onClick={() => onDelete(entry.path, false)}
-          className="text-destructive focus:text-destructive"
-        >
-          Eliminar
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+    <div className="relative">
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <button
+            onClick={() => hasHandler && onOpen(entry.path, entry.name)}
+            disabled={!hasHandler}
+            title={!hasHandler ? "No hay visor registrado para este tipo de archivo" : undefined}
+            className={cn(
+              "flex items-center gap-1.5 w-full text-left h-7 pr-2 rounded text-xs",
+              !hasHandler
+                ? "opacity-40 cursor-default"
+                : isActive
+                  ? "text-primary font-medium hover:bg-accent/50"
+                  : "hover:bg-accent/50 text-foreground/90"
+            )}
+            style={{ paddingLeft: pl }}
+            data-active={isActive}
+          >
+            <FileIcon className={cn("size-3.5 shrink-0", colorClass)} />
+            {isRenaming ? (
+              <InlineInput
+                defaultValue={entry.name}
+                depth={0}
+                onCommit={(n) => onCommitRename(entry.path, n)}
+                onCancel={onCancelAction}
+              />
+            ) : (
+              <span className="truncate">
+                {fileHandlerRegistry.resolveOrDefault(entry.name).displayName?.(entry.name) ??
+                  entry.name}
+              </span>
+            )}
+          </button>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onClick={() => onOpen(entry.path, entry.name)}>Abrir</ContextMenuItem>
+          <ContextMenuItem onClick={() => onStartRename(entry.path)}>Renombrar</ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem onClick={() => onCopyPath(entry.path)}>Copiar ruta</ContextMenuItem>
+          <ContextMenuItem onClick={() => onCopyRelativePath(entry.path, workspaceDir)}>
+            Copiar ruta relativa
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            onClick={() => onDelete(entry.path, false)}
+            className="text-destructive focus:text-destructive"
+          >
+            Eliminar
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    </div>
   );
 };
 
@@ -368,7 +412,6 @@ export const ExplorerPanel = () => {
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [creating, setCreating] = useState<CreatingState | null>(null);
 
-  // Expand root when workspace changes
   useEffect(() => {
     if (workspaceDir) {
       startTransition(() => {
@@ -447,7 +490,7 @@ export const ExplorerPanel = () => {
   const handleOpenFile = useCallback(
     (filePath: string, name: string) => {
       const handler = fileHandlerRegistry.resolve(name);
-      if (!handler) return; // no handler registered for this extension
+      if (!handler) return;
       const title = handler.displayName ? handler.displayName(name) : name;
       addTab({
         routeId: handler.routeId,
@@ -482,9 +525,7 @@ export const ExplorerPanel = () => {
         await mkdir(folderPath);
         await refresh();
       } else {
-        // If user typed an extension, only create if there's a registered handler
         if (name.includes(".") && !fileHandlerRegistry.resolve(name)) return;
-
         const handler = fileHandlerRegistry.getDefault();
         const finalName = name.includes(".") ? name : `${name}.${handler.defaultExtension}`;
         const filePath = await handler.create(parentPath, finalName);
@@ -515,7 +556,6 @@ export const ExplorerPanel = () => {
       const newPath = await join(dir, resolvedName);
       await rename(oldPath, newPath);
 
-      // Update any open tabs that reference the old path
       tabs.forEach((tab) => {
         if (tab.metadata?.filePath === oldPath) {
           const handler = fileHandlerRegistry.resolveOrDefault(resolvedName);
@@ -632,7 +672,7 @@ export const ExplorerPanel = () => {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Toolbar — solo acciones, sin nombre de carpeta */}
+      {/* Toolbar */}
       <div className="flex items-center justify-end px-2 py-1 border-b border-border/50 shrink-0 gap-0.5">
         <TooltipWrapper tooltip="Nuevo archivo" side="top">
           <Button
@@ -679,13 +719,13 @@ export const ExplorerPanel = () => {
       {/* File tree */}
       <ScrollArea className="flex-1">
         <div className="py-1">
-          {/* Root workspace node — VSCode style */}
+          {/* Root workspace node */}
           <TooltipWrapper tooltip={workspaceDir} side="right">
             <button
               onClick={() => handleToggle(workspaceDir)}
               className="flex items-center gap-1 w-full text-left h-7 px-2 hover:bg-accent rounded text-foreground/90"
             >
-              <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground">
+              <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/60">
                 {isRootExpanded ? (
                   <ChevronDown className="size-3" />
                 ) : (

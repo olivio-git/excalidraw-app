@@ -24,6 +24,7 @@ export interface RouteConfig {
     closable?: boolean;
     singleton?: boolean;
     maxInstances?: number;
+    keepMounted?: boolean; // Si true, el componente permanece montado aunque no esté activo (útil para mantener estado local o conexiones abiertas)
   };
 
   metadata?: {

@@ -338,6 +338,9 @@ export class PluginManagerClass {
         continue;
       }
 
+      // Skip already-registered plugins (e.g. StrictMode double-effect, refresh)
+      if (this.plugins.has(manifest.id)) continue;
+
       try {
         const blob = new Blob([info.script_content], { type: "text/javascript" });
         const url = URL.createObjectURL(blob);

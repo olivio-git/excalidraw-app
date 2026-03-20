@@ -49,6 +49,10 @@ const BUILTIN_KEYBINDINGS = [
     commandId: "workbench.action.focusSidebarSearch",
   },
   {
+    key: "ctrl+p",
+    commandId: "workbench.action.openQuickOpen",
+  },
+  {
     key: "ctrl+tab",
     commandId: "workbench.action.nextTab",
     allowInInput: true,

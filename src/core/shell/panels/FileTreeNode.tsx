@@ -232,7 +232,7 @@ export const FileTreeNode = ({
         {/* Folder row */}
         <div className="relative group/row">
           <ContextMenu>
-            <ContextMenuTrigger asChild>
+            <ContextMenuTrigger>
               <TooltipWrapper
                 tooltip={<span className="whitespace-pre-line">{tooltipLabel}</span>}
                 side="right"
@@ -252,11 +252,11 @@ export const FileTreeNode = ({
                   className={cn(
                     "flex items-center gap-1 w-full text-left h-7 pr-1 rounded text-foreground/80 text-xs",
                     "hover:bg-accent",
-                    isSelected && "bg-primary/15",
-                    isFocused && "ring-1 ring-ring ring-inset",
+                    isSelected && "bg-accent",
+                    isFocused && !isSelected && "ring-1 ring-border ring-inset",
                     isCut && "opacity-50",
                     isDraggedItem && "opacity-50",
-                    isDropTarget && "ring-1 ring-primary ring-inset bg-primary/10"
+                    isDropTarget && "ring-1 ring-border ring-inset bg-primary/10"
                   )}
                   style={{ paddingLeft: pl }}
                 >
@@ -400,7 +400,7 @@ export const FileTreeNode = ({
   return (
     <div className="relative" ref={setDraggableRef} {...listeners} {...attributes}>
       <ContextMenu>
-        <ContextMenuTrigger asChild>
+        <ContextMenuTrigger>
           <TooltipWrapper
             tooltip={<span className="whitespace-pre-line">{tooltipLabel}</span>}
             side="right"
@@ -428,10 +428,10 @@ export const FileTreeNode = ({
                 !hasHandler
                   ? "opacity-40 cursor-default"
                   : isActive
-                    ? "text-primary font-medium hover:bg-accent/50"
-                    : "hover:bg-accent/50 text-foreground/90",
-                isSelected && "bg-primary/15",
-                isFocused && "ring-1 ring-ring ring-inset",
+                    ? "text-primary font-medium hover:bg-accent"
+                    : "hover:bg-accent text-foreground/90",
+                isSelected && "bg-accent",
+                isFocused && !isSelected && "ring-1 ring-border ring-inset",
                 isCut && "opacity-50",
                 isDraggedItem && "opacity-50"
               )}

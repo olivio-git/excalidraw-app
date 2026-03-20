@@ -3,9 +3,10 @@ import { readDir, mkdir, remove } from "@tauri-apps/plugin-fs";
 import { rename } from "@tauri-apps/plugin-fs";
 import { open } from "@tauri-apps/plugin-dialog";
 import { join } from "@tauri-apps/api/path";
-import { FolderOpen } from "lucide-react";
+import { FolderOpen, FolderClosed, File } from "lucide-react";
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   type DragEndEvent,
   type DragStartEvent,
@@ -209,6 +210,27 @@ export const ExplorerPanel = () => {
     const dir = await open({ directory: true, multiple: false });
     if (typeof dir === "string") setWorkspaceDir(dir);
   };
+
+  // -------------------------------------------------------------------------
+  // Resolve best target folder for toolbar create buttons
+  // Prefers: focused folder > focused file's parent > single selected folder >
+  //          single selected file's parent > workspace root
+  // -------------------------------------------------------------------------
+
+  const getCreateTarget = useCallback(() => {
+    if (focusedPath) {
+      const node = flatNodes.find((n) => n.path === focusedPath);
+      if (node?.isDir) return focusedPath;
+      return focusedPath.substring(0, focusedPath.lastIndexOf("/"));
+    }
+    if (selectedPaths.size === 1) {
+      const [p] = Array.from(selectedPaths);
+      const node = flatNodes.find((n) => n.path === p);
+      if (node?.isDir) return p;
+      return p.substring(0, p.lastIndexOf("/"));
+    }
+    return workspaceDir ?? "";
+  }, [focusedPath, selectedPaths, flatNodes, workspaceDir]);
 
   // -------------------------------------------------------------------------
   // Tree toggle / collapse all
@@ -650,8 +672,8 @@ export const ExplorerPanel = () => {
         }}
       >
         <ExplorerToolbar
-          onNewFile={() => handleNewFile(workspaceDir)}
-          onNewFolder={() => handleNewFolder(workspaceDir)}
+          onNewFile={() => handleNewFile(getCreateTarget())}
+          onNewFolder={() => handleNewFolder(getCreateTarget())}
           onRefresh={refresh}
           onCollapseAll={handleCollapseAll}
           filterQuery={filterQuery}
@@ -730,6 +752,33 @@ export const ExplorerPanel = () => {
           onOpenFile={handleOpenFile}
         />
       </div>
+
+      {/* DragOverlay: file/folder name pill that follows the cursor while dragging */}
+      <DragOverlay>
+        {dnd.draggingPath
+          ? (() => {
+              const draggingEntry = flatNodes.find((n) => n.path === dnd.draggingPath);
+              const dragCount =
+                selectedPaths.size > 1 && dnd.draggingPath && selectedPaths.has(dnd.draggingPath)
+                  ? selectedPaths.size
+                  : 1;
+              return (
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-background border border-border rounded-md shadow-lg text-xs pointer-events-none select-none opacity-95">
+                  {draggingEntry?.isDir ? (
+                    <FolderClosed className="size-3.5 shrink-0 text-amber-500/80" />
+                  ) : (
+                    <File className="size-3.5 shrink-0 text-muted-foreground" />
+                  )}
+                  <span className="max-w-[200px] truncate text-foreground/90">
+                    {dragCount > 1
+                      ? `${dragCount} elementos`
+                      : (draggingEntry?.name ?? dnd.draggingPath?.split("/").pop() ?? "")}
+                  </span>
+                </div>
+              );
+            })()
+          : null}
+      </DragOverlay>
     </DndContext>
   );
 };

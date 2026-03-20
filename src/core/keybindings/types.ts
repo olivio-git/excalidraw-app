@@ -25,11 +25,13 @@ export type WhenExpression = string;
 
 // ── Sources ───────────────────────────────────────────────────────────────────
 
-export enum KeybindingSource {
-  Builtin = "builtin",
-  Plugin = "plugin",
-  User = "user",
-}
+export const KeybindingSource = {
+  Builtin: "builtin",
+  Plugin: "plugin",
+  User: "user",
+} as const;
+
+export type KeybindingSource = (typeof KeybindingSource)[keyof typeof KeybindingSource];
 
 // ── Core data shapes ──────────────────────────────────────────────────────────
 

@@ -112,6 +112,7 @@ export const ExplorerPanel = () => {
 
   // --- Ref for keyboard nav focus detection ---
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
 
   // --- Phase 1: multi-select (must be declared early — used by handleBatchDelete) ---
   const { selectedPaths, setSelectedPaths, handleNodeClick, clearSelection } = useMultiSelect();
@@ -732,6 +733,7 @@ export const ExplorerPanel = () => {
           filterQuery={filterQuery}
           onFilterChange={setFilterQuery}
           filterResultCount={filterResultCount}
+          searchRef={searchRef}
         />
 
         <ExplorerBreadcrumb

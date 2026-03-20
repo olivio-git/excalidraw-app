@@ -33,6 +33,17 @@ export default function Shell() {
       const sidebar = document.querySelector<HTMLElement>("[data-panel='sidebar']");
       const main = document.querySelector<HTMLElement>("[data-panel='main']");
 
+      if (e.key === "f") {
+        // Ctrl+F → focus the search input of the active sidebar panel
+        const search = sidebar?.querySelector<HTMLInputElement>("[data-panel-search]");
+        if (search) {
+          e.preventDefault();
+          search.focus();
+          search.select();
+        }
+        return;
+      }
+
       if (e.key === "h") {
         // Ctrl+H → focus sidebar (explorer container preferred)
         e.preventDefault();

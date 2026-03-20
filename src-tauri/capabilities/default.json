@@ -44,6 +44,9 @@
     { "identifier": "fs:scope", "allow": [{ "path": "$HOME/**" }, { "path": "$HOME" }] },
     "dialog:default",
     "dialog:allow-open",
-    "dialog:allow-save"
+    "dialog:allow-save",
+    "opener:allow-open-url",
+    "http:default",
+    { "identifier": "http:allow-fetch", "allow": [{ "url": "https://*.excalidraw.com/**" }] }
   ]
 }

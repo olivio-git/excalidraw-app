@@ -23,6 +23,7 @@ import { confirm } from "@/shared/lib/confirm";
 import { notify } from "@/shared/lib/notify";
 import { cn } from "@/shared/lib/utils";
 import { ExplorerToolbar } from "./ExplorerToolbar";
+import { ExplorerBreadcrumb } from "./ExplorerBreadcrumb";
 import { FileTreeNode } from "./FileTreeNode";
 import { InlineInput } from "./InlineInput";
 import { QuickOpenDialog } from "./QuickOpenDialog";
@@ -223,6 +224,17 @@ export const ExplorerPanel = () => {
   }, []);
 
   const handleCollapseAll = () => setExpandedPaths(new Set());
+
+  // Task 3.4: Breadcrumb — expand given paths in the tree
+  const handleExpandPaths = useCallback((paths: string[]) => {
+    startTransition(() => {
+      setExpandedPaths((prev) => {
+        const next = new Set(prev);
+        paths.forEach((p) => next.add(p));
+        return next;
+      });
+    });
+  }, []);
 
   // -------------------------------------------------------------------------
   // Open file
@@ -645,6 +657,12 @@ export const ExplorerPanel = () => {
           filterQuery={filterQuery}
           onFilterChange={setFilterQuery}
           filterResultCount={filterResultCount}
+        />
+
+        <ExplorerBreadcrumb
+          activeFilePath={activeFilePath}
+          workspaceDir={workspaceDir}
+          onExpandPaths={handleExpandPaths}
         />
 
         <ScrollArea className="flex-1">

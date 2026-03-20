@@ -1,3 +1,4 @@
+import { useState, useRef } from "react";
 import {
   FolderOpen,
   FolderClosed,
@@ -7,6 +8,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { stat } from "@tauri-apps/plugin-fs";
 import { cn } from "@/shared/lib/utils";
 import {
   ContextMenu,
@@ -15,9 +17,11 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/shared/components/ui/context-menu";
+import { TooltipWrapper } from "@/shared/common/TooltipWrapper";
 import { InlineInput } from "./InlineInput";
 import { fileIconRegistry } from "./file-icon-registry";
 import { fileHandlerRegistry } from "./file-handler-registry";
+import { formatFileSize, formatDate } from "./explorer-utils";
 import type { FileEntry, CreatingState, ClipboardState, DragData } from "./explorer-types";
 
 // ---------------------------------------------------------------------------
@@ -180,6 +184,48 @@ export const FileTreeNode = ({
   // The guide line x aligns with the center of THIS folder's chevron
   const guideX = pl + 7; // paddingLeft + half of size-3.5 (14px)
 
+  // ---------------------------------------------------------------------------
+  // Task 3.3 — File info tooltip: lazy stat fetch on hover, cached in ref
+  // ---------------------------------------------------------------------------
+
+  const statCache = useRef<{ size: number; mtime: number | null } | null>(null);
+  const [tooltipContent, setTooltipContent] = useState<string | null>(null);
+
+  const handleMouseEnter = async () => {
+    if (tooltipContent !== null) return; // already fetched
+
+    if (statCache.current !== null) {
+      // Already cached but tooltip not built yet (race guard)
+      const { size, mtime } = statCache.current;
+      const sizePart = entry.isDir ? "Carpeta" : formatFileSize(size);
+      const mtimePart = mtime !== null ? formatDate(mtime) : null;
+      setTooltipContent(mtimePart ? `${sizePart} · ${mtimePart}` : sizePart);
+      return;
+    }
+
+    try {
+      const info = await stat(entry.path);
+      const size = info.size ?? 0;
+      // Tauri v2 plugin-fs stat returns mtime as Date | null
+      const mtime =
+        info.mtime instanceof Date
+          ? info.mtime.getTime()
+          : typeof info.mtime === "number"
+            ? info.mtime
+            : null;
+      statCache.current = { size, mtime };
+      const sizePart = entry.isDir ? "Carpeta" : formatFileSize(size);
+      const mtimePart = mtime !== null ? formatDate(mtime) : null;
+      setTooltipContent(mtimePart ? `${sizePart} · ${mtimePart}` : sizePart);
+    } catch {
+      // stat failed (e.g. permissions) — show name only, don't retry
+      statCache.current = { size: 0, mtime: null };
+      setTooltipContent(entry.name);
+    }
+  };
+
+  const tooltipLabel = tooltipContent ? `${entry.name}\n${tooltipContent}` : entry.name;
+
   if (entry.isDir) {
     return (
       <div ref={setDroppableRef}>
@@ -187,48 +233,57 @@ export const FileTreeNode = ({
         <div className="relative group/row">
           <ContextMenu>
             <ContextMenuTrigger asChild>
-              <button
-                ref={setDraggableRef}
-                {...listeners}
-                {...attributes}
-                onClick={(e) => {
-                  onClick?.(e, entry.path);
-                  onToggle(entry.path);
-                }}
-                className={cn(
-                  "flex items-center gap-1 w-full text-left h-7 pr-1 rounded text-foreground/80 text-xs",
-                  "hover:bg-accent",
-                  isSelected && "bg-primary/15",
-                  isFocused && "ring-1 ring-ring ring-inset",
-                  isCut && "opacity-50",
-                  isDraggedItem && "opacity-50",
-                  isDropTarget && "ring-1 ring-primary ring-inset bg-primary/10"
-                )}
-                style={{ paddingLeft: pl }}
+              <TooltipWrapper
+                tooltip={<span className="whitespace-pre-line">{tooltipLabel}</span>}
+                side="right"
+                delayDuration={600}
               >
-                <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/60">
-                  {isExpanded ? (
-                    <ChevronDown className="size-3" />
-                  ) : (
-                    <ChevronRight className="size-3" />
+                <button
+                  ref={setDraggableRef}
+                  {...listeners}
+                  {...attributes}
+                  onMouseEnter={() => {
+                    void handleMouseEnter();
+                  }}
+                  onClick={(e) => {
+                    onClick?.(e, entry.path);
+                    onToggle(entry.path);
+                  }}
+                  className={cn(
+                    "flex items-center gap-1 w-full text-left h-7 pr-1 rounded text-foreground/80 text-xs",
+                    "hover:bg-accent",
+                    isSelected && "bg-primary/15",
+                    isFocused && "ring-1 ring-ring ring-inset",
+                    isCut && "opacity-50",
+                    isDraggedItem && "opacity-50",
+                    isDropTarget && "ring-1 ring-primary ring-inset bg-primary/10"
                   )}
-                </span>
-                {isExpanded ? (
-                  <FolderOpen className="size-3.5 shrink-0 text-amber-400/90" />
-                ) : (
-                  <FolderClosed className="size-3.5 shrink-0 text-amber-500/80" />
-                )}
-                {isRenaming ? (
-                  <InlineInput
-                    defaultValue={entry.name}
-                    depth={0}
-                    onCommit={(n) => onCommitRename(entry.path, n)}
-                    onCancel={onCancelAction}
-                  />
-                ) : (
-                  <span className="truncate flex-1 min-w-0">{entry.name}</span>
-                )}
-              </button>
+                  style={{ paddingLeft: pl }}
+                >
+                  <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/60">
+                    {isExpanded ? (
+                      <ChevronDown className="size-3" />
+                    ) : (
+                      <ChevronRight className="size-3" />
+                    )}
+                  </span>
+                  {isExpanded ? (
+                    <FolderOpen className="size-3.5 shrink-0 text-amber-400/90" />
+                  ) : (
+                    <FolderClosed className="size-3.5 shrink-0 text-amber-500/80" />
+                  )}
+                  {isRenaming ? (
+                    <InlineInput
+                      defaultValue={entry.name}
+                      depth={0}
+                      onCommit={(n) => onCommitRename(entry.path, n)}
+                      onCancel={onCancelAction}
+                    />
+                  ) : (
+                    <span className="truncate flex-1 min-w-0">{entry.name}</span>
+                  )}
+                </button>
+              </TooltipWrapper>
             </ContextMenuTrigger>
             <ContextMenuContent>
               <ContextMenuItem onClick={() => onNewFile(entry.path)}>
@@ -346,50 +401,59 @@ export const FileTreeNode = ({
     <div className="relative" ref={setDraggableRef} {...listeners} {...attributes}>
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <button
-            onClick={(e) => {
-              onClick?.(e, entry.path);
-              if (!onClick) {
-                if (hasHandler) onOpen(entry.path, entry.name);
-              } else {
-                // If onClick handled selection, only open on plain click (no modifiers)
-                if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
-                  if (hasHandler) onOpen(entry.path, entry.name);
-                }
-              }
-            }}
-            disabled={!hasHandler}
-            title={!hasHandler ? "No hay visor registrado para este tipo de archivo" : undefined}
-            className={cn(
-              "flex items-center gap-1.5 w-full text-left h-7 pr-2 rounded text-xs",
-              !hasHandler
-                ? "opacity-40 cursor-default"
-                : isActive
-                  ? "text-primary font-medium hover:bg-accent/50"
-                  : "hover:bg-accent/50 text-foreground/90",
-              isSelected && "bg-primary/15",
-              isFocused && "ring-1 ring-ring ring-inset",
-              isCut && "opacity-50",
-              isDraggedItem && "opacity-50"
-            )}
-            style={{ paddingLeft: pl }}
-            data-active={isActive}
+          <TooltipWrapper
+            tooltip={<span className="whitespace-pre-line">{tooltipLabel}</span>}
+            side="right"
+            delayDuration={600}
           >
-            <FileIcon className={cn("size-3.5 shrink-0", colorClass)} />
-            {isRenaming ? (
-              <InlineInput
-                defaultValue={entry.name}
-                depth={0}
-                onCommit={(n) => onCommitRename(entry.path, n)}
-                onCancel={onCancelAction}
-              />
-            ) : (
-              <span className="truncate">
-                {fileHandlerRegistry.resolveOrDefault(entry.name).displayName?.(entry.name) ??
-                  entry.name}
-              </span>
-            )}
-          </button>
+            <button
+              onMouseEnter={() => {
+                void handleMouseEnter();
+              }}
+              onClick={(e) => {
+                onClick?.(e, entry.path);
+                if (!onClick) {
+                  if (hasHandler) onOpen(entry.path, entry.name);
+                } else {
+                  // If onClick handled selection, only open on plain click (no modifiers)
+                  if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+                    if (hasHandler) onOpen(entry.path, entry.name);
+                  }
+                }
+              }}
+              disabled={!hasHandler}
+              title={!hasHandler ? "No hay visor registrado para este tipo de archivo" : undefined}
+              className={cn(
+                "flex items-center gap-1.5 w-full text-left h-7 pr-2 rounded text-xs",
+                !hasHandler
+                  ? "opacity-40 cursor-default"
+                  : isActive
+                    ? "text-primary font-medium hover:bg-accent/50"
+                    : "hover:bg-accent/50 text-foreground/90",
+                isSelected && "bg-primary/15",
+                isFocused && "ring-1 ring-ring ring-inset",
+                isCut && "opacity-50",
+                isDraggedItem && "opacity-50"
+              )}
+              style={{ paddingLeft: pl }}
+              data-active={isActive}
+            >
+              <FileIcon className={cn("size-3.5 shrink-0", colorClass)} />
+              {isRenaming ? (
+                <InlineInput
+                  defaultValue={entry.name}
+                  depth={0}
+                  onCommit={(n) => onCommitRename(entry.path, n)}
+                  onCancel={onCancelAction}
+                />
+              ) : (
+                <span className="truncate">
+                  {fileHandlerRegistry.resolveOrDefault(entry.name).displayName?.(entry.name) ??
+                    entry.name}
+                </span>
+              )}
+            </button>
+          </TooltipWrapper>
         </ContextMenuTrigger>
         <ContextMenuContent>
           <ContextMenuItem onClick={() => onOpen(entry.path, entry.name)}>Abrir</ContextMenuItem>

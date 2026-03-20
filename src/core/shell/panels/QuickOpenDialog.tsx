@@ -76,11 +76,13 @@ const QuickOpenContent = ({
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        setActiveIndex((prev) => Math.min(prev + 1, results.length - 1));
+        if (results.length === 0) break;
+        setActiveIndex((prev) => (prev + 1) % results.length);
         break;
       case "ArrowUp":
         e.preventDefault();
-        setActiveIndex((prev) => Math.max(prev - 1, 0));
+        if (results.length === 0) break;
+        setActiveIndex((prev) => (prev - 1 + results.length) % results.length);
         break;
       case "Enter":
         e.preventDefault();

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { copyFile, rename, stat } from "@tauri-apps/plugin-fs";
 import { join, dirname, basename } from "@tauri-apps/api/path";
-import { confirm } from "@/shared/lib/confirm";
 import { notify } from "@/shared/lib/notify";
 import { updateTabsAfterMove } from "@/core/shell/panels/explorer-tab-sync";
 import type { ClipboardState, UseFileClipboardReturn } from "@/core/shell/panels/explorer-types";
@@ -19,22 +18,30 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-async function resolveDestPath(srcPath: string, destDir: string): Promise<string | null> {
+/**
+ * Resolve a non-colliding destination path.
+ * If `destDir/srcName` already exists, appends " copy", " copy 2", etc.
+ * until a free slot is found. No user confirmation needed.
+ */
+async function resolveDestPath(srcPath: string, destDir: string): Promise<string> {
   const name = await basename(srcPath);
-  const candidate = await join(destDir, name);
-  const exists = await fileExists(candidate);
+  const dotIndex = name.lastIndexOf(".");
+  const hasExt = dotIndex > 0;
+  const ext = hasExt ? name.slice(dotIndex) : "";
+  const base = hasExt ? name.slice(0, dotIndex) : name;
 
-  if (!exists) return candidate;
+  // Try original name first
+  let candidate = await join(destDir, name);
+  if (!(await fileExists(candidate))) return candidate;
 
-  // Conflict — ask user
-  const ok = await confirm({
-    title: "Conflicto de nombres",
-    description: `Ya existe "${name}" en el destino. ¿Deseas reemplazarlo?`,
-    confirmLabel: "Reemplazar",
-    variant: "destructive",
-  });
-
-  return ok ? candidate : null;
+  // Try "base copy.ext", "base copy 2.ext", ...
+  let i = 1;
+  while (true) {
+    const suffix = i === 1 ? " copy" : ` copy ${i}`;
+    candidate = await join(destDir, `${base}${suffix}${ext}`);
+    if (!(await fileExists(candidate))) return candidate;
+    i++;
+  }
 }
 
 export function useFileClipboard(onRefresh: () => Promise<void>): UseFileClipboardReturn {
@@ -56,8 +63,6 @@ export function useFileClipboard(onRefresh: () => Promise<void>): UseFileClipboa
 
     for (const srcPath of paths) {
       const destPath = await resolveDestPath(srcPath, targetDir);
-      if (!destPath) continue; // user cancelled conflict
-
       const name = await basename(srcPath);
 
       try {

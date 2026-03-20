@@ -95,7 +95,10 @@ const TabBar: React.FC<TabBarProps> = ({ className, alwaysVisible = false }) => 
   const handleTabClick = useCallback(
     (tab: TabInstance) => {
       setActiveTab(tab.id);
-      navigate(tab.path);
+      const url = tab.instanceId
+        ? `${tab.path}?file=${encodeURIComponent(tab.instanceId)}`
+        : tab.path;
+      navigate(url);
     },
     [setActiveTab, navigate]
   );
@@ -111,7 +114,12 @@ const TabBar: React.FC<TabBarProps> = ({ className, alwaysVisible = false }) => 
         const newState = useTabStore.getState();
         if (newState.activeTabId) {
           const activeTab = newState.tabs.find((t) => t.id === newState.activeTabId);
-          if (activeTab) navigate(activeTab.path);
+          if (activeTab) {
+            const url = activeTab.instanceId
+              ? `${activeTab.path}?file=${encodeURIComponent(activeTab.instanceId)}`
+              : activeTab.path;
+            navigate(url);
+          }
         }
       }
     },

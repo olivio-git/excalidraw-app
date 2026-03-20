@@ -101,6 +101,12 @@ const Tab = React.memo(
                   <span className="truncate flex-1 text-left" title={tab.title}>
                     {tab.title || tab.path.split("/").pop() || "Untitled"}
                   </span>
+                  <span
+                    className={cn(
+                      "size-1.5 shrink-0 rounded-full bg-foreground transition-opacity",
+                      tab.metadata?.isDirty ? "opacity-100" : "opacity-0"
+                    )}
+                  />
                   {tab.isClosable && !isLastTab && (
                     <span
                       onClick={(e) => {

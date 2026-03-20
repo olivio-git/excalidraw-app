@@ -11,14 +11,14 @@ import { RouteRegistry } from "./route-registry";
 export function useTabRouter() {
   const location = useLocation();
   const navigate = useNavigate();
-  const lastPathRef = useRef(location.pathname);
+  const lastPathRef = useRef(location.pathname + location.search);
   const isTabSwitchRef = useRef(false);
 
-  // Always-current pathname ref — updated after every render so Tab→URL can read
-  // the latest value without location.pathname being a reactive dep of that effect.
-  const locationPathRef = useRef(location.pathname);
+  // Always-current full URL ref — updated after every render so Tab→URL can read
+  // the latest value without location being a reactive dep of that effect.
+  const locationPathRef = useRef(location.pathname + location.search);
   useLayoutEffect(() => {
-    locationPathRef.current = location.pathname;
+    locationPathRef.current = location.pathname + location.search;
   });
 
   const tabs = useTabStore((s) => s.tabs);
@@ -33,22 +33,23 @@ export function useTabRouter() {
       return;
     }
 
-    const path = location.pathname;
-    if (path === lastPathRef.current) return;
-    lastPathRef.current = path;
+    const fullUrl = location.pathname + location.search;
+    if (fullUrl === lastPathRef.current) return;
+    lastPathRef.current = fullUrl;
 
-    const {
-      tabs: currentTabs,
-      activeTabId: currentActiveId,
-      addTab,
-      setActiveTab,
-    } = useTabStore.getState();
+    const path = location.pathname;
+
+    const { activeTabId: currentActiveId, findTabByPath, setActiveTab } = useTabStore.getState();
 
     // Skip public routes (login, etc.)
     const route = RouteRegistry.getRouteByPath(path);
     if (!route || route.type === "public") return;
 
-    const existingTab = currentTabs.find((t) => t.path === path);
+    // Parse ?file= query param to identify the specific tab instance
+    const fileParam = new URLSearchParams(location.search).get("file");
+    const decodedInstanceId = fileParam ? decodeURIComponent(fileParam) : undefined;
+
+    const existingTab = findTabByPath(path, decodedInstanceId);
     if (existingTab) {
       if (existingTab.id !== currentActiveId) {
         setActiveTab(existingTab.id);
@@ -56,13 +57,8 @@ export function useTabRouter() {
       return;
     }
 
-    addTab({
-      routeId: route.id,
-      path,
-      title: route.name,
-      icon: route.icon,
-    });
-  }, [location.pathname]);
+    // No matching tab found — do not auto-create one
+  }, [location.pathname, location.search]);
 
   // Tab -> URL sync: When active tab changes, navigate to its path.
   //
@@ -76,10 +72,15 @@ export function useTabRouter() {
     if (!activeTabId) return;
 
     const activeTab = tabs.find((t) => t.id === activeTabId);
-    if (activeTab && activeTab.path !== locationPathRef.current) {
-      isTabSwitchRef.current = true;
-      lastPathRef.current = activeTab.path;
-      navigate(activeTab.path, { replace: true });
+    if (activeTab) {
+      const targetUrl = activeTab.instanceId
+        ? `${activeTab.path}?file=${encodeURIComponent(activeTab.instanceId)}`
+        : activeTab.path;
+      if (targetUrl !== locationPathRef.current) {
+        isTabSwitchRef.current = true;
+        lastPathRef.current = targetUrl;
+        navigate(targetUrl, { replace: true });
+      }
     }
   }, [activeTabId, tabs, navigate]);
 }

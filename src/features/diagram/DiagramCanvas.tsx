@@ -1,4 +1,4 @@
-import { Excalidraw } from "@excalidraw/excalidraw";
+import { Excalidraw, useHandleLibrary } from "@excalidraw/excalidraw";
 import { useEffect, useRef, useCallback, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTabContext } from "@/core/tabs/hooks/use-tab-context";
@@ -29,7 +29,13 @@ const DiagramCanvas = () => {
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const filesRef = useRef<BinaryFiles>({});
+  const isActiveRef = useRef(isActive);
+  // Excalidraw fires onChange once on mount with initialData — skip that init fire
+  const skipInitChangeRef = useRef(true);
   const [isDragging, setIsDragging] = useState(false);
+  const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI | null>(null);
+
+  useHandleLibrary({ excalidrawAPI });
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   // Block Excalidraw's native HTML5 file drop handler via capture on the wrapper div.
@@ -129,6 +135,7 @@ const DiagramCanvas = () => {
     (api: ExcalidrawImperativeAPI) => {
       if (instanceId && api) {
         DiagramController.register(instanceId, api);
+        setExcalidrawAPI(api);
       }
     },
     [instanceId]
@@ -141,43 +148,56 @@ const DiagramCanvas = () => {
     };
   }, [instanceId]);
 
+  useEffect(() => {
+    isActiveRef.current = isActive;
+  }, [isActive]);
+
   // Sync Excalidraw UI state when tab visibility changes
   useEffect(() => {
     if (!instanceId) return;
     const api = DiagramController.getApi(instanceId);
     if (!api) return;
     if (!isActive) {
-      // Clear selection so Excalidraw's portal toolbar disappears when tab is hidden
+      // Clear selection so Excalidraw's portal toolbar disappears when tab is hidden.
+      // isActiveRef guard in handleChange suppresses the resulting onChange.
       api.updateScene({
         appState: { selectedElementIds: {}, selectedGroupIds: {} } as Partial<AppState>,
       });
     } else {
-      // Force Excalidraw to re-sync its UI (zoom indicator, etc.) after becoming visible
+      // refresh() re-syncs Excalidraw UI (zoom indicator, etc.) after becoming visible
+      // and fires onChange internally — suppress it the same way as the init onChange.
+      skipInitChangeRef.current = true;
       api.refresh();
     }
   }, [isActive, instanceId]);
 
-  // Load diagram on mount
+  // Load diagram on mount — reset init-skip so each new diagram load suppresses one onChange
   useEffect(() => {
+    skipInitChangeRef.current = true;
     if (!instanceId || !filePath) return;
     loadDiagram(instanceId, filePath);
   }, [instanceId, filePath, loadDiagram]);
 
-  // Update tab title when dirty state changes
+  // Sync dirty state into tab metadata (title stays clean — dot is rendered by the Tab component)
   useEffect(() => {
     if (!diagram || !tab) return;
-    const baseName = filePath
-      ? (filePath.split("/").pop() ?? "diagram")
-      : tab.title.replace(" •", "");
-    const title = diagram.isDirty ? `${baseName} •` : baseName;
-    if (tab.title !== title) {
-      updateTab(tabId, { title });
+    if (tab.metadata?.isDirty !== diagram.isDirty) {
+      updateTab(tabId, { metadata: { ...tab.metadata, isDirty: diagram.isDirty } });
     }
-  }, [diagram?.isDirty, filePath, tab, tabId, updateTab]);
+  }, [diagram?.isDirty, tab, tabId, updateTab]);
 
   const handleChange = useCallback(
     (_elements: readonly ExcalidrawElement[], _appState: AppState, files: BinaryFiles) => {
       if (!instanceId) return;
+      // Inactive tabs can receive onChange from internal scene updates (e.g. updateScene
+      // clearing selections on tab switch). Ignore these — only active tabs can have
+      // real user-driven changes.
+      if (!isActiveRef.current) return;
+      // Skip Excalidraw's initialization onChange fired on mount with initialData
+      if (skipInitChangeRef.current) {
+        skipInitChangeRef.current = false;
+        return;
+      }
       filesRef.current = files;
       // Mark dirty WITHOUT storing elements/appState — keeps initialData stable
       // and avoids feedback loops that freeze Excalidraw's zoom indicator.
@@ -226,6 +246,7 @@ const DiagramCanvas = () => {
         }}
         onChange={handleChange}
         theme={resolvedTheme}
+        libraryReturnUrl={window.location.origin}
         UIOptions={{
           welcomeScreen: false,
           canvasActions: {

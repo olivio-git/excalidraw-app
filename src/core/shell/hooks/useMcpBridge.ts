@@ -5,6 +5,7 @@ import { convertToExcalidrawElements } from "@excalidraw/excalidraw";
 import { DiagramController } from "@/core/diagram/DiagramController";
 import { executeAITool } from "@/features/ai-chat/utils/tool-executor";
 import { useTabStore } from "@/core/tabs/store/tab-store";
+import { useDiagramStore } from "@/core/diagram/store/diagram-store";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { fileHandlerRegistry } from "@/core/shell/panels/file-handler-registry";
 import { diagramFileService } from "@/core/diagram/services/diagram-file.service";
@@ -90,10 +91,16 @@ export async function dispatchMcpTool(
         if (!filePath) return { result: null, error: "filePath is required." };
         const name = filePath.split(/[\\/]/).pop() ?? filePath;
         const handler = fileHandlerRegistry.resolveOrDefault(name);
+        const routePath = `/${handler.routeId}`;
+        const existing = useTabStore.getState().findTabByPath(routePath, filePath);
+        if (existing) {
+          useTabStore.getState().setActiveTab(existing.id);
+          break;
+        }
         const title = handler.displayName ? handler.displayName(name) : name;
         useTabStore.getState().addTab({
           routeId: handler.routeId,
-          path: `/${handler.routeId}`,
+          path: routePath,
           title,
           instanceId: filePath,
           metadata: { filePath },
@@ -261,6 +268,184 @@ export async function dispatchMcpTool(
           }),
           error: null,
         };
+      }
+
+      case "open_file_or_focus": {
+        const filePath = input.filePath as string | undefined;
+        if (!filePath) return { result: null, error: "filePath is required." };
+        const filename = filePath.split("/").pop() ?? filePath;
+        const handler = fileHandlerRegistry.resolveOrDefault(filename);
+        const routePath = `/${handler.routeId}`;
+        const existing = useTabStore.getState().findTabByPath(routePath, filePath);
+        if (existing) {
+          useTabStore.getState().setActiveTab(existing.id);
+          return { result: JSON.stringify({ tabId: existing.id, wasCreated: false }), error: null };
+        }
+        const title = handler.displayName ? handler.displayName(filename) : filename;
+        const tabId = useTabStore.getState().addTab({
+          routeId: handler.routeId,
+          path: routePath,
+          title,
+          instanceId: filePath,
+          metadata: { filePath },
+        });
+        return { result: JSON.stringify({ tabId, wasCreated: true }), error: null };
+      }
+
+      case "list_open_diagrams": {
+        const { tabs, activeTabId } = useTabStore.getState();
+        const diagramTabs = tabs.filter((t) => t.routeId === "diagram");
+        const result = diagramTabs.map((t) => ({
+          tabId: t.id,
+          title: t.title,
+          filePath: t.instanceId ?? null,
+          isDirty: useDiagramStore.getState().getDiagram(t.instanceId ?? "")?.isDirty ?? false,
+          isActive: t.id === activeTabId,
+          isPinned: t.isPinned,
+        }));
+        return { result: JSON.stringify(result), error: null };
+      }
+
+      case "activate_tab": {
+        const filePath = input.filePath as string | undefined;
+        const tabId = input.tabId as string | undefined;
+        if (!filePath && !tabId) return { result: null, error: "filePath or tabId is required." };
+        let tab;
+        if (filePath) {
+          const filename = filePath.split("/").pop() ?? filePath;
+          const handler = fileHandlerRegistry.resolveOrDefault(filename);
+          const routePath = `/${handler.routeId}`;
+          tab = useTabStore.getState().findTabByPath(routePath, filePath);
+        } else {
+          tab = useTabStore.getState().getTab(tabId!);
+        }
+        if (!tab) return { result: JSON.stringify({ success: false }), error: null };
+        useTabStore.getState().setActiveTab(tab.id);
+        return { result: JSON.stringify({ success: true, tabId: tab.id }), error: null };
+      }
+
+      case "close_tab": {
+        const filePath = input.filePath as string | undefined;
+        const tabId = input.tabId as string | undefined;
+        const force = input.force as boolean | undefined;
+        if (!filePath && !tabId) return { result: null, error: "filePath or tabId is required." };
+        let tab;
+        if (filePath) {
+          const filename = filePath.split("/").pop() ?? filePath;
+          const handler = fileHandlerRegistry.resolveOrDefault(filename);
+          const routePath = `/${handler.routeId}`;
+          tab = useTabStore.getState().findTabByPath(routePath, filePath);
+        } else {
+          tab = useTabStore.getState().getTab(tabId!);
+        }
+        if (!tab)
+          return {
+            result: JSON.stringify({ closed: false, wasDirty: false, reason: "not_found" }),
+            error: null,
+          };
+        if (tab.isPinned)
+          return {
+            result: JSON.stringify({ closed: false, wasDirty: false, reason: "pinned" }),
+            error: null,
+          };
+        if (!tab.isClosable)
+          return {
+            result: JSON.stringify({ closed: false, wasDirty: false, reason: "not_closable" }),
+            error: null,
+          };
+        if (useTabStore.getState().tabs.length === 1)
+          return {
+            result: JSON.stringify({ closed: false, wasDirty: false, reason: "last_tab" }),
+            error: null,
+          };
+        const isDirty =
+          useDiagramStore.getState().getDiagram(tab.instanceId ?? "")?.isDirty ?? false;
+        if (isDirty && !force)
+          return {
+            result: JSON.stringify({ closed: false, wasDirty: true, reason: "unsaved_changes" }),
+            error: null,
+          };
+        useTabStore.getState().removeTab(tab.id);
+        return { result: JSON.stringify({ closed: true, wasDirty: isDirty }), error: null };
+      }
+
+      case "get_tab_metadata": {
+        const filePath = input.filePath as string | undefined;
+        const tabId = input.tabId as string | undefined;
+        if (!filePath && !tabId) return { result: null, error: "filePath or tabId is required." };
+        let tab;
+        if (filePath) {
+          const filename = filePath.split("/").pop() ?? filePath;
+          const handler = fileHandlerRegistry.resolveOrDefault(filename);
+          const routePath = `/${handler.routeId}`;
+          tab = useTabStore.getState().findTabByPath(routePath, filePath);
+        } else {
+          tab = useTabStore.getState().getTab(tabId!);
+        }
+        if (!tab) return { result: null, error: "tab not found" };
+        const { activeTabId } = useTabStore.getState();
+        const isDirty =
+          useDiagramStore.getState().getDiagram(tab.instanceId ?? "")?.isDirty ?? false;
+        return {
+          result: JSON.stringify({
+            tabId: tab.id,
+            title: tab.title,
+            filePath: tab.instanceId,
+            isDirty,
+            isActive: tab.id === activeTabId,
+            isPinned: tab.isPinned,
+            routeId: tab.routeId,
+          }),
+          error: null,
+        };
+      }
+
+      case "save_all_diagrams": {
+        const instanceIds = input.instanceIds as string[] | undefined;
+        const { tabs } = useTabStore.getState();
+        const diagramTabs = tabs.filter((t) => t.routeId === "diagram" && t.instanceId);
+        const targets = instanceIds
+          ? diagramTabs.filter((t) => instanceIds.includes(t.instanceId!))
+          : diagramTabs.filter(
+              (t) => useDiagramStore.getState().getDiagram(t.instanceId!)?.isDirty === true
+            );
+        let saved = 0;
+        let failed = 0;
+        const errors: Record<string, string> = {};
+        // Count unknown instanceIds as failed upfront
+        if (instanceIds) {
+          const openIds = new Set(diagramTabs.map((t) => t.instanceId!));
+          for (const iid of instanceIds) {
+            if (!openIds.has(iid)) {
+              failed++;
+              errors[iid] = "No open diagram for instanceId.";
+            }
+          }
+        }
+        for (const t of targets) {
+          const iid = t.instanceId!;
+          const api = DiagramController.getApi(iid);
+          if (!api) {
+            failed++;
+            errors[iid] = "Canvas not ready.";
+            continue;
+          }
+          try {
+            await useDiagramStore
+              .getState()
+              .saveDiagram(iid, api.getSceneElements(), api.getAppState(), api.getFiles());
+            saved++;
+          } catch (err) {
+            failed++;
+            errors[iid] = String(err);
+          }
+        }
+        const payload: { saved: number; failed: number; errors?: Record<string, string> } = {
+          saved,
+          failed,
+        };
+        if (Object.keys(errors).length > 0) payload.errors = errors;
+        return { result: JSON.stringify(payload), error: null };
       }
 
       default:

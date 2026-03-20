@@ -645,6 +645,169 @@ describe("TabStore", () => {
   });
 
   // -------------------------------------------------------------------------
+  // findTabByPath — instanceId disambiguation (W1: path collision regression)
+  // -------------------------------------------------------------------------
+  describe("findTabByPath", () => {
+    it("returns the tab matching path + instanceId", () => {
+      useTabStore
+        .getState()
+        .addTab({
+          routeId: "diagram",
+          path: "/diagram",
+          title: "A",
+          instanceId: "/ws/a.excalidraw",
+        });
+      useTabStore
+        .getState()
+        .addTab({
+          routeId: "diagram",
+          path: "/diagram",
+          title: "B",
+          instanceId: "/ws/b.excalidraw",
+        });
+
+      const found = useTabStore.getState().findTabByPath("/diagram", "/ws/b.excalidraw");
+
+      expect(found).toBeDefined();
+      expect(found!.title).toBe("B");
+      expect(found!.instanceId).toBe("/ws/b.excalidraw");
+    });
+
+    it("returns undefined when instanceId does not match any tab", () => {
+      useTabStore
+        .getState()
+        .addTab({
+          routeId: "diagram",
+          path: "/diagram",
+          title: "A",
+          instanceId: "/ws/a.excalidraw",
+        });
+
+      const found = useTabStore.getState().findTabByPath("/diagram", "/ws/nonexistent.excalidraw");
+
+      expect(found).toBeUndefined();
+    });
+
+    it("when two tabs share the same path, never confuses them by returning the wrong one", () => {
+      useTabStore
+        .getState()
+        .addTab({
+          routeId: "diagram",
+          path: "/diagram",
+          title: "First",
+          instanceId: "/ws/first.excalidraw",
+        });
+      useTabStore
+        .getState()
+        .addTab({
+          routeId: "diagram",
+          path: "/diagram",
+          title: "Second",
+          instanceId: "/ws/second.excalidraw",
+        });
+
+      const first = useTabStore.getState().findTabByPath("/diagram", "/ws/first.excalidraw");
+      const second = useTabStore.getState().findTabByPath("/diagram", "/ws/second.excalidraw");
+
+      expect(first!.instanceId).toBe("/ws/first.excalidraw");
+      expect(second!.instanceId).toBe("/ws/second.excalidraw");
+      expect(first!.id).not.toBe(second!.id);
+    });
+
+    it("matches tab without instanceId when called with undefined", () => {
+      useTabStore.getState().addTab({ routeId: "home", path: "/home", title: "Home" });
+
+      const found = useTabStore.getState().findTabByPath("/home", undefined);
+
+      expect(found).toBeDefined();
+      expect(found!.path).toBe("/home");
+      expect(found!.instanceId).toBeUndefined();
+    });
+
+    it("does NOT match an instanceId tab when called with undefined", () => {
+      useTabStore
+        .getState()
+        .addTab({
+          routeId: "diagram",
+          path: "/diagram",
+          title: "A",
+          instanceId: "/ws/a.excalidraw",
+        });
+
+      const found = useTabStore.getState().findTabByPath("/diagram", undefined);
+
+      expect(found).toBeUndefined();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // updateTab — metadata.isDirty propagation (W2: dirty dot regression)
+  // -------------------------------------------------------------------------
+  describe("updateTab - metadata.isDirty", () => {
+    it("sets metadata.isDirty to true without mutating the title", () => {
+      useTabStore
+        .getState()
+        .addTab({
+          routeId: "diagram",
+          path: "/diagram",
+          title: "file.excalidraw",
+          instanceId: "/ws/file.excalidraw",
+        });
+      const tabId = useTabStore.getState().tabs[0].id;
+
+      useTabStore.getState().updateTab(tabId, { metadata: { isDirty: true } });
+
+      const tab = useTabStore.getState().tabs[0];
+      expect(tab.metadata?.isDirty).toBe(true);
+      expect(tab.title).toBe("file.excalidraw");
+      expect(tab.title).not.toContain("•");
+    });
+
+    it("clears metadata.isDirty back to false (simulates autosave)", () => {
+      useTabStore
+        .getState()
+        .addTab({
+          routeId: "diagram",
+          path: "/diagram",
+          title: "file.excalidraw",
+          instanceId: "/ws/file.excalidraw",
+        });
+      const tabId = useTabStore.getState().tabs[0].id;
+
+      useTabStore.getState().updateTab(tabId, { metadata: { isDirty: true } });
+      useTabStore.getState().updateTab(tabId, { metadata: { isDirty: false } });
+
+      expect(useTabStore.getState().tabs[0].metadata?.isDirty).toBe(false);
+    });
+
+    it("isDirty on one tab does not affect sibling tabs", () => {
+      useTabStore
+        .getState()
+        .addTab({
+          routeId: "diagram",
+          path: "/diagram",
+          title: "A",
+          instanceId: "/ws/a.excalidraw",
+        });
+      useTabStore
+        .getState()
+        .addTab({
+          routeId: "diagram",
+          path: "/diagram",
+          title: "B",
+          instanceId: "/ws/b.excalidraw",
+        });
+
+      const tabAId = useTabStore.getState().tabs[0].id;
+      useTabStore.getState().updateTab(tabAId, { metadata: { isDirty: true } });
+
+      const tabB = useTabStore.getState().tabs[1];
+      expect(tabB.metadata?.isDirty).toBeFalsy();
+      expect(tabB.title).toBe("B");
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // BONUS: reorderTabs
   // -------------------------------------------------------------------------
   describe("reorderTabs", () => {

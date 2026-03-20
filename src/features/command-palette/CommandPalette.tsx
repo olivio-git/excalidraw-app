@@ -200,7 +200,7 @@ export default function CommandPalette() {
         .filter((t) => t.metadata?.filePath)
         .map((t) => ({
           kind: "file" as const,
-          name: t.title.replace(" •", ""),
+          name: t.title,
           filePath: t.metadata!.filePath as string,
           isOpen: true,
           tabId: t.id,

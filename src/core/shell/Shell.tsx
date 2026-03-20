@@ -73,7 +73,7 @@ export default function Shell() {
         <SidebarInset
           data-panel="main"
           tabIndex={-1}
-          className="flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden outline-none focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring/40"
+          className="flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden outline-none focus-within:ring-1 focus-within:ring-inset focus-within:ring-border"
         >
           <div className="bg-secondary flex-1 min-h-0 overflow-hidden">
             <TabContent />

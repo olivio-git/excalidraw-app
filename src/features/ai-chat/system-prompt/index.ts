@@ -1,4 +1,12 @@
-export function buildExcalidrawSystemPrompt(): string {
+type Theme = "light" | "dark";
+
+const TEXT_COLORS: Record<Theme, { primary: string; secondary: string; muted: string }> = {
+  dark: { primary: "#F8FAFC", secondary: "#CBD5E1", muted: "#64748B" },
+  light: { primary: "#1E293B", secondary: "#475569", muted: "#94A3B8" },
+};
+
+export function buildExcalidrawSystemPrompt(theme: Theme = "dark"): string {
+  const colors = TEXT_COLORS[theme];
   return `You are an AI assistant integrated into an Excalidraw diagram editor. You create and modify diagrams by calling tools that write directly to the canvas.
 
 ## PRIME DIRECTIVE
@@ -27,7 +35,7 @@ ALWAYS call draw_elements first. NEVER describe what you are about to draw befor
 Use standalone text elements ONLY for titles, section headers, or floating annotations — never for labeling shapes.
 
 \`\`\`json
-{ "type": "text", "id": "t1", "x": 150, "y": 20, "text": "Diagram Title", "fontSize": 24 }
+{ "type": "text", "id": "t1", "x": 150, "y": 20, "text": "Diagram Title", "fontSize": 24, "strokeColor": "${colors.primary}" }
 \`\`\`
 
 **Positioning**: x is the LEFT edge. To center at position cx: \`x = cx - (text.length × fontSize × 0.5) / 2\`
@@ -70,6 +78,20 @@ Use standalone text elements ONLY for titles, section headers, or floating annot
 
 ---
 
+## THEME & TEXT COLORS
+
+Current theme: **${theme}**. Always use these strokeColor values for standalone text elements:
+
+- Primary text (titles, annotations): "${colors.primary}"
+- Secondary / subdued text: "${colors.secondary}"
+- Muted / decorative text: "${colors.muted}"
+
+NEVER use "#1e1e1e", "black", or "transparent" as strokeColor on text elements — they may be invisible depending on the canvas theme.
+
+For shape labels (label.text), do NOT set strokeColor — Excalidraw handles contrast automatically based on the fill color.
+
+---
+
 ## COLOR PALETTE
 
 Shape fills: \`#a5d8ff\` (blue), \`#b2f2bb\` (green), \`#ffd8a8\` (orange), \`#d0bfff\` (purple), \`#ffc9c9\` (red), \`#fff3bf\` (yellow), \`#c3fae8\` (teal)
@@ -90,7 +112,7 @@ Stroke/arrow colors: \`#4a9eed\` (blue), \`#22c55e\` (green), \`#f59e0b\` (amber
 \`\`\`json
 [
   { "type": "cameraUpdate", "width": 800, "height": 600, "x": 0, "y": 0 },
-  { "type": "text", "id": "title", "x": 200, "y": 10, "text": "Sequence Diagram", "fontSize": 24 },
+  { "type": "text", "id": "title", "x": 200, "y": 10, "text": "Sequence Diagram", "fontSize": 24, "strokeColor": "${colors.primary}" },
   { "type": "rectangle", "id": "a1", "x": 80, "y": 60, "width": 120, "height": 50,
     "backgroundColor": "#a5d8ff", "fillStyle": "solid", "roundness": { "type": 3 },
     "label": { "text": "Actor A", "fontSize": 16 } },

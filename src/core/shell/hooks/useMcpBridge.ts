@@ -47,6 +47,13 @@ const flattenDir = async (dir: string, prefix: string): Promise<FlatFileEntry[]>
 
 export const hasPathTraversal = (p: string): boolean => p.includes("..") || p.startsWith("/");
 
+function syncExplorerToFile(filePath: string): void {
+  useExplorerSelectionStore.getState().setSelectedPaths([filePath]);
+  window.dispatchEvent(
+    new CustomEvent("explorer:set-selection", { detail: { paths: [filePath] } })
+  );
+}
+
 async function saveMcpDiagram(
   instanceId: string,
   elements: readonly ExcalidrawElement[]
@@ -122,6 +129,7 @@ export async function dispatchMcpTool(
         const existing = useTabStore.getState().findTabByPath(routePath, filePath);
         if (existing) {
           useTabStore.getState().setActiveTab(existing.id);
+          syncExplorerToFile(filePath);
           break;
         }
         const title = handler.displayName ? handler.displayName(name) : name;
@@ -132,6 +140,7 @@ export async function dispatchMcpTool(
           instanceId: filePath,
           metadata: { filePath },
         });
+        syncExplorerToFile(filePath);
         return { result: `Opened ${name}.`, error: null };
       }
 
@@ -189,6 +198,7 @@ export async function dispatchMcpTool(
           instanceId: filePath,
           metadata: { filePath },
         });
+        syncExplorerToFile(filePath);
         return { result: JSON.stringify({ filePath, instanceId: filePath }), error: null };
       }
 
@@ -307,6 +317,7 @@ export async function dispatchMcpTool(
         const existing = useTabStore.getState().findTabByPath(routePath, filePath);
         if (existing) {
           useTabStore.getState().setActiveTab(existing.id);
+          syncExplorerToFile(filePath);
           return { result: JSON.stringify({ tabId: existing.id, wasCreated: false }), error: null };
         }
         const title = handler.displayName ? handler.displayName(filename) : filename;
@@ -317,6 +328,7 @@ export async function dispatchMcpTool(
           instanceId: filePath,
           metadata: { filePath },
         });
+        syncExplorerToFile(filePath);
         return { result: JSON.stringify({ tabId, wasCreated: true }), error: null };
       }
 
@@ -349,6 +361,8 @@ export async function dispatchMcpTool(
         }
         if (!tab) return { result: JSON.stringify({ success: false }), error: null };
         useTabStore.getState().setActiveTab(tab.id);
+        const tabFilePath = tab.metadata?.filePath as string | undefined;
+        if (tabFilePath) syncExplorerToFile(tabFilePath);
         return { result: JSON.stringify({ success: true, tabId: tab.id }), error: null };
       }
 

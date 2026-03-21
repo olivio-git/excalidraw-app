@@ -61,7 +61,17 @@ server.tool(
 // ─── draw_elements ────────────────────────────────────────────────────────────
 server.tool(
   "draw_elements",
-  "Add Excalidraw elements to the active canvas. Supports the full Excalidraw element format including labeled shapes, arrows with bindings, and pseudo-elements (delete, cameraUpdate).",
+  [
+    "Add Excalidraw elements to the active canvas without replacing existing content.",
+    "PREFERRED for building diagrams: call multiple times for different sections (e.g. one call per layer or subsystem).",
+    "Supports labeled shapes, arrows with bindings, and pseudo-elements (delete, cameraUpdate).",
+    "IMPORTANT — text positioning depends on textAlign:",
+    "  'left'   → x is the LEFT EDGE of the text element",
+    "  'center' → x is the CENTER POINT (x = container.x + container.width / 2)",
+    "  'right'  → x is the RIGHT EDGE",
+    "Setting x = container.x for center-aligned text will render it half outside the container.",
+    "Diagrams are saved to disk automatically after each call.",
+  ].join(" "),
   {
     elements: z
       .array(z.record(z.string(), z.unknown()))
@@ -78,7 +88,12 @@ server.tool(
 // ─── set_elements ─────────────────────────────────────────────────────────────
 server.tool(
   "set_elements",
-  "Replace ALL elements on the active canvas with the provided elements. Use draw_elements to add without replacing.",
+  [
+    "Replace ALL elements on the active canvas with the provided elements.",
+    "Use draw_elements instead when building a diagram incrementally — it is faster and avoids generating the entire diagram JSON in one shot.",
+    "Reserve set_elements for replacing or restoring a known complete canvas state.",
+    "Diagram is saved to disk automatically after the call.",
+  ].join(" "),
   {
     elements: z
       .array(z.record(z.string(), z.unknown()))

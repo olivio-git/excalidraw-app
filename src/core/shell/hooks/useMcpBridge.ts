@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { convertToExcalidrawElements } from "@excalidraw/excalidraw";
 import { DiagramController } from "@/core/diagram/DiagramController";
-import { executeAITool } from "@/features/ai-chat/utils/tool-executor";
+import { executeAITool, normalizeTextInContainers } from "@/features/ai-chat/utils/tool-executor";
 import { useTabStore } from "@/core/tabs/store/tab-store";
 import { useDiagramStore } from "@/core/diagram/store/diagram-store";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
@@ -47,6 +47,14 @@ const flattenDir = async (dir: string, prefix: string): Promise<FlatFileEntry[]>
 
 export const hasPathTraversal = (p: string): boolean => p.includes("..") || p.startsWith("/");
 
+async function saveMcpDiagram(instanceId: string): Promise<void> {
+  const api = DiagramController.getApi(instanceId);
+  if (!api) return;
+  await useDiagramStore
+    .getState()
+    .saveDiagram(instanceId, api.getSceneElements(), api.getAppState(), api.getFiles());
+}
+
 export async function dispatchMcpTool(
   tool: string,
   input: Record<string, unknown>
@@ -64,6 +72,9 @@ export async function dispatchMcpTool(
       case "clear_canvas":
       case "update_element": {
         const res = await executeAITool(tool, input, instanceId);
+        if (!res.isError && instanceId) {
+          await saveMcpDiagram(instanceId);
+        }
         return { result: res.result, error: res.isError ? res.result : null };
       }
 
@@ -78,7 +89,9 @@ export async function dispatchMcpTool(
         const elements = (input.elements as unknown[]) ?? [];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const converted = convertToExcalidrawElements(elements as any);
-        api.updateScene({ elements: converted as ExcalidrawElement[] });
+        const normalized = normalizeTextInContainers(converted as ExcalidrawElement[]);
+        api.updateScene({ elements: normalized });
+        await saveMcpDiagram(instanceId);
         return { result: `Set ${elements.length} element(s).`, error: null };
       }
 
@@ -177,6 +190,7 @@ export async function dispatchMcpTool(
         const appState = api.getAppState();
         const files = api.getFiles();
         await diagramFileService.writeDiagram(saveInstanceId, { elements, appState, files });
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { collaborators: _collaborators, ...serializableAppState } =
           appState as Partial<AppState> & { collaborators?: unknown };
         const serialized = JSON.stringify(

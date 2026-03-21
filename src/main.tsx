@@ -7,6 +7,11 @@ import "./styles/index.css";
 // instead of opening a new browser tab
 window.name = "excalidraw-app";
 
+// Tell Excalidraw where to find its font/asset files.
+// In dev, Vite serves node_modules directly so this isn't needed,
+// but in the production Tauri bundle the fonts live under /excalidraw-assets/.
+window.EXCALIDRAW_ASSET_PATH = "/excalidraw-assets/";
+
 // Intercept window.open for external URLs and open them in the system browser
 const _nativeOpen = window.open.bind(window);
 window.open = (url?: string | URL, target?: string, features?: string) => {

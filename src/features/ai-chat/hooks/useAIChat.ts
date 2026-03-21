@@ -5,6 +5,7 @@ import { AIProviderFactory } from "../providers/factory";
 import { StreamParser } from "../utils/stream-parser";
 import { executeAITool } from "../utils/tool-executor";
 import { buildExcalidrawSystemPrompt } from "../system-prompt";
+import { useThemeStore } from "@/stores/themeStore";
 import type { AIToolDefinition, AIMessage } from "../providers/types";
 
 const TOOLS: AIToolDefinition[] = [
@@ -51,6 +52,7 @@ export function useAIChat() {
   const messages = useAIChatStore((s) => s.messages);
   const status = useAIChatStore((s) => s.status);
   const errorMessage = useAIChatStore((s) => s.errorMessage);
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
   const sendMessage = async (text: string) => {
     const currentStatus = useAIChatStore.getState().status;
@@ -101,7 +103,7 @@ export function useAIChat() {
 
         const stream = aiProvider.stream(
           providerMessages,
-          buildExcalidrawSystemPrompt(),
+          buildExcalidrawSystemPrompt(resolvedTheme),
           TOOLS,
           { ...config, forceToolUse: iteration === 0 },
           controller.signal

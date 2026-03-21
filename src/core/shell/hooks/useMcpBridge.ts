@@ -105,12 +105,26 @@ export async function dispatchMcpTool(
           return { result: null, error: "Canvas not ready. Try again in a moment." };
         }
         const elements = (input.elements as unknown[]) ?? [];
+        if (elements.length === 0) {
+          api.updateScene({ elements: [] });
+          await saveMcpDiagram(instanceId, []);
+          return { result: "Set 0 element(s). Canvas cleared.", error: null };
+        }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const converted = convertToExcalidrawElements(elements as any);
         const normalized = normalizeTextInContainers(converted as ExcalidrawElement[]);
+        if (normalized.length === 0) {
+          return {
+            result: null,
+            error: `convertToExcalidrawElements returned 0 elements from ${elements.length} input. The elements may be malformed or use an unsupported format. Check that each element has at minimum: type, x, y, width, height.`,
+          };
+        }
         api.updateScene({ elements: normalized });
         await saveMcpDiagram(instanceId, normalized);
-        return { result: `Set ${elements.length} element(s).`, error: null };
+        return {
+          result: `Set ${normalized.length} element(s) (${elements.length} input → ${normalized.length} converted). Saved to disk.`,
+          error: null,
+        };
       }
 
       case "export_svg": {

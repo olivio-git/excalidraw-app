@@ -113,18 +113,26 @@ export async function executeAITool(
         // not x = container left edge (which is the LLM's common mistake).
         const normalized = normalizeTextInContainers(converted as ExcalidrawElement[]);
 
+        if (realElements.length > 0 && normalized.length === 0) {
+          return {
+            toolCallId: "",
+            result: `convertToExcalidrawElements returned 0 elements from ${realElements.length} input. Elements may be malformed. Ensure each has at minimum: type, x, y, width, height.`,
+            isError: true,
+          };
+        }
+
         // Merge additively with existing (minus deleted)
         type AnyEl = Parameters<typeof DiagramController.updateScene>[1]["elements"];
         api.updateScene({ elements: [...existing, ...(normalized as AnyEl)] });
 
         // Scroll canvas to show new content
-        if (realElements.length > 0) {
+        if (normalized.length > 0) {
           setTimeout(() => api.scrollToContent(), 150);
         }
 
         return {
           toolCallId: "",
-          result: `Drew ${realElements.length} element(s).`,
+          result: `Drew ${normalized.length} element(s) (${realElements.length} input → ${normalized.length} converted).`,
           isError: false,
         };
       }

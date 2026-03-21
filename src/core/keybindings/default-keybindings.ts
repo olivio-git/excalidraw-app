@@ -19,6 +19,12 @@ const BUILTIN_KEYBINDINGS = [
   {
     key: "ctrl+n",
     commandId: "diagram.action.newDiagram",
+    when: "!explorerFocus",
+  },
+  {
+    key: "ctrl+n",
+    commandId: "explorer.action.newFile",
+    when: "explorerFocus",
   },
   {
     key: "ctrl+shift+p",
@@ -94,6 +100,7 @@ export function registerDefaultKeybindings(): void {
       chord: keyNormalizer.normalizeChord(binding.key),
       source: KeybindingSource.Builtin,
       ...("allowInInput" in binding && { allowInInput: binding.allowInInput }),
+      ...("when" in binding && { when: binding.when }),
     });
   }
 }

@@ -29,6 +29,7 @@ import { FileTreeNode } from "./FileTreeNode";
 import { InlineInput } from "./InlineInput";
 import { QuickOpenDialog } from "./QuickOpenDialog";
 import { PluginManager } from "@/plugins/plugin-manager";
+import { contextKeyService } from "@/core/keybindings/context-key-service";
 import { updateTabsAfterRename, closeTabsForDeletedPath } from "./explorer-tab-sync";
 import { sortTree, flattenVisible, filterTree, getFilteredExpandedPaths } from "./explorer-utils";
 import { useDragAndDrop } from "@/core/shell/hooks/useDragAndDrop";
@@ -525,6 +526,53 @@ export const ExplorerPanel = () => {
     });
     return () => {
       PluginManager.unregisterCommandHandler("workbench.action.openQuickOpen");
+    };
+  }, []);
+
+  // -------------------------------------------------------------------------
+  // explorerFocus context key — drives the ctrl+n keybinding split
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const onFocusIn = () => contextKeyService.set("explorerFocus", true);
+    const onFocusOut = (e: FocusEvent) => {
+      if (!container.contains(e.relatedTarget as Node | null)) {
+        contextKeyService.set("explorerFocus", false);
+      }
+    };
+
+    container.addEventListener("focusin", onFocusIn);
+    container.addEventListener("focusout", onFocusOut);
+    return () => {
+      container.removeEventListener("focusin", onFocusIn);
+      container.removeEventListener("focusout", onFocusOut);
+      contextKeyService.set("explorerFocus", false);
+    };
+  }, []);
+
+  // -------------------------------------------------------------------------
+  // explorer.action.newFile — ctrl+n when explorerFocus
+  // -------------------------------------------------------------------------
+
+  const getCreateTargetRef = useRef(getCreateTarget);
+  useEffect(() => {
+    getCreateTargetRef.current = getCreateTarget;
+  }, [getCreateTarget]);
+
+  const handleNewFileRef = useRef(handleNewFile);
+  useEffect(() => {
+    handleNewFileRef.current = handleNewFile;
+  }, [handleNewFile]);
+
+  useEffect(() => {
+    PluginManager.registerCommandHandler("explorer.action.newFile", () => {
+      handleNewFileRef.current(getCreateTargetRef.current());
+    });
+    return () => {
+      PluginManager.unregisterCommandHandler("explorer.action.newFile");
     };
   }, []);
 

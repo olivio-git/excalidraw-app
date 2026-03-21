@@ -57,7 +57,18 @@ export function useTabRouter() {
       return;
     }
 
-    // No matching tab found — do not auto-create one
+    // Auto-create tab for routes that have a component and don't need an instanceId.
+    // Routes like /diagram always carry a ?file= param (instanceId), so they won't
+    // be auto-created here — they open explicitly via ExplorerPanel.
+    if (!fileParam && route.component) {
+      const { addTab } = useTabStore.getState();
+      addTab({
+        routeId: route.id,
+        path,
+        title: route.name,
+        icon: route.icon,
+      });
+    }
   }, [location.pathname, location.search]);
 
   // Tab -> URL sync: When active tab changes, navigate to its path.

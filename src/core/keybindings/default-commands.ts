@@ -5,6 +5,7 @@ import { useDiagramStore } from "@/core/diagram/store/diagram-store";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { diagramFileService } from "@/core/diagram/services/diagram-file.service";
 import { DiagramController } from "@/core/diagram/DiagramController";
+import { prompt } from "@/shared/lib/prompt";
 
 // ── Core command handlers ─────────────────────────────────────────────────────
 //
@@ -38,8 +39,23 @@ async function newDiagramHandler(): Promise<void> {
   const workspaceDir = useWorkspaceStore.getState().workspaceDir;
   if (!workspaceDir) return;
 
+  const result = await prompt({
+    title: "Nuevo diagrama",
+    fields: [
+      {
+        id: "name",
+        label: "Nombre",
+        placeholder: "mi-diagrama",
+        required: true,
+      },
+    ],
+    confirmLabel: "Crear",
+  });
+
+  if (!result) return;
+
+  const name = result.name.trim() || `diagram-${Date.now()}`;
   const { addTab } = useTabStore.getState();
-  const name = `diagram-${Date.now()}`;
   const filePath = await diagramFileService.createNewDiagram(workspaceDir, name);
   const fileName = filePath.split("/").pop() ?? name;
 

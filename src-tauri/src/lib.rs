@@ -217,5 +217,5 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![get_external_plugins, mcp_ack])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .expect("error while running tauri application:review logs for details");
 }

@@ -130,7 +130,7 @@ export async function dispatchMcpTool(
         if (existing) {
           useTabStore.getState().setActiveTab(existing.id);
           syncExplorerToFile(filePath);
-          break;
+          return { result: `Focused ${name}.`, error: null };
         }
         const title = handler.displayName ? handler.displayName(name) : name;
         useTabStore.getState().addTab({

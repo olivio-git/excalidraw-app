@@ -292,7 +292,7 @@ export async function dispatchMcpTool(
         const absolutePath = await join(workspaceDir, filePath);
         const { tabs } = useTabStore.getState();
         const matchingTabs = tabs.filter(
-          (t) => t.instanceId === absolutePath || t.instanceId.startsWith(absolutePath + "/")
+          (t) => t.instanceId === absolutePath || t.instanceId?.startsWith(absolutePath + "/")
         );
         for (const tab of matchingTabs) {
           useTabStore.getState().removeTab(tab.id);

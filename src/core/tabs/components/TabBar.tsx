@@ -11,6 +11,8 @@ import { cn } from "@/shared/lib/utils";
 import { useTabStore } from "../store/tab-store";
 import type { TabInstance } from "../types";
 import { RouteRegistry } from "@/core/routing/route-registry";
+import { useTabsSettingsStore } from "@/stores/tabsSettingsStore";
+import { useHomeDir } from "@/shared/hooks/useHomeDir";
 import {
   closestCenter,
   DndContext,
@@ -60,6 +62,8 @@ const TabBar: React.FC<TabBarProps> = ({ className, alwaysVisible = false }) => 
 
   const tabs = useTabStore((s) => s.tabs);
   const activeTabId = useTabStore((s) => s.activeTabId);
+  const allowCloseLastTab = useTabsSettingsStore((s) => s.allowCloseLastTab);
+  const homeDir = useHomeDir();
   const setActiveTab = useTabStore((s) => s.setActiveTab);
   const removeTab = useTabStore((s) => s.removeTab);
   const reorderTabs = useTabStore((s) => s.reorderTabs);
@@ -120,6 +124,8 @@ const TabBar: React.FC<TabBarProps> = ({ className, alwaysVisible = false }) => 
               : activeTab.path;
             navigate(url);
           }
+        } else {
+          navigate("/");
         }
       }
     },
@@ -164,7 +170,8 @@ const TabBar: React.FC<TabBarProps> = ({ className, alwaysVisible = false }) => 
                     <Tab
                       tab={tab}
                       isActive={tab.id === activeTabId}
-                      isLastTab={tabs.length === 1}
+                      isLastTab={tabs.length === 1 && !allowCloseLastTab}
+                      homeDir={homeDir}
                       onTabClick={handleTabClick}
                       onCloseTab={handleCloseTab}
                       onCloseOthers={closeOtherTabs}

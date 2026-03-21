@@ -18,6 +18,7 @@ import {
   ContextMenuTrigger,
 } from "@/shared/components/ui/context-menu";
 import { TooltipWrapper } from "@/shared/common/TooltipWrapper";
+import { tildify } from "@/shared/lib/path";
 import { InlineInput } from "./InlineInput";
 import { fileIconRegistry } from "./file-icon-registry";
 import { fileHandlerRegistry } from "./file-handler-registry";
@@ -37,6 +38,7 @@ export interface FileTreeNodeProps {
   renamingPath: string | null;
   creating: CreatingState | null;
   workspaceDir: string;
+  homeDir?: string;
 
   // New Phase 0 props — optional until wired in 0.8
   selectedPaths?: Set<string>;
@@ -76,6 +78,7 @@ export const FileTreeNode = ({
   renamingPath,
   creating,
   workspaceDir,
+  homeDir = "",
   selectedPaths,
   focusedPath,
   clipboardState,
@@ -158,6 +161,7 @@ export const FileTreeNode = ({
     renamingPath,
     creating,
     workspaceDir,
+    homeDir,
     selectedPaths,
     focusedPath,
     clipboardState,
@@ -218,13 +222,14 @@ export const FileTreeNode = ({
       const mtimePart = mtime !== null ? formatDate(mtime) : null;
       setTooltipContent(mtimePart ? `${sizePart} · ${mtimePart}` : sizePart);
     } catch {
-      // stat failed (e.g. permissions) — show name only, don't retry
+      // stat failed (e.g. permissions) — no extra info, don't retry
       statCache.current = { size: 0, mtime: null };
-      setTooltipContent(entry.name);
+      setTooltipContent("");
     }
   };
 
-  const tooltipLabel = tooltipContent ? `${entry.name}\n${tooltipContent}` : entry.name;
+  const displayPath = homeDir ? tildify(entry.path, homeDir) : entry.path;
+  const tooltipLabel = tooltipContent ? `${displayPath}\n${tooltipContent}` : displayPath;
 
   if (entry.isDir) {
     return (

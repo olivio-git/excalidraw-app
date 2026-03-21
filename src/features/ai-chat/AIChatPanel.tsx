@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import { Trash2 } from "lucide-react";
-import { useNavigate } from "react-router";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { ScrollArea } from "@/shared/components/ui/scroll-area";
@@ -10,9 +9,9 @@ import { useAISettingsStore } from "@/features/settings/ai/ai-settings-store";
 import { useAIChat } from "./hooks/useAIChat";
 import { AIChatMessage } from "./AIChatMessage";
 import { AIChatInput } from "./AIChatInput";
+import { PluginManager } from "@/plugins/plugin-manager";
 
 export function AIChatPanel() {
-  const navigate = useNavigate();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const clearMessages = useAIChatStore((s) => s.clearMessages);
@@ -37,7 +36,7 @@ export function AIChatPanel() {
   };
 
   const goToSettings = () => {
-    navigate("/settings");
+    PluginManager.executeCommand("workbench.action.openSettings");
   };
 
   return (

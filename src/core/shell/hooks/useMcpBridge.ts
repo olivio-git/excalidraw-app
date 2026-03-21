@@ -47,12 +47,27 @@ const flattenDir = async (dir: string, prefix: string): Promise<FlatFileEntry[]>
 
 export const hasPathTraversal = (p: string): boolean => p.includes("..") || p.startsWith("/");
 
-async function saveMcpDiagram(instanceId: string): Promise<void> {
+function syncExplorerToFile(filePath: string): void {
+  useExplorerSelectionStore.getState().setSelectedPaths([filePath]);
+  window.dispatchEvent(
+    new CustomEvent("explorer:set-selection", { detail: { paths: [filePath] } })
+  );
+}
+
+async function saveMcpDiagram(
+  instanceId: string,
+  elements: readonly ExcalidrawElement[]
+): Promise<void> {
   const api = DiagramController.getApi(instanceId);
   if (!api) return;
-  await useDiagramStore
-    .getState()
-    .saveDiagram(instanceId, api.getSceneElements(), api.getAppState(), api.getFiles());
+  // Write directly via the file service using instanceId as path (they are equal in this app).
+  // useDiagramStore.saveDiagram silently no-ops if the diagram hasn't been loaded into the
+  // store yet (e.g. right after create_diagram, before the DiagramCanvas has mounted).
+  await diagramFileService.writeDiagram(instanceId, {
+    elements,
+    appState: api.getAppState(),
+    files: api.getFiles(),
+  });
 }
 
 export async function dispatchMcpTool(
@@ -73,7 +88,10 @@ export async function dispatchMcpTool(
       case "update_element": {
         const res = await executeAITool(tool, input, instanceId);
         if (!res.isError && instanceId) {
-          await saveMcpDiagram(instanceId);
+          const api = DiagramController.getApi(instanceId);
+          if (api) {
+            await saveMcpDiagram(instanceId, api.getSceneElements());
+          }
         }
         return { result: res.result, error: res.isError ? res.result : null };
       }
@@ -91,7 +109,7 @@ export async function dispatchMcpTool(
         const converted = convertToExcalidrawElements(elements as any);
         const normalized = normalizeTextInContainers(converted as ExcalidrawElement[]);
         api.updateScene({ elements: normalized });
-        await saveMcpDiagram(instanceId);
+        await saveMcpDiagram(instanceId, normalized);
         return { result: `Set ${elements.length} element(s).`, error: null };
       }
 
@@ -111,7 +129,8 @@ export async function dispatchMcpTool(
         const existing = useTabStore.getState().findTabByPath(routePath, filePath);
         if (existing) {
           useTabStore.getState().setActiveTab(existing.id);
-          break;
+          syncExplorerToFile(filePath);
+          return { result: `Focused ${name}.`, error: null };
         }
         const title = handler.displayName ? handler.displayName(name) : name;
         useTabStore.getState().addTab({
@@ -121,6 +140,7 @@ export async function dispatchMcpTool(
           instanceId: filePath,
           metadata: { filePath },
         });
+        syncExplorerToFile(filePath);
         return { result: `Opened ${name}.`, error: null };
       }
 
@@ -178,6 +198,7 @@ export async function dispatchMcpTool(
           instanceId: filePath,
           metadata: { filePath },
         });
+        syncExplorerToFile(filePath);
         return { result: JSON.stringify({ filePath, instanceId: filePath }), error: null };
       }
 
@@ -271,7 +292,7 @@ export async function dispatchMcpTool(
         const absolutePath = await join(workspaceDir, filePath);
         const { tabs } = useTabStore.getState();
         const matchingTabs = tabs.filter(
-          (t) => t.instanceId === absolutePath || t.instanceId.startsWith(absolutePath + "/")
+          (t) => t.instanceId === absolutePath || t.instanceId?.startsWith(absolutePath + "/")
         );
         for (const tab of matchingTabs) {
           useTabStore.getState().removeTab(tab.id);
@@ -296,6 +317,7 @@ export async function dispatchMcpTool(
         const existing = useTabStore.getState().findTabByPath(routePath, filePath);
         if (existing) {
           useTabStore.getState().setActiveTab(existing.id);
+          syncExplorerToFile(filePath);
           return { result: JSON.stringify({ tabId: existing.id, wasCreated: false }), error: null };
         }
         const title = handler.displayName ? handler.displayName(filename) : filename;
@@ -306,6 +328,7 @@ export async function dispatchMcpTool(
           instanceId: filePath,
           metadata: { filePath },
         });
+        syncExplorerToFile(filePath);
         return { result: JSON.stringify({ tabId, wasCreated: true }), error: null };
       }
 
@@ -338,6 +361,8 @@ export async function dispatchMcpTool(
         }
         if (!tab) return { result: JSON.stringify({ success: false }), error: null };
         useTabStore.getState().setActiveTab(tab.id);
+        const tabFilePath = tab.metadata?.filePath as string | undefined;
+        if (tabFilePath) syncExplorerToFile(tabFilePath);
         return { result: JSON.stringify({ success: true, tabId: tab.id }), error: null };
       }
 

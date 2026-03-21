@@ -47,12 +47,20 @@ const flattenDir = async (dir: string, prefix: string): Promise<FlatFileEntry[]>
 
 export const hasPathTraversal = (p: string): boolean => p.includes("..") || p.startsWith("/");
 
-async function saveMcpDiagram(instanceId: string): Promise<void> {
+async function saveMcpDiagram(
+  instanceId: string,
+  elements: readonly ExcalidrawElement[]
+): Promise<void> {
   const api = DiagramController.getApi(instanceId);
   if (!api) return;
-  await useDiagramStore
-    .getState()
-    .saveDiagram(instanceId, api.getSceneElements(), api.getAppState(), api.getFiles());
+  // Write directly via the file service using instanceId as path (they are equal in this app).
+  // useDiagramStore.saveDiagram silently no-ops if the diagram hasn't been loaded into the
+  // store yet (e.g. right after create_diagram, before the DiagramCanvas has mounted).
+  await diagramFileService.writeDiagram(instanceId, {
+    elements,
+    appState: api.getAppState(),
+    files: api.getFiles(),
+  });
 }
 
 export async function dispatchMcpTool(
@@ -73,7 +81,10 @@ export async function dispatchMcpTool(
       case "update_element": {
         const res = await executeAITool(tool, input, instanceId);
         if (!res.isError && instanceId) {
-          await saveMcpDiagram(instanceId);
+          const api = DiagramController.getApi(instanceId);
+          if (api) {
+            await saveMcpDiagram(instanceId, api.getSceneElements());
+          }
         }
         return { result: res.result, error: res.isError ? res.result : null };
       }
@@ -91,7 +102,7 @@ export async function dispatchMcpTool(
         const converted = convertToExcalidrawElements(elements as any);
         const normalized = normalizeTextInContainers(converted as ExcalidrawElement[]);
         api.updateScene({ elements: normalized });
-        await saveMcpDiagram(instanceId);
+        await saveMcpDiagram(instanceId, normalized);
         return { result: `Set ${elements.length} element(s).`, error: null };
       }
 

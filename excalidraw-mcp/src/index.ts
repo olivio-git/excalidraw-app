@@ -92,6 +92,11 @@ server.tool(
     "Replace ALL elements on the active canvas with the provided elements.",
     "Use draw_elements instead when building a diagram incrementally — it is faster and avoids generating the entire diagram JSON in one shot.",
     "Reserve set_elements for replacing or restoring a known complete canvas state.",
+    "IMPORTANT — text positioning depends on textAlign:",
+    "  'left'   → x is the LEFT EDGE of the text element",
+    "  'center' → x is the CENTER POINT (x = container.x + container.width / 2)",
+    "  'right'  → x is the RIGHT EDGE",
+    "Setting x = container.x for center-aligned text will render it half outside the container.",
     "Diagram is saved to disk automatically after the call.",
   ].join(" "),
   {

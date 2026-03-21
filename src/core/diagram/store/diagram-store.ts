@@ -71,7 +71,7 @@ export const useDiagramStore = create<DiagramStoreState>()((set, get) => ({
     set((state) => ({
       diagrams: {
         ...state.diagrams,
-        [instanceId]: { ...state.diagrams[instanceId], isDirty: false },
+        [instanceId]: { ...state.diagrams[instanceId], isDirty: false, elements, files },
       },
     }));
   },

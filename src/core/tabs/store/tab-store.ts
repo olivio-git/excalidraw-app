@@ -4,6 +4,7 @@ import { tauriTabStorage } from "@/core/storage/tauri-storage";
 import { RouteRegistry } from "@/core/routing/route-registry";
 import { TABS_CONFIG } from "../config";
 import type { TabInstance } from "../types";
+import { useTabsSettingsStore } from "@/stores/tabsSettingsStore";
 
 interface TabState {
   tabs: TabInstance[];
@@ -113,8 +114,8 @@ export const useTabStore = create<TabState>()(
         const tab = state.tabs.find((t) => t.id === tabId);
         if (!tab || tab.isPinned || !tab.isClosable) return;
 
-        // Never close the last remaining tab
-        if (state.tabs.length === 1) return;
+        const { allowCloseLastTab } = useTabsSettingsStore.getState();
+        if (state.tabs.length === 1 && !allowCloseLastTab) return;
 
         const tabIndex = state.tabs.findIndex((t) => t.id === tabId);
         const newTabs = state.tabs.filter((t) => t.id !== tabId);
@@ -149,10 +150,12 @@ export const useTabStore = create<TabState>()(
       closeAllTabs: () => {
         const state = get();
         const pinnedTabs = state.tabs.filter((t) => t.isPinned);
+        const { allowCloseLastTab } = useTabsSettingsStore.getState();
 
-        // Always keep at least one tab (pinned tabs, or the current active tab)
         if (pinnedTabs.length > 0) {
           set({ tabs: pinnedTabs, activeTabId: pinnedTabs[0].id });
+        } else if (allowCloseLastTab) {
+          set({ tabs: [], activeTabId: null });
         } else {
           const keepTab = state.tabs.find((t) => t.id === state.activeTabId) ?? state.tabs[0];
           if (keepTab) {

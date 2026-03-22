@@ -5,18 +5,20 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useAppearanceStore } from "@/stores/appearanceStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { useTabsSettingsStore } from "@/stores/tabsSettingsStore";
 import KeybindingsPanel from "./keybindings/KeybindingsPanel";
 import { AISettingsPanel } from "./ai/AISettingsPanel";
 import { Button } from "@/shared/components/ui/button";
 import { Separator } from "@/shared/components/ui/separator";
 import { cn } from "@/shared/lib/utils";
 
-type SettingsTab = "appearance" | "keybindings" | "workspace" | "ai";
+type SettingsTab = "appearance" | "keybindings" | "workspace" | "ai" | "tabs";
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: "appearance", label: "Appearance" },
   { id: "keybindings", label: "Keybindings" },
   { id: "workspace", label: "Workspace" },
+  { id: "tabs", label: "Tabs" },
   { id: "ai", label: "AI" },
 ];
 
@@ -35,6 +37,9 @@ export default function SettingsPage() {
 
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.setTheme);
+
+  const allowCloseLastTab = useTabsSettingsStore((s) => s.allowCloseLastTab);
+  const setAllowCloseLastTab = useTabsSettingsStore((s) => s.setAllowCloseLastTab);
 
   const fontFamily = useAppearanceStore((s) => s.fontFamily);
   const fontSize = useAppearanceStore((s) => s.fontSize);
@@ -132,6 +137,32 @@ export default function SettingsPage() {
                     Quitar workspace
                   </Button>
                 )}
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* Tabs */}
+        {activeTab === "tabs" && (
+          <div className="space-y-8">
+            <section className="space-y-4">
+              <h2 className="text-base font-semibold">Tab Behavior</h2>
+              <div className="flex items-start justify-between gap-4 rounded-md border border-border px-4 py-3">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">Allow closing the last tab</p>
+                  <p className="text-xs text-muted-foreground">
+                    When enabled, closing the last open tab shows the welcome screen instead of
+                    keeping the tab open.
+                  </p>
+                </div>
+                <Button
+                  variant={allowCloseLastTab ? "default" : "outline"}
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => setAllowCloseLastTab(!allowCloseLastTab)}
+                >
+                  {allowCloseLastTab ? "On" : "Off"}
+                </Button>
               </div>
             </section>
           </div>

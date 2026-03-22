@@ -200,7 +200,9 @@ const DiagramSidebar = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent side="right" align="end" className="w-56" sideOffset={8}>
                 <DropdownMenuGroup>
-                  <DropdownMenuItem onClick={() => navigate("/settings")}>
+                  <DropdownMenuItem
+                    onClick={() => PluginManager.executeCommand("workbench.action.openSettings")}
+                  >
                     <Settings className="mr-2 size-4" />
                     <span>Settings</span>
                   </DropdownMenuItem>

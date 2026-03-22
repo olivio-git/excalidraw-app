@@ -14,11 +14,15 @@ import { Pin, X } from "lucide-react";
 import React, { useMemo } from "react";
 import type { TabInstance } from "../types";
 import { RouteRegistry } from "@/core/routing/route-registry";
+import { tildify, toRelativePath } from "@/shared/lib/path";
+import { notify } from "@/shared/lib/notify";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 
 interface TabProps {
   tab: TabInstance;
   isActive: boolean;
   isLastTab: boolean;
+  homeDir?: string;
   onTabClick: (tab: TabInstance) => void;
   onCloseTab: (e: React.MouseEvent, tabId: string) => void;
   onCloseOthers: (tabId: string) => void;
@@ -33,6 +37,7 @@ const Tab = React.memo(
     tab,
     isActive,
     isLastTab,
+    homeDir = "",
     onTabClick,
     onCloseTab,
     onCloseOthers,
@@ -41,6 +46,8 @@ const Tab = React.memo(
     onPin,
     onUnpin,
   }: TabProps) => {
+    const workspaceDir = useWorkspaceStore((s) => s.workspaceDir);
+
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
       id: tab.id,
     });
@@ -98,7 +105,14 @@ const Tab = React.memo(
               ) : (
                 <>
                   {Icon && <Icon className="size-3 flex-shrink-0" />}
-                  <span className="truncate flex-1 text-left" title={tab.title}>
+                  <span
+                    className="truncate flex-1 text-left"
+                    title={
+                      tab.instanceId && homeDir
+                        ? tildify(tab.instanceId, homeDir)
+                        : (tab.instanceId ?? tab.title)
+                    }
+                  >
                     {tab.title || tab.path.split("/").pop() || "Untitled"}
                   </span>
                   <span
@@ -134,6 +148,30 @@ const Tab = React.memo(
               <ContextMenuItem onClick={() => onUnpin(tab.id)}>Unpin tab</ContextMenuItem>
             ) : (
               <ContextMenuItem onClick={() => onPin(tab.id)}>Pin tab</ContextMenuItem>
+            )}
+            {tab.instanceId && (
+              <>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  onClick={() => {
+                    void navigator.clipboard.writeText(tab.instanceId!);
+                    notify("Ruta copiada", { type: "success" });
+                  }}
+                >
+                  Copy absolute path
+                </ContextMenuItem>
+                {workspaceDir && tab.instanceId.startsWith(workspaceDir) && (
+                  <ContextMenuItem
+                    onClick={() => {
+                      const relative = toRelativePath(tab.instanceId!, workspaceDir);
+                      void navigator.clipboard.writeText(relative);
+                      notify("Ruta relativa copiada", { type: "success" });
+                    }}
+                  >
+                    Copy relative path
+                  </ContextMenuItem>
+                )}
+              </>
             )}
             <ContextMenuSeparator />
             <ContextMenuItem onClick={() => onCloseOthers(tab.id)}>

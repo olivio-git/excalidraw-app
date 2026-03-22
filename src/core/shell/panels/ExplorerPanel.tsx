@@ -3,6 +3,8 @@ import { readDir, mkdir, remove } from "@tauri-apps/plugin-fs";
 import { rename } from "@tauri-apps/plugin-fs";
 import { open } from "@tauri-apps/plugin-dialog";
 import { join } from "@tauri-apps/api/path";
+import { tildify, toRelativePath } from "@/shared/lib/path";
+import { useHomeDir } from "@/shared/hooks/useHomeDir";
 import { FolderOpen, FolderClosed, File } from "lucide-react";
 import {
   DndContext,
@@ -102,6 +104,7 @@ export const ExplorerPanel = () => {
   );
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [creating, setCreating] = useState<CreatingState | null>(null);
+  const homeDirPath = useHomeDir();
 
   // --- Phase 1: selection + focus ---
   const [focusedPath, setFocusedPath] = useState<string | null>(null);
@@ -417,8 +420,7 @@ export const ExplorerPanel = () => {
   }, []);
 
   const handleCopyRelativePath = useCallback((path: string, wsDir: string) => {
-    const relative = path.replace(`${wsDir}/`, "");
-    navigator.clipboard.writeText(relative);
+    void navigator.clipboard.writeText(toRelativePath(path, wsDir));
   }, []);
 
   // -------------------------------------------------------------------------
@@ -729,6 +731,7 @@ export const ExplorerPanel = () => {
     renamingPath,
     creating,
     workspaceDir,
+    homeDir: homeDirPath,
     selectedPaths,
     focusedPath,
     clipboardState,
@@ -802,7 +805,10 @@ export const ExplorerPanel = () => {
             }}
           >
             {/* Root workspace node */}
-            <TooltipWrapper tooltip={workspaceDir} side="right">
+            <TooltipWrapper
+              tooltip={homeDirPath ? tildify(workspaceDir, homeDirPath) : workspaceDir}
+              side="right"
+            >
               <button
                 onClick={() => handleToggle(workspaceDir)}
                 className="flex items-center gap-1 w-full text-left h-7 px-2 hover:bg-accent rounded text-foreground/90"

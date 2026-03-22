@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -63,12 +64,13 @@ export function confirm(options: ConfirmOptions = {}): Promise<boolean> {
 
 export function ConfirmDialog() {
   const { open, options, _settle } = useConfirmStore();
+  const { t } = useTranslation("common");
 
   const {
-    title = "¿Estás seguro?",
+    title = t("dialog.title"),
     description,
-    confirmLabel = "Confirmar",
-    cancelLabel = "Cancelar",
+    confirmLabel = t("dialog.confirm"),
+    cancelLabel = t("dialog.cancel"),
     variant = "default",
   } = options;
 

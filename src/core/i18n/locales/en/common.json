@@ -1,0 +1,97 @@
+{
+  "app": {
+    "name": "Excalidraw"
+  },
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "rename": "Rename",
+    "create": "Create",
+    "open": "Open",
+    "close": "Close",
+    "copy": "Copy",
+    "edit": "Edit",
+    "tryAgain": "Try again",
+    "resetToDefaults": "Reset to Defaults"
+  },
+  "status": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success"
+  },
+  "dialog": {
+    "title": "Are you sure?",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "enterData": "Enter your data"
+  },
+  "error": {
+    "unexpectedTitle": "An unexpected problem occurred",
+    "unexpectedDescription": "We apologize for the inconvenience. An error prevented this view from loading correctly."
+  },
+  "sidebar": {
+    "collapse": "Collapse menu",
+    "expand": "Expand menu"
+  },
+  "panels": {
+    "explorer": "Explorer",
+    "plugins": "Plugins",
+    "navigation": "Navigation",
+    "aiChat": "AI Chat",
+    "library": "Libraries",
+    "settings": "Settings",
+    "pluginAdmin": "Plugin Administration",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System"
+  },
+  "commandPalette": {
+    "noCommandsFound": "No commands found",
+    "noWorkspaceSelected": "No workspace selected",
+    "noFilesFound": "No files found",
+    "footer": {
+      "navigate": "navigate",
+      "run": "run",
+      "open": "open",
+      "forCommands": "for commands"
+    }
+  },
+  "welcomeScreen": {
+    "noFilesOpen": "No files open",
+    "openWorkspaceHint": "Open a workspace from the side panel to get started"
+  },
+  "library": {
+    "openDiagramTip": "Open a diagram to add libraries",
+    "searchPlaceholder": "Search libraries…",
+    "loadError": "Failed to load libraries",
+    "retry": "Retry",
+    "installed": "Installed",
+    "browse": "Browse",
+    "noResults": "No libraries match your search."
+  },
+  "aiChat": {
+    "header": "AI Chat",
+    "clearChat": "Clear chat",
+    "clearConfirmDescription": "Clear all messages?",
+    "clearLabel": "Clear",
+    "configureApiKey": "Configure an API key in",
+    "settingsLink": "Settings → AI",
+    "emptyState": "Ask AI to draw or modify your diagram.",
+    "inputPlaceholder": "Ask AI to draw or modify your diagram…",
+    "stopGeneration": "Stop generation",
+    "sendMessage": "Send (Enter)",
+    "context": "Context",
+    "noDiagramActive": "No diagram active",
+    "thinking": "Thinking…",
+    "toolError": "Tool error",
+    "tools": {
+      "draw_elements": "Drawing on canvas",
+      "clear_canvas": "Clearing canvas",
+      "get_elements": "Reading canvas",
+      "update_element": "Updating element"
+    }
+  }
+}

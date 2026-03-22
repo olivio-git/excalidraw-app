@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Eye, EyeOff, Loader2, CheckCircle2, XCircle } from "lucide-react";
 
 import { useAISettingsStore } from "./ai-settings-store";
@@ -44,6 +45,7 @@ type InlineStatus =
   | { type: "error"; message: string };
 
 export function AISettingsPanel() {
+  const { t } = useTranslation("settings");
   const activeProvider = useAISettingsStore((s) => s.activeProvider);
   const providers = useAISettingsStore((s) => s.providers);
   const setActiveProvider = useAISettingsStore((s) => s.setActiveProvider);
@@ -91,7 +93,7 @@ export function AISettingsPanel() {
     const model = providers[activeProvider].model;
 
     if (!apiKey) {
-      setConnectionStatus({ type: "error", message: "No API key configured" });
+      setConnectionStatus({ type: "error", message: t("ai.actions.noApiKey") });
       return;
     }
 
@@ -134,10 +136,8 @@ export function AISettingsPanel() {
     <div className="space-y-8">
       {/* Provider selector */}
       <section className="space-y-3">
-        <h2 className="text-base font-semibold">AI Provider</h2>
-        <p className="text-sm text-muted-foreground">
-          Choose which AI provider to use for diagram assistance.
-        </p>
+        <h2 className="text-base font-semibold">{t("ai.provider.title")}</h2>
+        <p className="text-sm text-muted-foreground">{t("ai.provider.description")}</p>
         <div className="flex gap-2 flex-wrap">
           {PROVIDERS.map(({ id, label }) => (
             <Button
@@ -154,15 +154,17 @@ export function AISettingsPanel() {
 
       {/* API Key */}
       <section className="space-y-3">
-        <h2 className="text-base font-semibold">API Key</h2>
+        <h2 className="text-base font-semibold">{t("ai.apiKey.title")}</h2>
         {maskedPreview && (
           <p className="text-xs text-muted-foreground font-mono">
-            Current: <span className="text-foreground">{maskedPreview}</span>
+            {t("ai.apiKey.current")} <span className="text-foreground">{maskedPreview}</span>
           </p>
         )}
         <div className="space-y-2">
           <label className="text-sm font-medium">
-            {PROVIDERS.find((p) => p.id === activeProvider)?.label} API Key
+            {t("ai.apiKey.label", {
+              provider: PROVIDERS.find((p) => p.id === activeProvider)?.label,
+            })}
           </label>
           <div className="relative">
             <Input
@@ -178,7 +180,7 @@ export function AISettingsPanel() {
               type="button"
               onClick={() => setShowKey((v) => !v)}
               className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition-colors"
-              aria-label={showKey ? "Hide API key" : "Show API key"}
+              aria-label={showKey ? t("ai.apiKey.hideKey") : t("ai.apiKey.showKey")}
             >
               {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
@@ -188,9 +190,9 @@ export function AISettingsPanel() {
 
       {/* Model selector */}
       <section className="space-y-3">
-        <h2 className="text-base font-semibold">Model</h2>
+        <h2 className="text-base font-semibold">{t("ai.model.title")}</h2>
         <div className="space-y-2">
-          <label className="text-sm font-medium">Select Model</label>
+          <label className="text-sm font-medium">{t("ai.model.selectLabel")}</label>
           <select
             value={providers[activeProvider]?.model ?? ""}
             onChange={(e) => setProviderModel(activeProvider, e.target.value)}
@@ -212,7 +214,7 @@ export function AISettingsPanel() {
       <section className="space-y-3">
         <div className="flex items-center gap-3 flex-wrap">
           <Button size="sm" onClick={handleSave}>
-            Save
+            {t("ai.actions.save")}
           </Button>
           <Button
             variant="outline"
@@ -221,20 +223,20 @@ export function AISettingsPanel() {
             disabled={connectionStatus.type === "loading"}
           >
             {connectionStatus.type === "loading" && <Loader2 className="size-4 animate-spin" />}
-            Test Connection
+            {t("ai.actions.testConnection")}
           </Button>
 
           {saveStatus.type === "success" && (
             <span className="inline-flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400">
               <CheckCircle2 className="size-4" />
-              Saved
+              {t("ai.actions.saved")}
             </span>
           )}
 
           {connectionStatus.type === "success" && saveStatus.type === "idle" && (
             <span className="inline-flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400">
               <CheckCircle2 className="size-4" />
-              Connected
+              {t("ai.actions.connected")}
             </span>
           )}
           {connectionStatus.type === "error" && (

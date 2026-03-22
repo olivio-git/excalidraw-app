@@ -1,3 +1,4 @@
+import "@/core/i18n/i18n";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
@@ -10,6 +11,8 @@ import { ErrorBoundary } from "@/shared/components/error/ErrorBoundary";
 import { ErrorFallback } from "@/shared/components/error/ErrorFallback";
 import { registerDefaultKeybindings } from "@/core/keybindings/default-keybindings";
 import { initializeCoreCommands } from "@/core/keybindings/default-commands";
+import { useLanguageStore } from "@/stores/languageStore";
+import i18n from "@/core/i18n/i18n";
 
 registerFeatureRoutes();
 registerDefaultKeybindings();
@@ -18,6 +21,11 @@ PluginManager.loadInternalPlugins();
 
 export default function App() {
   const [ready, setReady] = useState(false);
+  const language = useLanguageStore((s) => s.language);
+
+  useEffect(() => {
+    void i18n.changeLanguage(language);
+  }, [language]);
 
   useEffect(() => {
     const init = async () => {

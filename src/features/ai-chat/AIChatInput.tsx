@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Send, Square } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { useAISettingsStore } from "@/features/settings/ai/ai-settings-store";
@@ -14,6 +15,7 @@ interface AIChatInputProps {
 }
 
 export function AIChatInput({ onSend, onCancel, isStreaming, disabled }: AIChatInputProps) {
+  const { t } = useTranslation("common");
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -51,7 +53,7 @@ export function AIChatInput({ onSend, onCancel, isStreaming, disabled }: AIChatI
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask AI to draw or modify your diagram…"
+          placeholder={t("aiChat.inputPlaceholder")}
           rows={3}
           disabled={isStreaming || disabled}
           className={cn(
@@ -67,7 +69,7 @@ export function AIChatInput({ onSend, onCancel, isStreaming, disabled }: AIChatI
               variant="destructive"
               size="icon"
               onClick={onCancel}
-              title="Stop generation"
+              title={t("aiChat.stopGeneration")}
               className="size-7"
             >
               <Square className="size-3.5" />
@@ -78,7 +80,7 @@ export function AIChatInput({ onSend, onCancel, isStreaming, disabled }: AIChatI
               size="icon"
               onClick={handleSend}
               disabled={!value.trim() || disabled}
-              title="Send (Enter)"
+              title={t("aiChat.sendMessage")}
               className="size-7"
             >
               <Send className="size-3.5" />
@@ -96,10 +98,12 @@ export function AIChatInput({ onSend, onCancel, isStreaming, disabled }: AIChatI
             className="text-[10px] text-muted-foreground/60 truncate max-w-[120px]"
             title={contextLabel}
           >
-            Context: {contextLabel}
+            {t("aiChat.context")}: {contextLabel}
           </span>
         ) : (
-          <span className="text-[10px] text-muted-foreground/40">No diagram active</span>
+          <span className="text-[10px] text-muted-foreground/40">
+            {t("aiChat.noDiagramActive")}
+          </span>
         )}
       </div>
     </div>

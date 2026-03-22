@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/components/ui/button";
 import { TooltipWrapper } from "@/shared/common/TooltipWrapper";
 import {
@@ -46,7 +47,15 @@ const Tab = React.memo(
     onPin,
     onUnpin,
   }: TabProps) => {
+    const { t } = useTranslation("tabs");
+    const { t: tCommands } = useTranslation("commands");
     const workspaceDir = useWorkspaceStore((s) => s.workspaceDir);
+
+    // Route tabs get translated at render time. Diagram tabs use tab.title (the filename).
+    const displayTitle =
+      tab.routeId && tab.routeId !== "diagram"
+        ? tCommands(`routes.${tab.routeId}`, { defaultValue: tab.title })
+        : tab.title;
 
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
       id: tab.id,
@@ -93,7 +102,7 @@ const Tab = React.memo(
               )}
             >
               {tab.isPinned ? (
-                <TooltipWrapper tooltip={tab.title} side="bottom">
+                <TooltipWrapper tooltip={displayTitle} side="bottom">
                   <span className="flex items-center justify-center">
                     {Icon ? (
                       <Icon className="size-3 flex-shrink-0" />
@@ -113,7 +122,7 @@ const Tab = React.memo(
                         : (tab.instanceId ?? tab.title)
                     }
                   >
-                    {tab.title || tab.path.split("/").pop() || "Untitled"}
+                    {displayTitle || tab.path.split("/").pop() || t("tab.untitled")}
                   </span>
                   <span
                     className={cn(
@@ -133,7 +142,7 @@ const Tab = React.memo(
                         "flex-shrink-0 rounded-sm opacity-0 group-hover:opacity-100 hover:bg-border p-0.5 transition-opacity cursor-pointer",
                         isActive && "opacity-100"
                       )}
-                      aria-label="Close tab"
+                      aria-label={t("tab.closeTab")}
                     >
                       <X className="size-3" />
                     </span>
@@ -145,9 +154,9 @@ const Tab = React.memo(
           </ContextMenuTrigger>
           <ContextMenuContent className="border-none">
             {tab.isPinned ? (
-              <ContextMenuItem onClick={() => onUnpin(tab.id)}>Unpin tab</ContextMenuItem>
+              <ContextMenuItem onClick={() => onUnpin(tab.id)}>{t("tab.unpinTab")}</ContextMenuItem>
             ) : (
-              <ContextMenuItem onClick={() => onPin(tab.id)}>Pin tab</ContextMenuItem>
+              <ContextMenuItem onClick={() => onPin(tab.id)}>{t("tab.pinTab")}</ContextMenuItem>
             )}
             {tab.instanceId && (
               <>
@@ -155,33 +164,33 @@ const Tab = React.memo(
                 <ContextMenuItem
                   onClick={() => {
                     void navigator.clipboard.writeText(tab.instanceId!);
-                    notify("Ruta copiada", { type: "success" });
+                    notify(t("status.pathCopied"), { type: "success" });
                   }}
                 >
-                  Copy absolute path
+                  {t("tab.copyAbsolutePath")}
                 </ContextMenuItem>
                 {workspaceDir && tab.instanceId.startsWith(workspaceDir) && (
                   <ContextMenuItem
                     onClick={() => {
                       const relative = toRelativePath(tab.instanceId!, workspaceDir);
                       void navigator.clipboard.writeText(relative);
-                      notify("Ruta relativa copiada", { type: "success" });
+                      notify(t("status.relativePathCopied"), { type: "success" });
                     }}
                   >
-                    Copy relative path
+                    {t("tab.copyRelativePath")}
                   </ContextMenuItem>
                 )}
               </>
             )}
             <ContextMenuSeparator />
             <ContextMenuItem onClick={() => onCloseOthers(tab.id)}>
-              Close other tabs
+              {t("tab.closeOthers")}
             </ContextMenuItem>
             <ContextMenuItem onClick={() => onCloseToRight(tab.id)}>
-              Close tabs to the right
+              {t("tab.closeToRight")}
             </ContextMenuItem>
             {!isLastTab && (
-              <ContextMenuItem onClick={() => onCloseAll()}>Close all tabs</ContextMenuItem>
+              <ContextMenuItem onClick={() => onCloseAll()}>{t("tab.closeAll")}</ContextMenuItem>
             )}
           </ContextMenuContent>
         </ContextMenu>

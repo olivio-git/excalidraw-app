@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import {
   FolderOpen,
   FolderClosed,
@@ -102,6 +103,7 @@ export const FileTreeNode = ({
   draggingPath,
   overFolderPath,
 }: FileTreeNodeProps) => {
+  const { t } = useTranslation("explorer");
   const pl = 8 + depth * 25;
   const isExpanded = expandedPaths.has(entry.path);
   const isActive = !entry.isDir && entry.path === activeFilePath;
@@ -201,7 +203,7 @@ export const FileTreeNode = ({
     if (statCache.current !== null) {
       // Already cached but tooltip not built yet (race guard)
       const { size, mtime } = statCache.current;
-      const sizePart = entry.isDir ? "Carpeta" : formatFileSize(size);
+      const sizePart = entry.isDir ? t("tooltip.folder") : formatFileSize(size);
       const mtimePart = mtime !== null ? formatDate(mtime) : null;
       setTooltipContent(mtimePart ? `${sizePart} · ${mtimePart}` : sizePart);
       return;
@@ -218,7 +220,7 @@ export const FileTreeNode = ({
             ? info.mtime
             : null;
       statCache.current = { size, mtime };
-      const sizePart = entry.isDir ? "Carpeta" : formatFileSize(size);
+      const sizePart = entry.isDir ? t("tooltip.folder") : formatFileSize(size);
       const mtimePart = mtime !== null ? formatDate(mtime) : null;
       setTooltipContent(mtimePart ? `${sizePart} · ${mtimePart}` : sizePart);
     } catch {
@@ -292,31 +294,37 @@ export const FileTreeNode = ({
             </ContextMenuTrigger>
             <ContextMenuContent>
               <ContextMenuItem onClick={() => onNewFile(entry.path)}>
-                Nuevo archivo aquí
+                {t("contextMenu.newFileHere")}
               </ContextMenuItem>
               <ContextMenuItem onClick={() => onNewFolder(entry.path)}>
-                Nueva carpeta aquí
+                {t("contextMenu.newFolderHere")}
               </ContextMenuItem>
               <ContextMenuSeparator />
-              <ContextMenuItem onClick={() => onStartRename(entry.path)}>Renombrar</ContextMenuItem>
+              <ContextMenuItem onClick={() => onStartRename(entry.path)}>
+                {t("contextMenu.rename")}
+              </ContextMenuItem>
               <ContextMenuSeparator />
               {onCut && (
                 <ContextMenuItem onClick={() => onCut(effectiveSelectedPaths)}>
-                  Cortar
+                  {t("contextMenu.cut")}
                 </ContextMenuItem>
               )}
               {onCopy && (
                 <ContextMenuItem onClick={() => onCopy(effectiveSelectedPaths)}>
-                  Copiar
+                  {t("contextMenu.copy")}
                 </ContextMenuItem>
               )}
               {onPaste && hasPasteableClipboard && (
-                <ContextMenuItem onClick={() => onPaste(entry.path)}>Pegar aquí</ContextMenuItem>
+                <ContextMenuItem onClick={() => onPaste(entry.path)}>
+                  {t("contextMenu.paste")}
+                </ContextMenuItem>
               )}
               {(onCut || onCopy) && <ContextMenuSeparator />}
-              <ContextMenuItem onClick={() => onCopyPath(entry.path)}>Copiar ruta</ContextMenuItem>
+              <ContextMenuItem onClick={() => onCopyPath(entry.path)}>
+                {t("contextMenu.copyPath")}
+              </ContextMenuItem>
               <ContextMenuItem onClick={() => onCopyRelativePath(entry.path, workspaceDir)}>
-                Copiar ruta relativa
+                {t("contextMenu.copyRelativePath")}
               </ContextMenuItem>
               <ContextMenuSeparator />
               {isMultiSelected && onBatchDelete ? (
@@ -324,14 +332,14 @@ export const FileTreeNode = ({
                   onClick={() => onBatchDelete(effectiveSelectedPaths)}
                   className="text-destructive focus:text-destructive"
                 >
-                  Eliminar {multiSelectCount} elementos
+                  {t("contextMenu.deleteMultiple", { count: multiSelectCount })}
                 </ContextMenuItem>
               ) : (
                 <ContextMenuItem
                   onClick={() => onDelete(entry.path, true)}
                   className="text-destructive focus:text-destructive"
                 >
-                  Eliminar carpeta
+                  {t("contextMenu.deleteFolder")}
                 </ContextMenuItem>
               )}
             </ContextMenuContent>
@@ -346,7 +354,7 @@ export const FileTreeNode = ({
                   onNewFile(entry.path);
                 }}
                 className="size-4 flex items-center justify-center rounded hover:bg-foreground/10 text-muted-foreground hover:text-foreground"
-                title="Nuevo archivo"
+                title={t("nodeButton.newFile")}
               >
                 <Plus className="size-3" />
               </button>
@@ -356,7 +364,7 @@ export const FileTreeNode = ({
                   onNewFolder(entry.path);
                 }}
                 className="size-4 flex items-center justify-center rounded hover:bg-foreground/10 text-muted-foreground hover:text-foreground"
-                title="Nueva carpeta"
+                title={t("nodeButton.newFolder")}
               >
                 <FolderPlus className="size-3" />
               </button>
@@ -427,7 +435,7 @@ export const FileTreeNode = ({
                 }
               }}
               disabled={!hasHandler}
-              title={!hasHandler ? "No hay visor registrado para este tipo de archivo" : undefined}
+              title={!hasHandler ? t("nodeButton.noViewer") : undefined}
               className={cn(
                 "flex items-center gap-1.5 w-full text-left h-7 pr-2 rounded text-xs",
                 !hasHandler ? "opacity-40 cursor-default" : "hover:bg-accent",
@@ -466,19 +474,29 @@ export const FileTreeNode = ({
           </TooltipWrapper>
         </ContextMenuTrigger>
         <ContextMenuContent>
-          <ContextMenuItem onClick={() => onOpen(entry.path, entry.name)}>Abrir</ContextMenuItem>
-          <ContextMenuItem onClick={() => onStartRename(entry.path)}>Renombrar</ContextMenuItem>
+          <ContextMenuItem onClick={() => onOpen(entry.path, entry.name)}>
+            {t("contextMenu.open")}
+          </ContextMenuItem>
+          <ContextMenuItem onClick={() => onStartRename(entry.path)}>
+            {t("contextMenu.rename")}
+          </ContextMenuItem>
           <ContextMenuSeparator />
           {onCut && (
-            <ContextMenuItem onClick={() => onCut(effectiveSelectedPaths)}>Cortar</ContextMenuItem>
+            <ContextMenuItem onClick={() => onCut(effectiveSelectedPaths)}>
+              {t("contextMenu.cut")}
+            </ContextMenuItem>
           )}
           {onCopy && (
-            <ContextMenuItem onClick={() => onCopy(effectiveSelectedPaths)}>Copiar</ContextMenuItem>
+            <ContextMenuItem onClick={() => onCopy(effectiveSelectedPaths)}>
+              {t("contextMenu.copy")}
+            </ContextMenuItem>
           )}
           {(onCut || onCopy) && <ContextMenuSeparator />}
-          <ContextMenuItem onClick={() => onCopyPath(entry.path)}>Copiar ruta</ContextMenuItem>
+          <ContextMenuItem onClick={() => onCopyPath(entry.path)}>
+            {t("contextMenu.copyPath")}
+          </ContextMenuItem>
           <ContextMenuItem onClick={() => onCopyRelativePath(entry.path, workspaceDir)}>
-            Copiar ruta relativa
+            {t("contextMenu.copyRelativePath")}
           </ContextMenuItem>
           <ContextMenuSeparator />
           {isMultiSelected && onBatchDelete ? (
@@ -486,14 +504,14 @@ export const FileTreeNode = ({
               onClick={() => onBatchDelete(effectiveSelectedPaths)}
               className="text-destructive focus:text-destructive"
             >
-              Eliminar {multiSelectCount} elementos
+              {t("contextMenu.deleteMultiple", { count: multiSelectCount })}
             </ContextMenuItem>
           ) : (
             <ContextMenuItem
               onClick={() => onDelete(entry.path, false)}
               className="text-destructive focus:text-destructive"
             >
-              Eliminar
+              {t("contextMenu.delete")}
             </ContextMenuItem>
           )}
         </ContextMenuContent>

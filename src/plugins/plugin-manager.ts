@@ -334,7 +334,7 @@ export class PluginManagerClass {
       try {
         manifest = JSON.parse(info.manifest_json);
       } catch {
-        logger.error("PluginManager", "manifest.json inválido, ignorando plugin.");
+        logger.error("PluginManager", "Invalid manifest.json, skipping plugin.");
         continue;
       }
 

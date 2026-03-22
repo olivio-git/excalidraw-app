@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Search } from "lucide-react";
 import {
   Dialog,
@@ -32,6 +33,7 @@ const QuickOpenContent = ({
   onOpenFile,
   onClose,
 }: Omit<QuickOpenDialogProps, "open">) => {
+  const { t } = useTranslation("explorer");
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -108,7 +110,7 @@ const QuickOpenContent = ({
           value={query}
           onChange={(e) => handleQueryChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Buscar archivo..."
+          placeholder={t("quickOpen.placeholder")}
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
       </div>
@@ -117,7 +119,7 @@ const QuickOpenContent = ({
       <div ref={listRef} className="max-h-72 overflow-y-auto py-1">
         {results.length === 0 ? (
           <p className="text-xs text-muted-foreground text-center py-6 px-4">
-            {query ? `Sin resultados para "${query}"` : "Sin archivos en el workspace"}
+            {query ? t("quickOpen.noResults", { query }) : t("quickOpen.noFiles")}
           </p>
         ) : (
           results.map((node, i) => {
@@ -151,9 +153,9 @@ const QuickOpenContent = ({
       {/* Footer hint */}
       {results.length > 0 && (
         <div className="flex items-center gap-3 px-3 py-1.5 border-t border-border/50 text-[10px] text-muted-foreground">
-          <span>↑↓ navegar</span>
-          <span>↵ abrir</span>
-          <span>Esc cerrar</span>
+          <span>{t("quickOpen.navHint")}</span>
+          <span>{t("quickOpen.openHint")}</span>
+          <span>{t("quickOpen.closeHint")}</span>
         </div>
       )}
     </>
@@ -167,6 +169,7 @@ export const QuickOpenDialog = ({
   workspaceDir,
   onOpenFile,
 }: QuickOpenDialogProps) => {
+  const { t } = useTranslation("explorer");
   return (
     <Dialog
       open={open}
@@ -176,9 +179,9 @@ export const QuickOpenDialog = ({
     >
       <DialogContent className="p-0 gap-0 max-w-lg overflow-hidden" showClose={false}>
         {/* Accessible title/description (visually hidden) */}
-        <DialogTitle className="sr-only">Abrir archivo rápido</DialogTitle>
+        <DialogTitle className="sr-only">{t("quickOpen.dialogTitle")}</DialogTitle>
         <DialogDescription className="sr-only">
-          Escribe para buscar archivos en el workspace
+          {t("quickOpen.dialogDescription")}
         </DialogDescription>
 
         {/* Key forces remount on each open, cleanly resetting all inner state */}

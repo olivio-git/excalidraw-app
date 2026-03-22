@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
+import { useTranslation } from "react-i18next";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { fetch } from "@tauri-apps/plugin-http";
 import { loadLibraryFromBlob } from "@excalidraw/excalidraw";
@@ -31,6 +32,7 @@ const H_PADDING = 12; // px-3 → 12px each side
 // ─── Panel ────────────────────────────────────────────────────────────────────
 
 export const LibraryBrowserPanel = memo(function LibraryBrowserPanel() {
+  const { t } = useTranslation("common");
   const [libraries, setLibraries] = useState<ExcalidrawLibraryEntry[]>([]);
   const [query, setQuery] = useState("");
   const [loadingCatalog, setLoadingCatalog] = useState(true);
@@ -76,7 +78,7 @@ export const LibraryBrowserPanel = memo(function LibraryBrowserPanel() {
       const data = await fetchLibraries();
       setLibraries(data);
     } catch (err) {
-      setCatalogError(err instanceof Error ? err.message : "Failed to load libraries");
+      setCatalogError(err instanceof Error ? err.message : t("library.loadError"));
     } finally {
       setLoadingCatalog(false);
     }
@@ -141,11 +143,11 @@ export const LibraryBrowserPanel = memo(function LibraryBrowserPanel() {
     const result: VirtualRow[] = [];
 
     if (installed.length > 0) {
-      result.push({ type: "header", title: "Installed" });
+      result.push({ type: "header", title: t("library.installed") });
       for (let i = 0; i < installed.length; i += columns) {
         result.push({ type: "items", libs: installed.slice(i, i + columns) });
       }
-      result.push({ type: "header", title: "Browse" });
+      result.push({ type: "header", title: t("library.browse") });
     }
 
     if (browse.length === 0) {
@@ -157,7 +159,7 @@ export const LibraryBrowserPanel = memo(function LibraryBrowserPanel() {
     }
 
     return result;
-  }, [libraries, query, installStatus, columns]);
+  }, [libraries, query, installStatus, columns, t]);
 
   // ── Virtualizer ───────────────────────────────────────────────────────────
   // paddingStart/End handle the py-2 spacing without causing overflow —
@@ -182,12 +184,12 @@ export const LibraryBrowserPanel = memo(function LibraryBrowserPanel() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Panel header */}
       <div className="flex items-center px-3 py-2 border-b border-border shrink-0">
-        <span className="text-sm font-medium">Libraries</span>
+        <span className="text-sm font-medium">{t("panels.library")}</span>
       </div>
 
       {!hasDiagramActive && !loadingCatalog && (
         <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border shrink-0">
-          Open a diagram to add libraries
+          {t("library.openDiagramTip")}
         </div>
       )}
 
@@ -197,7 +199,7 @@ export const LibraryBrowserPanel = memo(function LibraryBrowserPanel() {
           ref={searchRef}
           value={query}
           onChange={setQuery}
-          placeholder="Search libraries…"
+          placeholder={t("library.searchPlaceholder")}
         />
       </div>
 
@@ -228,7 +230,7 @@ export const LibraryBrowserPanel = memo(function LibraryBrowserPanel() {
             <p className="text-sm text-muted-foreground">{catalogError}</p>
             <Button size="sm" variant="outline" onClick={loadCatalog} className="gap-1.5">
               <RefreshCw className="size-3.5" />
-              Retry
+              {t("library.retry")}
             </Button>
           </div>
         )}
@@ -276,7 +278,7 @@ export const LibraryBrowserPanel = memo(function LibraryBrowserPanel() {
 
                   {row.type === "empty" && (
                     <p className="py-6 text-center text-xs text-muted-foreground">
-                      No libraries match your search.
+                      {t("library.noResults")}
                     </p>
                   )}
                 </div>

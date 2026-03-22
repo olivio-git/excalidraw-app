@@ -1,0 +1,103 @@
+{
+  "page": {
+    "title": "Settings",
+    "description": "Customize the appearance and behavior of the application."
+  },
+  "tabs": {
+    "appearance": "Appearance",
+    "keybindings": "Keybindings",
+    "workspace": "Workspace",
+    "tabs": "Tabs",
+    "ai": "AI"
+  },
+  "appearance": {
+    "language": "Language",
+    "theme": {
+      "title": "Theme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "typography": {
+      "title": "Typography",
+      "fontFamily": "Font Family",
+      "fontSize": "Font Size"
+    },
+    "borderRadius": {
+      "title": "Border Radius"
+    },
+    "accessibility": {
+      "title": "Accessibility",
+      "highContrast": "High Contrast: {{state}}",
+      "reduceAnimations": "Reduce Animations: {{state}}",
+      "on": "On",
+      "off": "Off"
+    },
+    "reset": "Reset to Defaults"
+  },
+  "keybindings": {
+    "title": "Keybindings",
+    "description": "View and customize keyboard shortcuts. Click a row to reassign.",
+    "searchPlaceholder": "Search keybindings...",
+    "resetAll": "Reset all ({{count}})",
+    "noResults": "No keybindings found",
+    "table": {
+      "command": "Command",
+      "keybinding": "Keybinding",
+      "source": "Source"
+    },
+    "capture": {
+      "pressKey": "Press a key combo...",
+      "save": "Save",
+      "cancel": "Cancel",
+      "resetToDefault": "Reset to default"
+    },
+    "badge": {
+      "conflict": "conflict",
+      "modified": "modified",
+      "user": "user",
+      "plugin": "plugin",
+      "builtin": "builtin"
+    }
+  },
+  "workspace": {
+    "title": "Workspace Folder",
+    "description": "Select a local folder to use as your workspace. Diagrams will be read from and saved to this directory.",
+    "noWorkspace": "No workspace selected",
+    "changeFolder": "Change folder",
+    "removeWorkspace": "Remove workspace"
+  },
+  "tabsBehavior": {
+    "title": "Tab Behavior",
+    "allowCloseLastTab": "Allow closing the last tab",
+    "allowCloseLastTabDescription": "When enabled, closing the last open tab shows the welcome screen instead of keeping the tab open.",
+    "on": "On",
+    "off": "Off"
+  },
+  "ai": {
+    "title": "AI Configuration",
+    "description": "Configure AI providers and API keys for diagram assistance.",
+    "provider": {
+      "title": "AI Provider",
+      "description": "Choose which AI provider to use for diagram assistance."
+    },
+    "apiKey": {
+      "title": "API Key",
+      "label": "{{provider}} API Key",
+      "current": "Current:",
+      "showKey": "Show API key",
+      "hideKey": "Hide API key"
+    },
+    "model": {
+      "title": "Model",
+      "selectLabel": "Select Model"
+    },
+    "actions": {
+      "save": "Save",
+      "testConnection": "Test Connection",
+      "saved": "Saved",
+      "connected": "Connected",
+      "noApiKey": "No API key configured"
+    }
+  }
+}

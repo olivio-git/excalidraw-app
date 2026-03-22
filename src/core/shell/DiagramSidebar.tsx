@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useNavigate, useLocation, matchPath } from "react-router";
+import { useTranslation } from "react-i18next";
+import { useLocation, matchPath } from "react-router";
 import {
   Files,
   Blocks,
@@ -53,17 +54,18 @@ interface PanelTab {
   label: string;
 }
 
-const PANEL_TABS: PanelTab[] = [
-  { id: "explorer", icon: Files, label: "Explorador" },
-  { id: "plugins", icon: Blocks, label: "Plugins" },
-  { id: "navigation", icon: Compass, label: "Navegación" },
-  { id: "ai-chat", icon: Bot, label: "AI Chat" },
-  { id: "library", icon: BookOpen, label: "Libraries" },
-];
-
 const DiagramSidebar = () => {
+  const { t } = useTranslation("common");
   const [activePanel, setActivePanel] = useState<Panel>("explorer");
   const prevWidthRef = useRef<number | null>(null);
+
+  const PANEL_TABS: PanelTab[] = [
+    { id: "explorer", icon: Files, label: t("panels.explorer") },
+    { id: "plugins", icon: Blocks, label: t("panels.plugins") },
+    { id: "navigation", icon: Compass, label: t("panels.navigation") },
+    { id: "ai-chat", icon: Bot, label: t("panels.aiChat") },
+    { id: "library", icon: BookOpen, label: t("panels.library") },
+  ];
 
   const { sidebarWidth, setSidebarWidth, toggleSidebar } = useSidebar();
 
@@ -84,7 +86,6 @@ const DiagramSidebar = () => {
   }, []);
   const isCompact = sidebarWidth < COMPACT_THRESHOLD;
 
-  const navigate = useNavigate();
   const { pathname } = useLocation();
   const isOnSettings = Boolean(matchPath({ path: "/settings", end: false }, pathname));
   const theme = useThemeStore((s) => s.theme);
@@ -118,7 +119,10 @@ const DiagramSidebar = () => {
           isCompact ? "flex-col items-center" : "flex-row items-center"
         )}
       >
-        <TooltipWrapper tooltip={isCompact ? "Expandir" : "Colapsar"} side="right">
+        <TooltipWrapper
+          tooltip={isCompact ? t("sidebar.expand") : t("sidebar.collapse")}
+          side="right"
+        >
           <Button
             variant="ghost"
             size="icon"
@@ -182,7 +186,7 @@ const DiagramSidebar = () => {
             isCompact ? "flex-col items-center" : "flex-row items-center"
           )}
         >
-          <TooltipWrapper tooltip="Settings" side="right">
+          <TooltipWrapper tooltip={t("panels.settings")} side="right">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -204,35 +208,37 @@ const DiagramSidebar = () => {
                     onClick={() => PluginManager.executeCommand("workbench.action.openSettings")}
                   >
                     <Settings className="mr-2 size-4" />
-                    <span>Settings</span>
+                    <span>{t("panels.settings")}</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/settings/plugins")}>
+                  <DropdownMenuItem
+                    onClick={() => PluginManager.executeCommand("workbench.action.openPluginAdmin")}
+                  >
                     <PlugZap className="mr-2 size-4" />
-                    <span>Plugin Administration</span>
+                    <span>{t("panels.pluginAdmin")}</span>
                   </DropdownMenuItem>
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger>
                       <Palette className="mr-2 size-4" />
-                      <span>Theme</span>
+                      <span>{t("panels.theme")}</span>
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent>
                       <DropdownMenuItem
                         onClick={() => setTheme("light")}
                         className={cn(theme === "light" && "bg-accent text-accent-foreground")}
                       >
-                        <Sun className="mr-2 size-4" /> Light
+                        <Sun className="mr-2 size-4" /> {t("panels.themeLight")}
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => setTheme("dark")}
                         className={cn(theme === "dark" && "bg-accent text-accent-foreground")}
                       >
-                        <Moon className="mr-2 size-4" /> Dark
+                        <Moon className="mr-2 size-4" /> {t("panels.themeDark")}
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => setTheme("system")}
                         className={cn(theme === "system" && "bg-accent text-accent-foreground")}
                       >
-                        <Monitor className="mr-2 size-4" /> System
+                        <Monitor className="mr-2 size-4" /> {t("panels.themeSystem")}
                       </DropdownMenuItem>
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>

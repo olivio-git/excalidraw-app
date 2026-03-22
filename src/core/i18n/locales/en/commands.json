@@ -1,0 +1,20 @@
+{
+  "palette": {
+    "newDiagram": {
+      "title": "New Diagram",
+      "nameLabel": "Name",
+      "namePlaceholder": "my-diagram",
+      "createLabel": "Create"
+    }
+  },
+  "changeLanguage": {
+    "title": "Change Language / Cambiar Idioma"
+  },
+  "routes": {
+    "home": "Home",
+    "home-overview": "Welcome",
+    "settings": "Settings",
+    "plugin-admin": "Plugin Administration",
+    "library-detail": "Library Detail"
+  }
+}

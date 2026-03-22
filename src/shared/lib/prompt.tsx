@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { create } from "zustand";
 import {
   Dialog,
@@ -76,16 +77,17 @@ export function prompt(options: PromptOptions): Promise<PromptResult> {
 
 export function PromptDialog() {
   const { open, options, _settle } = usePromptStore();
+  const { t } = useTranslation("common");
   const [values, setValues] = useState<Record<string, string>>({});
 
   if (!options) return null;
 
   const {
-    title = "Ingresá los datos",
+    title = t("dialog.enterData"),
     description,
     fields,
-    confirmLabel = "Confirmar",
-    cancelLabel = "Cancelar",
+    confirmLabel = t("dialog.confirm"),
+    cancelLabel = t("dialog.cancel"),
   } = options;
 
   const handleOpenChange = (v: boolean) => {

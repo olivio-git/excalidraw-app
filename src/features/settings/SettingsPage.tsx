@@ -1,29 +1,31 @@
 import { Moon, Sun, Monitor, RotateCcw, Folder, FolderOpen, X } from "lucide-react";
-import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
 
 import { useAppearanceStore } from "@/stores/appearanceStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useTabsSettingsStore } from "@/stores/tabsSettingsStore";
+import { useLanguageStore } from "@/stores/languageStore";
+import { useSettingsStore, type SettingsTab } from "@/stores/settingsStore";
 import KeybindingsPanel from "./keybindings/KeybindingsPanel";
 import { AISettingsPanel } from "./ai/AISettingsPanel";
 import { Button } from "@/shared/components/ui/button";
 import { Separator } from "@/shared/components/ui/separator";
 import { cn } from "@/shared/lib/utils";
 
-type SettingsTab = "appearance" | "keybindings" | "workspace" | "ai" | "tabs";
-
-const TABS: { id: SettingsTab; label: string }[] = [
-  { id: "appearance", label: "Appearance" },
-  { id: "keybindings", label: "Keybindings" },
-  { id: "workspace", label: "Workspace" },
-  { id: "tabs", label: "Tabs" },
-  { id: "ai", label: "AI" },
-];
-
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<SettingsTab>("appearance");
+  const { t } = useTranslation("settings");
+  const activeTab = useSettingsStore((s) => s.activeTab);
+  const setActiveTab = useSettingsStore((s) => s.setActiveTab);
+
+  const TABS: { id: SettingsTab; label: string }[] = [
+    { id: "appearance", label: t("tabs.appearance") },
+    { id: "keybindings", label: t("tabs.keybindings") },
+    { id: "workspace", label: t("tabs.workspace") },
+    { id: "tabs", label: t("tabs.tabs") },
+    { id: "ai", label: t("tabs.ai") },
+  ];
 
   const workspaceDir = useWorkspaceStore((s) => s.workspaceDir);
   const setWorkspaceDir = useWorkspaceStore((s) => s.setWorkspaceDir);
@@ -37,6 +39,9 @@ export default function SettingsPage() {
 
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.setTheme);
+
+  const language = useLanguageStore((s) => s.language);
+  const setLanguage = useLanguageStore((s) => s.setLanguage);
 
   const allowCloseLastTab = useTabsSettingsStore((s) => s.allowCloseLastTab);
   const setAllowCloseLastTab = useTabsSettingsStore((s) => s.setAllowCloseLastTab);
@@ -58,10 +63,8 @@ export default function SettingsPage() {
       <div className="mx-auto max-w-2xl px-6 py-8 space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Customize the appearance and behavior of the application.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("page.title")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t("page.description")}</p>
         </div>
 
         {/* Tab navigation */}
@@ -88,10 +91,8 @@ export default function SettingsPage() {
         {activeTab === "keybindings" && (
           <section className="space-y-3">
             <div>
-              <h2 className="text-base font-semibold">Keybindings</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                View and customize keyboard shortcuts. Click a row to reassign.
-              </p>
+              <h2 className="text-base font-semibold">{t("keybindings.title")}</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">{t("keybindings.description")}</p>
             </div>
             <KeybindingsPanel />
           </section>
@@ -101,11 +102,8 @@ export default function SettingsPage() {
         {activeTab === "workspace" && (
           <div className="space-y-8">
             <section className="space-y-3">
-              <h2 className="text-base font-semibold">Workspace Folder</h2>
-              <p className="text-sm text-muted-foreground">
-                Select a local folder to use as your workspace. Diagrams will be read from and saved
-                to this directory.
-              </p>
+              <h2 className="text-base font-semibold">{t("workspace.title")}</h2>
+              <p className="text-sm text-muted-foreground">{t("workspace.description")}</p>
               <div className="flex items-center gap-3 rounded-md border border-border bg-muted/40 px-3 py-2.5">
                 {workspaceDir ? (
                   <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
@@ -118,13 +116,13 @@ export default function SettingsPage() {
                     workspaceDir ? "font-mono" : "text-muted-foreground italic"
                   )}
                 >
-                  {workspaceDir ?? "No workspace selected"}
+                  {workspaceDir ?? t("workspace.noWorkspace")}
                 </span>
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={handleChangeFolder}>
                   <FolderOpen className="size-4" />
-                  Cambiar carpeta
+                  {t("workspace.changeFolder")}
                 </Button>
                 {workspaceDir && (
                   <Button
@@ -134,7 +132,7 @@ export default function SettingsPage() {
                     onClick={() => setWorkspaceDir(null)}
                   >
                     <X className="size-4" />
-                    Quitar workspace
+                    {t("workspace.removeWorkspace")}
                   </Button>
                 )}
               </div>
@@ -146,13 +144,12 @@ export default function SettingsPage() {
         {activeTab === "tabs" && (
           <div className="space-y-8">
             <section className="space-y-4">
-              <h2 className="text-base font-semibold">Tab Behavior</h2>
+              <h2 className="text-base font-semibold">{t("tabsBehavior.title")}</h2>
               <div className="flex items-start justify-between gap-4 rounded-md border border-border px-4 py-3">
                 <div className="space-y-0.5">
-                  <p className="text-sm font-medium">Allow closing the last tab</p>
+                  <p className="text-sm font-medium">{t("tabsBehavior.allowCloseLastTab")}</p>
                   <p className="text-xs text-muted-foreground">
-                    When enabled, closing the last open tab shows the welcome screen instead of
-                    keeping the tab open.
+                    {t("tabsBehavior.allowCloseLastTabDescription")}
                   </p>
                 </div>
                 <Button
@@ -161,7 +158,7 @@ export default function SettingsPage() {
                   className="shrink-0"
                   onClick={() => setAllowCloseLastTab(!allowCloseLastTab)}
                 >
-                  {allowCloseLastTab ? "On" : "Off"}
+                  {allowCloseLastTab ? t("tabsBehavior.on") : t("tabsBehavior.off")}
                 </Button>
               </div>
             </section>
@@ -172,10 +169,8 @@ export default function SettingsPage() {
         {activeTab === "ai" && (
           <section className="space-y-3">
             <div>
-              <h2 className="text-base font-semibold">AI Configuration</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Configure AI providers and API keys for diagram assistance.
-              </p>
+              <h2 className="text-base font-semibold">{t("ai.title")}</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">{t("ai.description")}</p>
             </div>
             <AISettingsPanel />
           </section>
@@ -184,14 +179,35 @@ export default function SettingsPage() {
         {/* Appearance */}
         {activeTab === "appearance" && (
           <div className="space-y-8">
+            {/* Language */}
+            <section className="space-y-3">
+              <h2 className="text-base font-semibold">{t("appearance.language")}</h2>
+              <div className="flex gap-2">
+                <Button
+                  variant={language === "en" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setLanguage("en")}
+                >
+                  English
+                </Button>
+                <Button
+                  variant={language === "es" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setLanguage("es")}
+                >
+                  Español
+                </Button>
+              </div>
+            </section>
+
             {/* Theme */}
             <section className="space-y-3">
-              <h2 className="text-base font-semibold">Theme</h2>
+              <h2 className="text-base font-semibold">{t("appearance.theme.title")}</h2>
               <div className="flex gap-2">
                 {[
-                  { value: "light" as const, icon: Sun, label: "Light" },
-                  { value: "dark" as const, icon: Moon, label: "Dark" },
-                  { value: "system" as const, icon: Monitor, label: "System" },
+                  { value: "light" as const, icon: Sun, label: t("appearance.theme.light") },
+                  { value: "dark" as const, icon: Moon, label: t("appearance.theme.dark") },
+                  { value: "system" as const, icon: Monitor, label: t("appearance.theme.system") },
                 ].map(({ value, icon: Icon, label }) => (
                   <Button
                     key={value}
@@ -208,9 +224,11 @@ export default function SettingsPage() {
 
             {/* Typography */}
             <section className="space-y-4">
-              <h2 className="text-base font-semibold">Typography</h2>
+              <h2 className="text-base font-semibold">{t("appearance.typography.title")}</h2>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Font Family</label>
+                <label className="text-sm font-medium">
+                  {t("appearance.typography.fontFamily")}
+                </label>
                 <div className="flex gap-2">
                   {(["sans", "mono", "serif"] as const).map((ff) => (
                     <Button
@@ -226,7 +244,7 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Font Size</label>
+                <label className="text-sm font-medium">{t("appearance.typography.fontSize")}</label>
                 <div className="flex gap-2">
                   {(["small", "medium", "large"] as const).map((fs) => (
                     <Button
@@ -245,7 +263,7 @@ export default function SettingsPage() {
 
             {/* Border Radius */}
             <section className="space-y-3">
-              <h2 className="text-base font-semibold">Border Radius</h2>
+              <h2 className="text-base font-semibold">{t("appearance.borderRadius.title")}</h2>
               <div className="flex gap-2">
                 {(["none", "sm", "md", "lg"] as const).map((br) => (
                   <Button
@@ -263,21 +281,29 @@ export default function SettingsPage() {
 
             {/* Accessibility */}
             <section className="space-y-3">
-              <h2 className="text-base font-semibold">Accessibility</h2>
+              <h2 className="text-base font-semibold">{t("appearance.accessibility.title")}</h2>
               <div className="flex gap-2 flex-wrap">
                 <Button
                   variant={highContrast ? "default" : "outline"}
                   size="sm"
                   onClick={() => setHighContrast(!highContrast)}
                 >
-                  High Contrast: {highContrast ? "On" : "Off"}
+                  {t("appearance.accessibility.highContrast", {
+                    state: highContrast
+                      ? t("appearance.accessibility.on")
+                      : t("appearance.accessibility.off"),
+                  })}
                 </Button>
                 <Button
                   variant={reduceAnimations ? "default" : "outline"}
                   size="sm"
                   onClick={() => setReduceAnimations(!reduceAnimations)}
                 >
-                  Reduce Animations: {reduceAnimations ? "On" : "Off"}
+                  {t("appearance.accessibility.reduceAnimations", {
+                    state: reduceAnimations
+                      ? t("appearance.accessibility.on")
+                      : t("appearance.accessibility.off"),
+                  })}
                 </Button>
               </div>
             </section>
@@ -287,7 +313,7 @@ export default function SettingsPage() {
               <Separator className="mb-6" />
               <Button variant="outline" size="sm" onClick={resetToDefaults}>
                 <RotateCcw className="size-4" />
-                Reset to Defaults
+                {t("appearance.reset")}
               </Button>
             </section>
           </div>

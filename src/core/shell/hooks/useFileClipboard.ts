@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { copyFile, rename, stat } from "@tauri-apps/plugin-fs";
 import { join, dirname, basename } from "@tauri-apps/api/path";
 import { notify } from "@/shared/lib/notify";
@@ -45,6 +46,7 @@ async function resolveDestPath(srcPath: string, destDir: string): Promise<string
 }
 
 export function useFileClipboard(onRefresh: () => Promise<void>): UseFileClipboardReturn {
+  const { t } = useTranslation("explorer");
   const [clipboardState, setClipboardState] = useState<ClipboardState>(null);
 
   const cut = (paths: string[]) => {
@@ -79,7 +81,7 @@ export function useFileClipboard(onRefresh: () => Promise<void>): UseFileClipboa
         anySuccess = true;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        notify(`Error al pegar "${name}": ${msg}`, { type: "error" });
+        notify(t("clipboard.errorPasting", { name, message: msg }), { type: "error" });
       }
     }
 

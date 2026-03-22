@@ -1,0 +1,17 @@
+{
+  "tab": {
+    "untitled": "Sin título",
+    "closeTab": "Cerrar pestaña",
+    "pinTab": "Fijar pestaña",
+    "unpinTab": "Desfijar pestaña",
+    "closeOthers": "Cerrar otras pestañas",
+    "closeToRight": "Cerrar pestañas a la derecha",
+    "closeAll": "Cerrar todas las pestañas",
+    "copyAbsolutePath": "Copiar ruta absoluta",
+    "copyRelativePath": "Copiar ruta relativa"
+  },
+  "status": {
+    "pathCopied": "Ruta copiada",
+    "relativePathCopied": "Ruta relativa copiada"
+  }
+}

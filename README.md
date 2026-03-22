@@ -2,7 +2,7 @@
 
 A desktop Excalidraw editor with an embedded AI assistant and an MCP server that lets external agents control the live canvas. Built with Tauri v2, React 19, and a multi-provider AI system (Anthropic, Groq, OpenAI, Gemini).
 
-![Excalidraw App — AI Chat + Canvas](docs/Excalidraw_app_oliviodev_giant.png)
+![Excalidraw App — AI Chat + Canvas](docs/docs/Excalidraw_app_oliviodev.png.png)
 
 ---
 

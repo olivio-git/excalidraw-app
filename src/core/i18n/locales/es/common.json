@@ -1,0 +1,97 @@
+{
+  "app": {
+    "name": "Excalidraw"
+  },
+  "actions": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "delete": "Eliminar",
+    "rename": "Renombrar",
+    "create": "Crear",
+    "open": "Abrir",
+    "close": "Cerrar",
+    "copy": "Copiar",
+    "edit": "Editar",
+    "tryAgain": "Intentar de nuevo",
+    "resetToDefaults": "Restablecer valores predeterminados"
+  },
+  "status": {
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito"
+  },
+  "dialog": {
+    "title": "¿Estás seguro?",
+    "confirm": "Confirmar",
+    "cancel": "Cancelar",
+    "enterData": "Ingresa los datos"
+  },
+  "error": {
+    "unexpectedTitle": "Ocurrió un problema inesperado",
+    "unexpectedDescription": "Pedimos disculpas por los inconvenientes. Un error impidió que esta vista se cargara correctamente."
+  },
+  "sidebar": {
+    "collapse": "Contraer menú",
+    "expand": "Expandir menú"
+  },
+  "panels": {
+    "explorer": "Explorador",
+    "plugins": "Plugins",
+    "navigation": "Navegación",
+    "aiChat": "Chat IA",
+    "library": "Bibliotecas",
+    "settings": "Configuración",
+    "pluginAdmin": "Administración de plugins",
+    "theme": "Tema",
+    "themeLight": "Claro",
+    "themeDark": "Oscuro",
+    "themeSystem": "Sistema"
+  },
+  "commandPalette": {
+    "noCommandsFound": "No se encontraron comandos",
+    "noWorkspaceSelected": "No hay workspace seleccionado",
+    "noFilesFound": "No se encontraron archivos",
+    "footer": {
+      "navigate": "navegar",
+      "run": "ejecutar",
+      "open": "abrir",
+      "forCommands": "para comandos"
+    }
+  },
+  "welcomeScreen": {
+    "noFilesOpen": "Sin archivos abiertos",
+    "openWorkspaceHint": "Abre un workspace desde el panel lateral para comenzar"
+  },
+  "library": {
+    "openDiagramTip": "Abre un diagrama para agregar bibliotecas",
+    "searchPlaceholder": "Buscar bibliotecas…",
+    "loadError": "Error al cargar las bibliotecas",
+    "retry": "Reintentar",
+    "installed": "Instaladas",
+    "browse": "Explorar",
+    "noResults": "Ninguna biblioteca coincide con tu búsqueda."
+  },
+  "aiChat": {
+    "header": "Chat IA",
+    "clearChat": "Limpiar chat",
+    "clearConfirmDescription": "¿Limpiar todos los mensajes?",
+    "clearLabel": "Limpiar",
+    "configureApiKey": "Configura una clave de API en",
+    "settingsLink": "Configuración → IA",
+    "emptyState": "Pide a la IA que dibuje o modifique tu diagrama.",
+    "inputPlaceholder": "Pide a la IA que dibuje o modifique tu diagrama…",
+    "stopGeneration": "Detener generación",
+    "sendMessage": "Enviar (Enter)",
+    "context": "Contexto",
+    "noDiagramActive": "Sin diagrama activo",
+    "thinking": "Pensando…",
+    "toolError": "Error de herramienta",
+    "tools": {
+      "draw_elements": "Dibujando en el lienzo",
+      "clear_canvas": "Limpiando el lienzo",
+      "get_elements": "Leyendo el lienzo",
+      "update_element": "Actualizando elemento"
+    }
+  }
+}

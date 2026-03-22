@@ -1,0 +1,73 @@
+{
+  "toolbar": {
+    "newFile": "Nuevo archivo",
+    "newFolder": "Nueva carpeta",
+    "refresh": "Actualizar",
+    "collapseAll": "Contraer todo",
+    "filterPlaceholder": "Filtrar archivos...",
+    "showDotfiles": "Mostrar dotfiles",
+    "hideDotfiles": "Ocultar dotfiles",
+    "sortPrefix": "Ordenar: "
+  },
+  "sort": {
+    "typeFirst": "Tipo primero",
+    "nameAsc": "Nombre A→Z",
+    "nameDesc": "Nombre Z→A"
+  },
+  "contextMenu": {
+    "newFileHere": "Nuevo archivo aquí",
+    "newFolderHere": "Nueva carpeta aquí",
+    "rename": "Renombrar",
+    "cut": "Cortar",
+    "copy": "Copiar",
+    "paste": "Pegar aquí",
+    "copyPath": "Copiar ruta",
+    "copyRelativePath": "Copiar ruta relativa",
+    "deleteFolder": "Eliminar carpeta",
+    "delete": "Eliminar",
+    "deleteMultiple": "Eliminar {{count}} elementos",
+    "open": "Abrir"
+  },
+  "nodeButton": {
+    "newFile": "Nuevo archivo",
+    "newFolder": "Nueva carpeta",
+    "noViewer": "No hay visor registrado para este tipo de archivo"
+  },
+  "tooltip": {
+    "folder": "Carpeta"
+  },
+  "quickOpen": {
+    "placeholder": "Buscar archivo...",
+    "noResults": "Sin resultados para \"{{query}}\"",
+    "noFiles": "Sin archivos en el workspace",
+    "navHint": "↑↓ navegar",
+    "openHint": "↵ abrir",
+    "closeHint": "Esc cerrar",
+    "dialogTitle": "Apertura rápida de archivo",
+    "dialogDescription": "Escribe para buscar archivos en el workspace"
+  },
+  "dragDrop": {
+    "conflictTitle": "Conflicto de nombre",
+    "conflictDescription": "\"{{name}}\" ya existe en el destino. ¿Deseas reemplazarlo?",
+    "conflictConfirm": "Reemplazar",
+    "errorMoving": "Error al mover \"{{name}}\": {{message}}"
+  },
+  "panel": {
+    "noFilesInFolder": "No hay archivos en esta carpeta",
+    "noFilterResults": "Sin resultados para \"{{query}}\"",
+    "deleteFileTitle": "Eliminar archivo",
+    "deleteFolderTitle": "Eliminar carpeta",
+    "deleteDescription": "¿Eliminar \"{{name}}\"? Esta acción no se puede deshacer.",
+    "deleteLabel": "Eliminar",
+    "deletedSuccess": "\"{{name}}\" eliminado",
+    "errorDeleting": "Error al eliminar \"{{name}}\": {{message}}",
+    "batchDeleteTitle": "Eliminar {{count}} elementos",
+    "batchDeleteDescription": "¿Eliminar los siguientes elementos? Esta acción no se puede deshacer.\n\n{{preview}}",
+    "batchDeleteLabel": "Eliminar todo",
+    "batchDeleteMore": "\ny {{count}} más...",
+    "batchDeletedSuccess": "{{count}} elementos eliminados"
+  },
+  "clipboard": {
+    "errorPasting": "Error al pegar \"{{name}}\": {{message}}"
+  }
+}

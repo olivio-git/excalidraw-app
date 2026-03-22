@@ -1,0 +1,73 @@
+{
+  "toolbar": {
+    "newFile": "New file",
+    "newFolder": "New folder",
+    "refresh": "Refresh",
+    "collapseAll": "Collapse all",
+    "filterPlaceholder": "Filter files...",
+    "showDotfiles": "Show dotfiles",
+    "hideDotfiles": "Hide dotfiles",
+    "sortPrefix": "Sort: "
+  },
+  "sort": {
+    "typeFirst": "Type first",
+    "nameAsc": "Name A→Z",
+    "nameDesc": "Name Z→A"
+  },
+  "contextMenu": {
+    "newFileHere": "New file here",
+    "newFolderHere": "New folder here",
+    "rename": "Rename",
+    "cut": "Cut",
+    "copy": "Copy",
+    "paste": "Paste here",
+    "copyPath": "Copy path",
+    "copyRelativePath": "Copy relative path",
+    "deleteFolder": "Delete folder",
+    "delete": "Delete",
+    "deleteMultiple": "Delete {{count}} items",
+    "open": "Open"
+  },
+  "nodeButton": {
+    "newFile": "New file",
+    "newFolder": "New folder",
+    "noViewer": "No viewer registered for this file type"
+  },
+  "tooltip": {
+    "folder": "Folder"
+  },
+  "quickOpen": {
+    "placeholder": "Search file...",
+    "noResults": "No results for \"{{query}}\"",
+    "noFiles": "No files in workspace",
+    "navHint": "↑↓ navigate",
+    "openHint": "↵ open",
+    "closeHint": "Esc close",
+    "dialogTitle": "Quick open file",
+    "dialogDescription": "Type to search for files in the workspace"
+  },
+  "dragDrop": {
+    "conflictTitle": "Name conflict",
+    "conflictDescription": "\"{{name}}\" already exists in the destination. Do you want to replace it?",
+    "conflictConfirm": "Replace",
+    "errorMoving": "Error moving \"{{name}}\": {{message}}"
+  },
+  "panel": {
+    "noFilesInFolder": "No files in this folder",
+    "noFilterResults": "No results for \"{{query}}\"",
+    "deleteFileTitle": "Delete file",
+    "deleteFolderTitle": "Delete folder",
+    "deleteDescription": "Delete \"{{name}}\"? This action cannot be undone.",
+    "deleteLabel": "Delete",
+    "deletedSuccess": "\"{{name}}\" deleted",
+    "errorDeleting": "Error deleting \"{{name}}\": {{message}}",
+    "batchDeleteTitle": "Delete {{count}} items",
+    "batchDeleteDescription": "Delete the following items? This action cannot be undone.\n\n{{preview}}",
+    "batchDeleteLabel": "Delete all",
+    "batchDeleteMore": "\nand {{count}} more...",
+    "batchDeletedSuccess": "{{count}} items deleted"
+  },
+  "clipboard": {
+    "errorPasting": "Error pasting \"{{name}}\": {{message}}"
+  }
+}

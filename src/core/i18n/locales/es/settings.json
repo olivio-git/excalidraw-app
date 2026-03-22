@@ -1,0 +1,103 @@
+{
+  "page": {
+    "title": "Configuración",
+    "description": "Personaliza la apariencia y el comportamiento de la aplicación."
+  },
+  "tabs": {
+    "appearance": "Apariencia",
+    "keybindings": "Atajos de teclado",
+    "workspace": "Workspace",
+    "tabs": "Pestañas",
+    "ai": "IA"
+  },
+  "appearance": {
+    "language": "Idioma",
+    "theme": {
+      "title": "Tema",
+      "light": "Claro",
+      "dark": "Oscuro",
+      "system": "Sistema"
+    },
+    "typography": {
+      "title": "Tipografía",
+      "fontFamily": "Familia tipográfica",
+      "fontSize": "Tamaño de fuente"
+    },
+    "borderRadius": {
+      "title": "Radio de borde"
+    },
+    "accessibility": {
+      "title": "Accesibilidad",
+      "highContrast": "Alto contraste: {{state}}",
+      "reduceAnimations": "Reducir animaciones: {{state}}",
+      "on": "Activado",
+      "off": "Desactivado"
+    },
+    "reset": "Restablecer valores predeterminados"
+  },
+  "keybindings": {
+    "title": "Atajos de teclado",
+    "description": "Ver y personalizar los atajos de teclado. Haz clic en una fila para reasignar.",
+    "searchPlaceholder": "Buscar atajos de teclado...",
+    "resetAll": "Restablecer todo ({{count}})",
+    "noResults": "No se encontraron atajos de teclado",
+    "table": {
+      "command": "Comando",
+      "keybinding": "Atajo",
+      "source": "Origen"
+    },
+    "capture": {
+      "pressKey": "Presiona una combinación de teclas...",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "resetToDefault": "Restablecer al predeterminado"
+    },
+    "badge": {
+      "conflict": "conflicto",
+      "modified": "modificado",
+      "user": "usuario",
+      "plugin": "plugin",
+      "builtin": "integrado"
+    }
+  },
+  "workspace": {
+    "title": "Carpeta de workspace",
+    "description": "Selecciona una carpeta local para usar como workspace. Los diagramas se leerán y guardarán en este directorio.",
+    "noWorkspace": "No hay workspace seleccionado",
+    "changeFolder": "Cambiar carpeta",
+    "removeWorkspace": "Eliminar workspace"
+  },
+  "tabsBehavior": {
+    "title": "Comportamiento de pestañas",
+    "allowCloseLastTab": "Permitir cerrar la última pestaña",
+    "allowCloseLastTabDescription": "Cuando está activado, cerrar la última pestaña abierta muestra la pantalla de bienvenida en lugar de mantener la pestaña abierta.",
+    "on": "Activado",
+    "off": "Desactivado"
+  },
+  "ai": {
+    "title": "Configuración de IA",
+    "description": "Configura los proveedores de IA y las claves de API para asistencia con diagramas.",
+    "provider": {
+      "title": "Proveedor de IA",
+      "description": "Elige qué proveedor de IA usar para asistencia con diagramas."
+    },
+    "apiKey": {
+      "title": "Clave de API",
+      "label": "Clave de API de {{provider}}",
+      "current": "Actual:",
+      "showKey": "Mostrar clave de API",
+      "hideKey": "Ocultar clave de API"
+    },
+    "model": {
+      "title": "Modelo",
+      "selectLabel": "Seleccionar modelo"
+    },
+    "actions": {
+      "save": "Guardar",
+      "testConnection": "Probar conexión",
+      "saved": "Guardado",
+      "connected": "Conectado",
+      "noApiKey": "No hay clave de API configurada"
+    }
+  }
+}

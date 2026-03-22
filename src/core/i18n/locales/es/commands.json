@@ -1,0 +1,20 @@
+{
+  "palette": {
+    "newDiagram": {
+      "title": "Nuevo diagrama",
+      "nameLabel": "Nombre",
+      "namePlaceholder": "mi-diagrama",
+      "createLabel": "Crear"
+    }
+  },
+  "changeLanguage": {
+    "title": "Change Language / Cambiar Idioma"
+  },
+  "routes": {
+    "home": "Inicio",
+    "home-overview": "Bienvenida",
+    "settings": "Configuración",
+    "plugin-admin": "Administración de plugins",
+    "library-detail": "Detalle de biblioteca"
+  }
+}

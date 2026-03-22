@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { RotateCcw } from "lucide-react";
 import { keybindingRegistry } from "@/core/keybindings/keybinding-registry";
 import { keyNormalizer } from "@/core/keybindings/key-normalizer";
@@ -7,6 +8,7 @@ import { KeybindingSource } from "@/core/keybindings/types";
 import type { KeybindingEntry, KeybindingConflict } from "@/core/keybindings/types";
 import { PluginManager } from "@/plugins/plugin-manager";
 import { cn } from "@/shared/lib/utils";
+import { PanelSearch } from "@/shared/common/PanelSearch";
 
 // ── Display helpers ────────────────────────────────────────────────────────────
 
@@ -32,14 +34,14 @@ function sourceBadgeClasses(source: KeybindingSource): string {
   }
 }
 
-function sourceBadgeLabel(source: KeybindingSource): string {
+function sourceBadgeLabel(source: KeybindingSource, t: (key: string) => string): string {
   switch (source) {
     case KeybindingSource.User:
-      return "user";
+      return t("keybindings.badge.user");
     case KeybindingSource.Plugin:
-      return "plugin";
+      return t("keybindings.badge.plugin");
     default:
-      return "builtin";
+      return t("keybindings.badge.builtin");
   }
 }
 
@@ -64,11 +66,12 @@ function filterEntries(
 
 interface ReassignCaptureProps {
   entry: KeybindingEntry;
+  t: (key: string) => string;
   onConfirm: (entry: KeybindingEntry, newEntry: KeybindingEntry) => void;
   onCancel: () => void;
 }
 
-function ReassignCapture({ entry, onConfirm, onCancel }: ReassignCaptureProps) {
+function ReassignCapture({ entry, t, onConfirm, onCancel }: ReassignCaptureProps) {
   const [capturedKey, setCapturedKey] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -117,7 +120,7 @@ function ReassignCapture({ entry, onConfirm, onCancel }: ReassignCaptureProps) {
       <input
         ref={inputRef}
         readOnly
-        value={capturedKey ? capturedKey : "Press a key combo..."}
+        value={capturedKey ? capturedKey : t("keybindings.capture.pressKey")}
         onKeyDown={handleKeyDown}
         className="h-7 w-48 rounded border border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 px-2 text-xs font-mono text-zinc-700 dark:text-zinc-300 outline-none focus:border-blue-400 dark:focus:border-blue-500"
       />
@@ -134,14 +137,14 @@ function ReassignCapture({ entry, onConfirm, onCancel }: ReassignCaptureProps) {
             onConfirm(entry, newEntry);
           }}
         >
-          Save
+          {t("keybindings.capture.save")}
         </button>
       )}
       <button
         className="h-7 rounded border border-zinc-200 dark:border-zinc-700 bg-transparent px-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
         onClick={onCancel}
       >
-        Cancel
+        {t("keybindings.capture.cancel")}
       </button>
     </div>
   );
@@ -150,6 +153,7 @@ function ReassignCapture({ entry, onConfirm, onCancel }: ReassignCaptureProps) {
 // ── KeybindingsPanel ──────────────────────────────────────────────────────────
 
 export default function KeybindingsPanel() {
+  const { t } = useTranslation("settings");
   const [query, setQuery] = useState("");
   const [entries, setEntries] = useState<KeybindingEntry[]>([]);
   const [conflicts, setConflicts] = useState<KeybindingConflict[]>([]);
@@ -219,25 +223,10 @@ export default function KeybindingsPanel() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="relative max-w-xs flex-1">
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-zinc-400 dark:text-zinc-500 pointer-events-none"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-            />
-          </svg>
-          <input
-            placeholder="Search keybindings..."
+          <PanelSearch
+            placeholder={t("keybindings.searchPlaceholder")}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="w-full h-9 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 pl-9 pr-3 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none focus:border-zinc-400 dark:focus:border-zinc-500 transition-colors"
+            onChange={setQuery}
           />
         </div>
         {overrides.length > 0 && (
@@ -246,7 +235,7 @@ export default function KeybindingsPanel() {
             className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 h-9 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shrink-0"
           >
             <RotateCcw className="size-3.5" />
-            Reset all ({overrides.length})
+            {t("keybindings.resetAll", { count: overrides.length })}
           </button>
         )}
       </div>
@@ -258,13 +247,13 @@ export default function KeybindingsPanel() {
             <thead className="sticky top-0 z-10">
               <tr className="border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/80">
                 <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  Command
+                  {t("keybindings.table.command")}
                 </th>
                 <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 w-48">
-                  Keybinding
+                  {t("keybindings.table.keybinding")}
                 </th>
                 <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 w-24">
-                  Source
+                  {t("keybindings.table.source")}
                 </th>
                 <th className="px-4 py-2.5 w-20" />
               </tr>
@@ -276,7 +265,7 @@ export default function KeybindingsPanel() {
                     colSpan={4}
                     className="px-4 py-10 text-center text-sm text-zinc-500 dark:text-zinc-400"
                   >
-                    No keybindings found
+                    {t("keybindings.noResults")}
                   </td>
                 </tr>
               ) : (
@@ -317,12 +306,12 @@ export default function KeybindingsPanel() {
                           </span>
                           {conflict && (
                             <span className="inline-flex items-center rounded border border-red-300 dark:border-red-700 bg-red-100 dark:bg-red-900/50 px-1.5 py-0 text-[10px] font-medium text-red-700 dark:text-red-300">
-                              conflict
+                              {t("keybindings.badge.conflict")}
                             </span>
                           )}
                           {overridden && !conflict && (
                             <span className="inline-flex items-center rounded border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0 text-[10px] font-medium text-blue-600 dark:text-blue-400">
-                              modified
+                              {t("keybindings.badge.modified")}
                             </span>
                           )}
                         </div>
@@ -336,6 +325,7 @@ export default function KeybindingsPanel() {
                         {isReassigning ? (
                           <ReassignCapture
                             entry={entry}
+                            t={t}
                             onConfirm={handleReassign}
                             onCancel={() => setReassigningId(null)}
                           />
@@ -354,7 +344,7 @@ export default function KeybindingsPanel() {
                             sourceBadgeClasses(entry.source)
                           )}
                         >
-                          {sourceBadgeLabel(entry.source)}
+                          {sourceBadgeLabel(entry.source, t)}
                         </span>
                       </td>
 
@@ -362,7 +352,7 @@ export default function KeybindingsPanel() {
                       <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                         {overridden && (
                           <button
-                            title="Reset to default"
+                            title={t("keybindings.capture.resetToDefault")}
                             onClick={() => handleReset(entry)}
                             className="inline-flex items-center justify-center h-7 w-7 rounded border border-zinc-200 dark:border-zinc-700 bg-transparent text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
                           >

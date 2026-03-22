@@ -79,6 +79,7 @@ class TauriStorageAdapter implements StateStorage {
   }
 }
 
+export const tauriLanguageStorage = new TauriStorageAdapter("language-storage.json");
 export const tauriAppearanceStorage = new TauriStorageAdapter("appearance-storage.json");
 export const tauriThemeStorage = new TauriStorageAdapter("theme-storage.json");
 export const tauriTabStorage = new TauriStorageAdapter("tab-storage.json");

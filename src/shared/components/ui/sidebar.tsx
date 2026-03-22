@@ -275,7 +275,7 @@ const SidebarTrigger = React.forwardRef<
         </Button>
       </TooltipTrigger>
       <TooltipContent side="right">
-        {state === "expanded" ? "Colapsar menú" : "Expandir menú"}
+        {state === "expanded" ? "Collapse menu" : "Expand menu"}
       </TooltipContent>
     </Tooltip>
   );

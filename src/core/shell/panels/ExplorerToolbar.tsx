@@ -10,6 +10,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import type { RefObject } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/components/ui/button";
 import { TooltipWrapper } from "@/shared/common/TooltipWrapper";
 import {
@@ -39,12 +40,6 @@ interface ExplorerToolbarProps {
   searchRef?: RefObject<HTMLInputElement | null>;
 }
 
-const SORT_LABELS: Record<SortOrder, string> = {
-  "type-first": "Tipo primero",
-  "name-asc": "Nombre A→Z",
-  "name-desc": "Nombre Z→A",
-};
-
 const SORT_ICONS: Record<SortOrder, React.ComponentType<{ className?: string }>> = {
   "type-first": Layers,
   "name-asc": ArrowUpAZ,
@@ -61,10 +56,17 @@ export const ExplorerToolbar = ({
   filterResultCount,
   searchRef,
 }: ExplorerToolbarProps) => {
+  const { t } = useTranslation("explorer");
   const sortOrder = useExplorerStore((s) => s.sortOrder);
   const setSortOrder = useExplorerStore((s) => s.setSortOrder);
   const showDotfiles = useExplorerStore((s) => s.showDotfiles);
   const setShowDotfiles = useExplorerStore((s) => s.setShowDotfiles);
+
+  const sortLabels: Record<SortOrder, string> = {
+    "type-first": t("sort.typeFirst"),
+    "name-asc": t("sort.nameAsc"),
+    "name-desc": t("sort.nameDesc"),
+  };
 
   const SortIcon = SORT_ICONS[sortOrder];
   const isFiltering = filterQuery.length > 0;
@@ -73,7 +75,7 @@ export const ExplorerToolbar = ({
     <div className="flex flex-col border-b border-border/50 shrink-0">
       {/* Action buttons row */}
       <div className="flex items-center justify-end px-2 py-1 gap-0.5">
-        <TooltipWrapper tooltip="Nuevo archivo" side="top">
+        <TooltipWrapper tooltip={t("toolbar.newFile")} side="top">
           <Button
             variant="ghost"
             size="icon"
@@ -84,7 +86,7 @@ export const ExplorerToolbar = ({
           </Button>
         </TooltipWrapper>
 
-        <TooltipWrapper tooltip="Nueva carpeta" side="top">
+        <TooltipWrapper tooltip={t("toolbar.newFolder")} side="top">
           <Button
             variant="ghost"
             size="icon"
@@ -95,7 +97,7 @@ export const ExplorerToolbar = ({
           </Button>
         </TooltipWrapper>
 
-        <TooltipWrapper tooltip="Refrescar" side="top">
+        <TooltipWrapper tooltip={t("toolbar.refresh")} side="top">
           <Button
             variant="ghost"
             size="icon"
@@ -106,7 +108,7 @@ export const ExplorerToolbar = ({
           </Button>
         </TooltipWrapper>
 
-        <TooltipWrapper tooltip="Colapsar todo" side="top">
+        <TooltipWrapper tooltip={t("toolbar.collapseAll")} side="top">
           <Button
             variant="ghost"
             size="icon"
@@ -119,7 +121,7 @@ export const ExplorerToolbar = ({
 
         {/* Sort order dropdown */}
         <DropdownMenu>
-          <TooltipWrapper tooltip={`Ordenar: ${SORT_LABELS[sortOrder]}`} side="top">
+          <TooltipWrapper tooltip={`${t("toolbar.sortPrefix")}${sortLabels[sortOrder]}`} side="top">
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
@@ -136,7 +138,7 @@ export const ExplorerToolbar = ({
               className={sortOrder === "type-first" ? "text-primary" : undefined}
             >
               <Layers className="size-3.5" />
-              Tipo primero
+              {t("sort.typeFirst")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -144,20 +146,23 @@ export const ExplorerToolbar = ({
               className={sortOrder === "name-asc" ? "text-primary" : undefined}
             >
               <ArrowUpAZ className="size-3.5" />
-              Nombre A→Z
+              {t("sort.nameAsc")}
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => setSortOrder("name-desc")}
               className={sortOrder === "name-desc" ? "text-primary" : undefined}
             >
               <ArrowDownAZ className="size-3.5" />
-              Nombre Z→A
+              {t("sort.nameDesc")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
         {/* Dotfiles toggle */}
-        <TooltipWrapper tooltip={showDotfiles ? "Ocultar dotfiles" : "Mostrar dotfiles"} side="top">
+        <TooltipWrapper
+          tooltip={showDotfiles ? t("toolbar.hideDotfiles") : t("toolbar.showDotfiles")}
+          side="top"
+        >
           <Button
             variant="ghost"
             size="icon"
@@ -178,7 +183,7 @@ export const ExplorerToolbar = ({
           ref={searchRef}
           value={filterQuery}
           onChange={onFilterChange}
-          placeholder="Filtrar archivos..."
+          placeholder={t("toolbar.filterPlaceholder")}
           resultCount={filterResultCount}
         />
       </div>

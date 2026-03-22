@@ -8,6 +8,7 @@ import { DiagramController } from "@/core/diagram/DiagramController";
 import { fileHandlerRegistry } from "@/core/shell/panels/file-handler-registry";
 import { notify } from "@/shared/lib/notify";
 import { useThemeStore } from "@/stores/themeStore";
+import { useLanguageStore } from "@/stores/languageStore";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
@@ -27,6 +28,8 @@ const DiagramCanvas = () => {
   const saveDiagram = useDiagramStore((s) => s.saveDiagram);
 
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
+  const language = useLanguageStore((s) => s.language);
+  const excalidrawLang = language === "es" ? "es-ES" : "en";
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const filesRef = useRef<BinaryFiles>({});
   const isActiveRef = useRef(isActive);
@@ -246,6 +249,7 @@ const DiagramCanvas = () => {
         }}
         onChange={handleChange}
         theme={resolvedTheme}
+        langCode={excalidrawLang}
         libraryReturnUrl={window.location.origin}
         UIOptions={{
           welcomeScreen: false,

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, startTransition, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { readDir, mkdir, remove } from "@tauri-apps/plugin-fs";
 import { rename } from "@tauri-apps/plugin-fs";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -88,6 +89,7 @@ const getAncestorPaths = (filePath: string, workspaceDir: string): string[] => {
 // ---------------------------------------------------------------------------
 
 export const ExplorerPanel = () => {
+  const { t } = useTranslation("explorer");
   // --- Store subscriptions ---
   const workspaceDir = useWorkspaceStore((s) => s.workspaceDir);
   const setWorkspaceDir = useWorkspaceStore((s) => s.setWorkspaceDir);
@@ -352,15 +354,15 @@ export const ExplorerPanel = () => {
     async (filePath: string, isDir: boolean) => {
       const name = filePath.split("/").pop() ?? filePath;
       const ok = await confirm({
-        title: isDir ? "Eliminar carpeta" : "Eliminar archivo",
-        description: `¿Eliminar "${name}"? Esta acción no se puede deshacer.`,
-        confirmLabel: "Eliminar",
+        title: isDir ? t("panel.deleteFolderTitle") : t("panel.deleteFileTitle"),
+        description: t("panel.deleteDescription", { name }),
+        confirmLabel: t("panel.deleteLabel"),
         variant: "destructive",
       });
       if (!ok) return;
       await remove(filePath, { recursive: isDir });
       closeTabsForDeletedPath(filePath);
-      notify(`"${name}" eliminado`, { type: "success" });
+      notify(t("panel.deletedSuccess", { name }), { type: "success" });
       await refresh();
     },
     [refresh]
@@ -379,12 +381,12 @@ export const ExplorerPanel = () => {
         .slice(0, 5)
         .map((n) => `• ${n}`)
         .join("\n");
-      const extra = paths.length > 5 ? `\ny ${paths.length - 5} más...` : "";
+      const extra = paths.length > 5 ? t("panel.batchDeleteMore", { count: paths.length - 5 }) : "";
 
       const ok = await confirm({
-        title: `Eliminar ${paths.length} elementos`,
-        description: `¿Eliminar los siguientes elementos? Esta acción no se puede deshacer.\n\n${listPreview}${extra}`,
-        confirmLabel: "Eliminar todo",
+        title: t("panel.batchDeleteTitle", { count: paths.length }),
+        description: t("panel.batchDeleteDescription", { preview: `${listPreview}${extra}` }),
+        confirmLabel: t("panel.batchDeleteLabel"),
         variant: "destructive",
       });
       if (!ok) return;
@@ -399,13 +401,13 @@ export const ExplorerPanel = () => {
         } catch (err) {
           const name = filePath.split("/").pop() ?? filePath;
           const msg = err instanceof Error ? err.message : String(err);
-          notify(`Error al eliminar "${name}": ${msg}`, { type: "error" });
+          notify(t("panel.errorDeleting", { name, message: msg }), { type: "error" });
         }
       }
 
       clearSelection();
       setFocusedPath(null);
-      notify(`${paths.length} elementos eliminados`, { type: "success" });
+      notify(t("panel.batchDeletedSuccess", { count: paths.length }), { type: "success" });
       await refresh();
     },
     [flatNodes, refresh, clearSelection]
@@ -708,9 +710,9 @@ export const ExplorerPanel = () => {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 px-4 text-center">
         <FolderOpen className="size-8 text-muted-foreground/40" />
-        <p className="text-xs text-muted-foreground">Abrí una carpeta para ver tus diagramas</p>
+        <p className="text-xs text-muted-foreground">Open a folder to see your diagrams</p>
         <Button size="sm" onClick={handleOpenWorkspace}>
-          Abrir carpeta
+          Open folder
         </Button>
       </div>
     );
@@ -839,8 +841,8 @@ export const ExplorerPanel = () => {
                 {displayTree.length === 0 && !creating ? (
                   <p className={cn("text-xs text-muted-foreground text-center pt-4 px-4")}>
                     {filterQuery.trim()
-                      ? `Sin resultados para "${filterQuery}"`
-                      : "No hay archivos en esta carpeta"}
+                      ? t("panel.noFilterResults", { query: filterQuery })
+                      : t("panel.noFilesInFolder")}
                   </p>
                 ) : (
                   displayTree.map((entry) => (

@@ -3,9 +3,12 @@ import { useTabStore } from "@/core/tabs/store/tab-store";
 import { RouteRegistry } from "@/core/routing/route-registry";
 import { useDiagramStore } from "@/core/diagram/store/diagram-store";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { useLanguageStore } from "@/stores/languageStore";
+import { useSettingsStore, type SettingsTab } from "@/stores/settingsStore";
 import { diagramFileService } from "@/core/diagram/services/diagram-file.service";
 import { DiagramController } from "@/core/diagram/DiagramController";
 import { prompt } from "@/shared/lib/prompt";
+import i18n from "@/core/i18n/i18n";
 
 // ── Core command handlers ─────────────────────────────────────────────────────
 //
@@ -40,16 +43,16 @@ async function newDiagramHandler(): Promise<void> {
   if (!workspaceDir) return;
 
   const result = await prompt({
-    title: "Nuevo diagrama",
+    title: i18n.t("commands:palette.newDiagram.title"),
     fields: [
       {
         id: "name",
-        label: "Nombre",
-        placeholder: "mi-diagrama",
+        label: i18n.t("commands:palette.newDiagram.nameLabel"),
+        placeholder: i18n.t("commands:palette.newDiagram.namePlaceholder"),
         required: true,
       },
     ],
-    confirmLabel: "Crear",
+    confirmLabel: i18n.t("commands:palette.newDiagram.createLabel"),
   });
 
   if (!result) return;
@@ -140,6 +143,36 @@ function focusSidebarSearchHandler(): void {
   }
 }
 
+function openPluginAdminHandler(): void {
+  const { tabs, addTab, setActiveTab } = useTabStore.getState();
+
+  const route = RouteRegistry.getRoute("plugin-admin");
+  if (!route) return;
+
+  const existingTab = tabs.find((t) => t.routeId === "plugin-admin");
+  if (existingTab) {
+    setActiveTab(existingTab.id);
+    return;
+  }
+
+  addTab({
+    routeId: route.id,
+    path: route.path ?? "/settings/plugins",
+    title: route.name,
+    icon: route.icon,
+  });
+}
+
+function openSettingsAtTabHandler(tab: SettingsTab): void {
+  useSettingsStore.getState().setActiveTab(tab);
+  openSettingsHandler();
+}
+
+function changeLanguageHandler(): void {
+  const { language, setLanguage } = useLanguageStore.getState();
+  setLanguage(language === "en" ? "es" : "en");
+}
+
 // ── Public initializer ────────────────────────────────────────────────────────
 
 /**
@@ -157,6 +190,10 @@ export function initializeCoreCommands(): void {
   PluginManager.registerCommandHandler("diagram.action.newDiagram", newDiagramHandler);
 
   PluginManager.registerCommandHandler("workbench.action.openSettings", openSettingsHandler);
+  PluginManager.registerCommandHandler("workbench.action.openPluginAdmin", openPluginAdminHandler);
+  PluginManager.registerCommandHandler("settings.action.openAITab", () =>
+    openSettingsAtTabHandler("ai")
+  );
 
   PluginManager.registerCommandHandler("workbench.action.closeActiveTab", closeActiveTabHandler);
 
@@ -172,4 +209,6 @@ export function initializeCoreCommands(): void {
     "workbench.action.focusSidebarSearch",
     focusSidebarSearchHandler
   );
+
+  PluginManager.registerCommandHandler("workbench.action.changeLanguage", changeLanguageHandler);
 }

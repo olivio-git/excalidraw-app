@@ -35,6 +35,12 @@ export interface RouteConfig {
     hidden?: boolean;
   };
 
+  /**
+   * If set, NavigationPanel uses this command instead of navigate() to open the route.
+   * Required for routes that have a registered command handler (tab-system awareness).
+   */
+  commandId?: string;
+
   subRoutes?: RouteConfig[];
   isHeader?: boolean;
   showSidebar?: boolean;

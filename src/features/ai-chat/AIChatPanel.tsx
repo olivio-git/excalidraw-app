@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { ScrollArea } from "@/shared/components/ui/scroll-area";
@@ -12,6 +13,7 @@ import { AIChatInput } from "./AIChatInput";
 import { PluginManager } from "@/plugins/plugin-manager";
 
 export function AIChatPanel() {
+  const { t } = useTranslation("common");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const clearMessages = useAIChatStore((s) => s.clearMessages);
@@ -27,28 +29,28 @@ export function AIChatPanel() {
 
   const handleClear = async () => {
     const ok = await confirm({
-      title: "Clear chat",
-      description: "Clear all messages?",
-      confirmLabel: "Clear",
+      title: t("aiChat.clearChat"),
+      description: t("aiChat.clearConfirmDescription"),
+      confirmLabel: t("aiChat.clearLabel"),
       variant: "destructive",
     });
     if (ok) clearMessages();
   };
 
   const goToSettings = () => {
-    PluginManager.executeCommand("workbench.action.openSettings");
+    PluginManager.executeCommand("settings.action.openAITab");
   };
 
   return (
     <div className={cn("flex flex-col h-full overflow-hidden")}>
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
-        <span className="text-sm font-medium">AI Chat</span>
+        <span className="text-sm font-medium">{t("panels.aiChat")}</span>
         <Button
           variant="ghost"
           size="icon"
           onClick={handleClear}
-          title="Clear chat"
+          title={t("aiChat.clearChat")}
           className="size-7 text-muted-foreground hover:text-foreground"
         >
           <Trash2 className="size-3.5" />
@@ -58,12 +60,12 @@ export function AIChatPanel() {
       {/* No API key banner */}
       {!hasApiKey && (
         <div className="px-3 py-2.5 text-xs text-muted-foreground border-b border-border shrink-0">
-          Configure an API key in{" "}
+          {t("aiChat.configureApiKey")}{" "}
           <button
             onClick={goToSettings}
             className="underline underline-offset-2 hover:text-foreground transition-colors"
           >
-            Settings → AI
+            {t("aiChat.settingsLink")}
           </button>
         </div>
       )}
@@ -73,7 +75,7 @@ export function AIChatPanel() {
         <div className="px-3 py-2">
           {messages.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-6">
-              Ask AI to draw or modify your diagram.
+              {t("aiChat.emptyState")}
             </p>
           )}
           {messages.map((m) => (

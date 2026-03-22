@@ -1,4 +1,5 @@
 import { AlertCircle, RefreshCw } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/components/ui/button";
 
 interface ErrorFallbackProps {
@@ -7,6 +8,7 @@ interface ErrorFallbackProps {
 }
 
 export function ErrorFallback({ error, resetErrorBoundary }: ErrorFallbackProps) {
+  const { t } = useTranslation("common");
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-background text-foreground animate-in fade-in duration-300">
       <div className="max-w-md w-full flex flex-col items-center text-center space-y-6">
@@ -14,10 +16,8 @@ export function ErrorFallback({ error, resetErrorBoundary }: ErrorFallbackProps)
           <AlertCircle className="size-12 text-destructive" />
         </div>
         <div className="space-y-2">
-          <h2 className="text-2xl font-semibold tracking-tight">Ocurrió un problema inesperado</h2>
-          <p className="text-muted-foreground">
-            Lamentamos los inconvenientes. Un error impidió cargar esta vista correctamente.
-          </p>
+          <h2 className="text-2xl font-semibold tracking-tight">{t("error.unexpectedTitle")}</h2>
+          <p className="text-muted-foreground">{t("error.unexpectedDescription")}</p>
         </div>
 
         {import.meta.env.DEV && (
@@ -33,7 +33,7 @@ export function ErrorFallback({ error, resetErrorBoundary }: ErrorFallbackProps)
 
         <Button onClick={resetErrorBoundary} className="gap-2">
           <RefreshCw className="size-4" />
-          Intentar de nuevo
+          {t("actions.tryAgain")}
         </Button>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   DndContext,
   PointerSensor,
@@ -46,6 +47,7 @@ export interface UseDragAndDropReturn {
 // ---------------------------------------------------------------------------
 
 export function useDragAndDrop(): UseDragAndDropReturn {
+  const { t } = useTranslation("explorer");
   const [draggingPath, setDraggingPath] = useState<string | null>(null);
   const [overFolderPath, setOverFolderPath] = useState<string | null>(null);
 
@@ -113,9 +115,9 @@ export function useDragAndDrop(): UseDragAndDropReturn {
 
       if (exists) {
         const ok = await confirm({
-          title: "Conflicto de nombres",
-          description: `Ya existe "${name}" en el destino. ¿Deseas reemplazarlo?`,
-          confirmLabel: "Reemplazar",
+          title: t("dragDrop.conflictTitle"),
+          description: t("dragDrop.conflictDescription", { name }),
+          confirmLabel: t("dragDrop.conflictConfirm"),
           variant: "destructive",
         });
         if (!ok) continue;
@@ -126,7 +128,7 @@ export function useDragAndDrop(): UseDragAndDropReturn {
         updateTabsAfterMove(pathToMove, newPath);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        notify(`Error al mover "${name}": ${msg}`, { type: "error" });
+        notify(t("dragDrop.errorMoving", { name, message: msg }), { type: "error" });
       }
     }
 

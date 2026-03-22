@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, startTransition } from "react";
+import { useTranslation } from "react-i18next";
 import { Dialog, DialogContent, DialogTitle } from "@/shared/components/ui/dialog";
 import { Button } from "@/shared/components/ui/button";
 import { FileText, Terminal } from "lucide-react";
@@ -109,6 +110,7 @@ function fuzzySort<T extends { label?: string; name?: string }>(items: T[], q: s
 // ── CommandPalette ─────────────────────────────────────────────────────────────
 
 export default function CommandPalette() {
+  const { t } = useTranslation("common");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -313,10 +315,10 @@ export default function CommandPalette() {
   // ── Empty state messages ────────────────────────────────────────────────────
   const isEmpty = allItems.length === 0;
   const emptyMessage = isCommandMode
-    ? "No commands found"
+    ? t("commandPalette.noCommandsFound")
     : !workspaceDir
-      ? "No workspace selected"
-      : "No files found";
+      ? t("commandPalette.noWorkspaceSelected")
+      : t("commandPalette.noFilesFound");
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -445,13 +447,13 @@ export default function CommandPalette() {
             <kbd className="inline-flex items-center rounded border border-border bg-muted px-1 text-[10px] font-mono">
               ↑↓
             </kbd>
-            navigate
+            {t("commandPalette.footer.navigate")}
           </span>
           <span className="text-[11px] text-muted-foreground flex items-center gap-1">
             <kbd className="inline-flex items-center rounded border border-border bg-muted px-1 text-[10px] font-mono">
               ↵
             </kbd>
-            {isCommandMode ? "run" : "open"}
+            {isCommandMode ? t("commandPalette.footer.run") : t("commandPalette.footer.open")}
           </span>
           {!isCommandMode && (
             <span className="text-[11px] text-muted-foreground ml-auto">
@@ -459,7 +461,7 @@ export default function CommandPalette() {
               <kbd className="inline-flex items-center rounded border border-border bg-muted px-1 text-[10px] font-mono">
                 &gt;
               </kbd>{" "}
-              for commands
+              {t("commandPalette.footer.forCommands")}
             </span>
           )}
         </div>

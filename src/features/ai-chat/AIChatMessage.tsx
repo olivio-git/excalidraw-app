@@ -1,4 +1,5 @@
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/utils";
 import type { AIMessage } from "./providers/types";
 
@@ -7,6 +8,8 @@ interface AIChatMessageProps {
 }
 
 export function AIChatMessage({ message }: AIChatMessageProps) {
+  const { t } = useTranslation("common");
+
   if (message.role === "user") {
     return (
       <div className="flex justify-end mb-2">
@@ -31,7 +34,7 @@ export function AIChatMessage({ message }: AIChatMessageProps) {
           {showStreamingIndicator ? (
             <span className="flex items-center gap-1 text-muted-foreground">
               <Loader2 className="size-3 animate-spin" />
-              <span>Thinking…</span>
+              <span>{t("aiChat.thinking")}</span>
             </span>
           ) : (
             <span className="whitespace-pre-wrap">{message.content}</span>
@@ -41,12 +44,8 @@ export function AIChatMessage({ message }: AIChatMessageProps) {
           {message.toolCalls && message.toolCalls.length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1">
               {message.toolCalls.map((tc) => {
-                const label: Record<string, string> = {
-                  draw_elements: "Drawing on canvas",
-                  clear_canvas: "Clearing canvas",
-                  get_elements: "Reading canvas",
-                  update_element: "Updating element",
-                };
+                const toolKey = `aiChat.tools.${tc.name}` as const;
+                const label = t(toolKey as Parameters<typeof t>[0], { defaultValue: tc.name });
                 return (
                   <span
                     key={tc.id}
@@ -57,7 +56,7 @@ export function AIChatMessage({ message }: AIChatMessageProps) {
                     ) : (
                       <CheckCircle2 className="size-2.5 text-green-500" />
                     )}
-                    {label[tc.name] ?? tc.name}
+                    {label}
                   </span>
                 );
               })}
@@ -79,7 +78,7 @@ export function AIChatMessage({ message }: AIChatMessageProps) {
       <div className="flex justify-start mb-1">
         <span className="inline-flex items-center gap-1 rounded-full border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[10px] text-destructive">
           <XCircle className="size-2.5 shrink-0" />
-          {message.toolResults?.find((tr) => tr.isError)?.result ?? "Tool error"}
+          {message.toolResults?.find((tr) => tr.isError)?.result ?? t("aiChat.toolError")}
         </span>
       </div>
     );

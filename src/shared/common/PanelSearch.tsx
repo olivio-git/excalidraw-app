@@ -27,6 +27,13 @@ const PanelSearch = forwardRef<HTMLInputElement, PanelSearchProps>(
           data-panel-search
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              onChange("");
+              e.currentTarget.blur();
+              e.stopPropagation();
+            }
+          }}
           placeholder={placeholder}
           className="flex-1 min-w-0 bg-transparent text-xs outline-none placeholder:text-muted-foreground/60"
         />

@@ -14,6 +14,7 @@ import { DocumentEditorToolbar } from "./DocumentEditorToolbar";
 import { useDocumentPersistence } from "./hooks/useDocumentPersistence";
 import { getDocumentController } from "./documentController.singleton";
 import { documentSchema } from "./documentSchema";
+import { documentEditorRegistry } from "./documentEditorRegistry";
 
 // ---------------------------------------------------------------------------
 // DocumentEditorContainer — smart container
@@ -42,6 +43,15 @@ export default function DocumentEditorContainer() {
 
   // Auto-save side effects — return value not needed (toolbar no longer shows save status)
   useDocumentPersistence(filePath);
+
+  // ── Register editor instance for MCP bridge access ───────────────────────
+  useEffect(() => {
+    if (!filePath) return;
+    documentEditorRegistry.register(filePath, editor);
+    return () => {
+      documentEditorRegistry.unregister(filePath);
+    };
+  }, [filePath, editor]);
 
   // ── Mount: open document if not already in store ─────────────────────────
   useEffect(() => {

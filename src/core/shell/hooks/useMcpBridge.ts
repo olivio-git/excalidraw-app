@@ -14,6 +14,7 @@ import { join } from "@tauri-apps/api/path";
 import { getFileStat, copyPath } from "@/core/shell/services/file.service";
 import { useExplorerStore, useExplorerSelectionStore } from "@/stores/explorerStore";
 import { getDocumentController } from "@/features/document-editor/documentController.singleton";
+import { documentEditorRegistry } from "@/features/document-editor/documentEditorRegistry";
 import type { SortOrder } from "@/core/shell/panels/explorer-types";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { AppState } from "@excalidraw/excalidraw/types";
@@ -978,6 +979,93 @@ export async function dispatchMcpTool(
           }
           const result = await getDocumentController().deleteDocument(filePath);
           return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_set_block_color": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+
+          const sectionId = input.sectionId as string | undefined;
+          if (!sectionId) return { result: null, error: "sectionId is required." };
+
+          const textColor = input.textColor as string | undefined;
+          const backgroundColor = input.backgroundColor as string | undefined;
+          if (!textColor && !backgroundColor) {
+            return {
+              result: null,
+              error: "At least one of textColor or backgroundColor is required.",
+            };
+          }
+
+          const editor = documentEditorRegistry.getEditor(filePath);
+          if (!editor) {
+            return {
+              result: null,
+              error:
+                "Editor not mounted for this document. The tab must be open and visible (keepMounted: true).",
+            };
+          }
+
+          // Resolve section → heading level + text from the controller
+          const sections = getDocumentController().getSections(filePath);
+          const sectionIdx = sections.findIndex((s) => s.id === sectionId);
+          if (sectionIdx === -1) {
+            return { result: null, error: `Section not found: ${sectionId}` };
+          }
+          const section = sections[sectionIdx];
+
+          // Occurrence index among sections with the same heading + level
+          const targetOccurrence = sections
+            .slice(0, sectionIdx)
+            .filter((s) => s.heading === section.heading && s.level === section.level).length;
+
+          // Walk top-level blocks to find the matching heading block.
+          // BlockNote markdown imports produce a flat block list — headings are top-level.
+          let occurrenceCount = 0;
+          let targetBlockId: string | undefined;
+          for (const block of editor.document as Array<{
+            id: string;
+            type: string;
+            props: Record<string, unknown>;
+            content: Array<{ type: string; text?: string }>;
+          }>) {
+            if (block.type === "heading" && block.props["level"] === section.level) {
+              const blockText = block.content
+                .filter((c) => c.type === "text")
+                .map((c) => c.text ?? "")
+                .join("");
+              if (blockText === section.heading) {
+                if (occurrenceCount === targetOccurrence) {
+                  targetBlockId = block.id;
+                  break;
+                }
+                occurrenceCount++;
+              }
+            }
+          }
+
+          if (!targetBlockId) {
+            return {
+              result: null,
+              error: `Could not find heading block for section "${sectionId}" in the editor. The editor content may not match the stored markdown.`,
+            };
+          }
+
+          const propUpdates: Record<string, string> = {};
+          if (textColor) propUpdates["textColor"] = textColor;
+          if (backgroundColor) propUpdates["backgroundColor"] = backgroundColor;
+
+          editor.updateBlock(targetBlockId, { props: propUpdates });
+
+          return { result: JSON.stringify({ ok: true, blockId: targetBlockId }), error: null };
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
           return { result: null, error };

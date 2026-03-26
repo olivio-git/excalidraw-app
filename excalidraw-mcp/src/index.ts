@@ -858,6 +858,70 @@ server.tool(
   }
 );
 
+// ─── document_set_block_color ─────────────────────────────────────────────────
+server.tool(
+  "document_set_block_color",
+  [
+    "Apply a text color or background color to a heading block in the live editor.",
+    "Uses BlockNote's native color system — values must be one of the named colors:",
+    "default | gray | brown | orange | yellow | green | blue | purple | pink | red.",
+    "IMPORTANT: colors are applied to the in-memory editor only.",
+    "Since .md files do not support block colors, the color will NOT be persisted to disk — it is a visual-only change for the current session.",
+    "Get sectionId from document_get_sections. The document tab must be open.",
+  ].join(" "),
+  {
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document. Obtain this from document_list — do NOT guess or infer the path."
+      ),
+    sectionId: z
+      .string()
+      .describe("The heading section ID to colorize (from document_get_sections)"),
+    textColor: z
+      .enum([
+        "default",
+        "gray",
+        "brown",
+        "orange",
+        "yellow",
+        "green",
+        "blue",
+        "purple",
+        "pink",
+        "red",
+      ])
+      .optional()
+      .describe("Named text color to apply to the heading block"),
+    backgroundColor: z
+      .enum([
+        "default",
+        "gray",
+        "brown",
+        "orange",
+        "yellow",
+        "green",
+        "blue",
+        "purple",
+        "pink",
+        "red",
+      ])
+      .optional()
+      .describe("Named background color to apply to the heading block"),
+  },
+  async ({ filePath, sectionId, textColor, backgroundColor }) => {
+    const res = await callBridge("document_set_block_color", {
+      filePath,
+      sectionId,
+      textColor,
+      backgroundColor,
+    });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
 // ─── document_delete ──────────────────────────────────────────────────────────
 server.tool(
   "document_delete",

@@ -570,13 +570,18 @@ server.tool(
   "document_get_content",
   [
     "Get the markdown content of an open document.",
+    "IMPORTANT: filePath must be an absolute path obtained from document_list or document_create — never guess or construct the path.",
     "Embedded base64 images are replaced with '[embedded-image]' placeholders by default to avoid token overflow — pass includeDataUrls: true only when you need the raw bytes.",
     "For large documents, use offset and limit to paginate by line number.",
     "The response includes { content, offset, total, hasMore } when paginating.",
     "When hasMore is true, fetch the next page with offset = offset + limit.",
   ].join(" "),
   {
-    filePath: z.string().describe("Absolute path to the open document"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document. Obtain this from document_list or document_create — do NOT guess or infer the path."
+      ),
     includeDataUrls: z
       .boolean()
       .optional()
@@ -619,7 +624,11 @@ server.tool(
     "Use headingsOnly: true to get only id/heading/level — sufficient for finding a section ID before replace/insert/delete.",
   ].join(" "),
   {
-    filePath: z.string().describe("Absolute path to the open document"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document. Obtain this from document_list or document_create — do NOT guess or infer the path."
+      ),
     headingsOnly: z
       .boolean()
       .optional()
@@ -650,7 +659,11 @@ server.tool(
   "document_set_content",
   "Replace the full content of an open document",
   {
-    filePath: z.string().describe("Absolute path to the open document"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document. Obtain this from document_list or document_create — do NOT guess or infer the path."
+      ),
     content: z.string().describe("New markdown content to set"),
   },
   async ({ filePath, content }) => {
@@ -666,7 +679,11 @@ server.tool(
   "document_append",
   "Append markdown content to the end of a document",
   {
-    filePath: z.string().describe("Absolute path to the open document"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document. Obtain this from document_list or document_create — do NOT guess or infer the path."
+      ),
     content: z.string().describe("Markdown content to append"),
   },
   async ({ filePath, content }) => {
@@ -682,7 +699,11 @@ server.tool(
   "document_insert_after_section",
   "Insert content after a section identified by ID",
   {
-    filePath: z.string().describe("Absolute path to the open document"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document. Obtain this from document_list or document_create — do NOT guess or infer the path."
+      ),
     sectionId: z.string().describe("The section ID to insert after (from document_get_sections)"),
     content: z.string().describe("Markdown content to insert"),
   },
@@ -699,7 +720,11 @@ server.tool(
   "document_insert_after_heading",
   "Insert content after a section identified by heading text",
   {
-    filePath: z.string().describe("Absolute path to the open document"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document. Obtain this from document_list or document_create — do NOT guess or infer the path."
+      ),
     heading: z.string().describe("The heading text to insert after"),
     content: z.string().describe("Markdown content to insert"),
   },
@@ -716,7 +741,11 @@ server.tool(
   "document_replace_section",
   "Replace the content of a section",
   {
-    filePath: z.string().describe("Absolute path to the open document"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document. Obtain this from document_list or document_create — do NOT guess or infer the path."
+      ),
     sectionId: z.string().describe("The section ID to replace (from document_get_sections)"),
     content: z.string().describe("New markdown content for the section body"),
   },
@@ -733,7 +762,11 @@ server.tool(
   "document_delete_section",
   "Delete a section and its content",
   {
-    filePath: z.string().describe("Absolute path to the open document"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document. Obtain this from document_list or document_create — do NOT guess or infer the path."
+      ),
     sectionId: z.string().describe("The section ID to delete (from document_get_sections)"),
   },
   async ({ filePath, sectionId }) => {
@@ -787,7 +820,11 @@ server.tool(
   "document_save",
   "Save a document to disk",
   {
-    filePath: z.string().describe("Absolute path to the open document to save"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document to save. Obtain this from document_list — do NOT guess or infer the path."
+      ),
   },
   async ({ filePath }) => {
     const res = await callBridge("document_save", { filePath });
@@ -798,18 +835,28 @@ server.tool(
 );
 
 // ─── document_list ────────────────────────────────────────────────────────────
-server.tool("document_list", "List all open documents", {}, async () => {
-  const res = await callBridge("document_list", {});
-  if (res.error) return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
-  return { content: [{ type: "text", text: toText(res.result) }] };
-});
+server.tool(
+  "document_list",
+  "List all currently open documents. Returns an array of { filePath, title, isDirty } objects. Use this to obtain filePath values before calling any other document tool.",
+  {},
+  async () => {
+    const res = await callBridge("document_list", {});
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
 
 // ─── document_delete ──────────────────────────────────────────────────────────
 server.tool(
   "document_delete",
   "Delete a document file and close its tab",
   {
-    filePath: z.string().describe("Absolute path to the document to delete"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the document to delete. Obtain this from document_list — do NOT guess or infer the path."
+      ),
     confirm: z
       .boolean()
       .describe("Must be true to confirm deletion. This action cannot be undone."),

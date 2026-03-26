@@ -264,3 +264,32 @@ input[type="number"].no-spinners {
 [data-radix-popper-content-wrapper] {
   z-index: 50;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Document editor — print / PDF export
+   Uses visibility trick to print only .document-paper while keeping layout.
+───────────────────────────────────────────────────────────────────────────── */
+@page {
+  size: A4;
+  margin: 1in;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .document-paper,
+  .document-paper * {
+    visibility: visible;
+  }
+
+  .document-paper {
+    position: absolute;
+    inset: 0;
+    box-shadow: none;
+    padding: 0;
+    max-width: 100%;
+    margin: 0;
+  }
+}

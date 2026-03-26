@@ -72,6 +72,12 @@
     "browse": "Browse",
     "noResults": "No libraries match your search."
   },
+  "documentEditor": {
+    "export": "Export",
+    "exportHtml": "Export as HTML",
+    "exportMarkdown": "Export as Markdown",
+    "exported": "File exported successfully"
+  },
   "aiChat": {
     "header": "AI Chat",
     "clearChat": "Clear chat",

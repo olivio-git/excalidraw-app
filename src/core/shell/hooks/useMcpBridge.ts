@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { convertToExcalidrawElements } from "@excalidraw/excalidraw";
 import { DiagramController } from "@/core/diagram/DiagramController";
-import { executeAITool, normalizeTextInContainers } from "@/features/ai-chat/utils/tool-executor";
+import { executeAITool } from "@/features/ai-chat/utils/tool-executor";
 import { useTabStore } from "@/core/tabs/store/tab-store";
 import { useDiagramStore } from "@/core/diagram/store/diagram-store";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
@@ -13,6 +13,7 @@ import { readDir, readTextFile, remove, rename, mkdir, stat } from "@tauri-apps/
 import { join } from "@tauri-apps/api/path";
 import { getFileStat, copyPath } from "@/core/shell/services/file.service";
 import { useExplorerStore, useExplorerSelectionStore } from "@/stores/explorerStore";
+import { getDocumentController } from "@/features/document-editor/documentController.singleton";
 import type { SortOrder } from "@/core/shell/panels/explorer-types";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { AppState } from "@excalidraw/excalidraw/types";
@@ -46,6 +47,14 @@ const flattenDir = async (dir: string, prefix: string): Promise<FlatFileEntry[]>
 };
 
 export const hasPathTraversal = (p: string): boolean => p.includes("..") || p.startsWith("/");
+
+// For document tools that use absolute paths — verifies path is inside workspace and has no traversal
+const isDocumentPathAllowed = (filePath: string): boolean => {
+  if (filePath.includes("..")) return false;
+  const workspaceDir = useWorkspaceStore.getState().workspaceDir;
+  if (!workspaceDir) return false;
+  return filePath.startsWith(workspaceDir);
+};
 
 function syncExplorerToFile(filePath: string): void {
   useExplorerSelectionStore.getState().setSelectedPaths([filePath]);
@@ -111,8 +120,7 @@ export async function dispatchMcpTool(
           return { result: "Set 0 element(s). Canvas cleared.", error: null };
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const converted = convertToExcalidrawElements(elements as any);
-        const normalized = normalizeTextInContainers(converted as ExcalidrawElement[]);
+        const normalized = convertToExcalidrawElements(elements as any) as ExcalidrawElement[];
         if (normalized.length === 0) {
           return {
             result: null,
@@ -640,6 +648,262 @@ export async function dispatchMcpTool(
         // Also emit a DOM event so ExplorerPanel can sync local Set state
         window.dispatchEvent(new CustomEvent("explorer:set-selection", { detail: { paths } }));
         return { result: JSON.stringify({ selected: paths.length }), error: null };
+      }
+
+      case "document_create": {
+        try {
+          const title = input.title as string | undefined;
+          if (!title) return { result: null, error: "title is required." };
+          if (hasPathTraversal(title)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          const result = await getDocumentController().createDocument(title);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_open": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          const result = await getDocumentController().openDocument(filePath);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_get_content": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          const result = getDocumentController().getContent(filePath);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_get_sections": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          const result = getDocumentController().getSections(filePath);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_set_content": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          const content = input.content as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          if (content === undefined) return { result: null, error: "content is required." };
+          const result = await getDocumentController().setContent(filePath, content);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_append": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          const content = input.content as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          if (content === undefined) return { result: null, error: "content is required." };
+          const result = await getDocumentController().appendContent(filePath, content);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_insert_after_section": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          const sectionId = input.sectionId as string | undefined;
+          const content = input.content as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          if (!sectionId) return { result: null, error: "sectionId is required." };
+          if (content === undefined) return { result: null, error: "content is required." };
+          const result = await getDocumentController().insertAfterSection(
+            filePath,
+            sectionId,
+            content
+          );
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_insert_after_heading": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          const heading = input.heading as string | undefined;
+          const content = input.content as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          if (!heading) return { result: null, error: "heading is required." };
+          if (content === undefined) return { result: null, error: "content is required." };
+          const result = await getDocumentController().insertAfterHeading(
+            filePath,
+            heading,
+            content
+          );
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_replace_section": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          const sectionId = input.sectionId as string | undefined;
+          const content = input.content as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          if (!sectionId) return { result: null, error: "sectionId is required." };
+          if (content === undefined) return { result: null, error: "content is required." };
+          const result = await getDocumentController().replaceSection(filePath, sectionId, content);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_delete_section": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          const sectionId = input.sectionId as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          if (!sectionId) return { result: null, error: "sectionId is required." };
+          const result = await getDocumentController().deleteSection(filePath, sectionId);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_insert_diagram": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          const diagramPath = input.diagramPath as string | undefined;
+          const caption = input.caption as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          if (!diagramPath) return { result: null, error: "diagramPath is required." };
+
+          // instanceId === diagramPath in this app — export requires an open tab
+          const svg = await DiagramController.exportToSVG(diagramPath);
+          if (!svg) {
+            return {
+              result: null,
+              error: `Diagram not open or export failed. Open "${diagramPath}" in a tab first, then retry.`,
+            };
+          }
+
+          // Serialize → base64 data URL (CSP allows data: in img-src)
+          const svgString = new XMLSerializer().serializeToString(svg);
+          const base64 = btoa(unescape(encodeURIComponent(svgString)));
+          const dataUrl = `data:image/svg+xml;base64,${base64}`;
+
+          const result = await getDocumentController().insertDiagram(filePath, dataUrl, caption);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_save": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          const result = await getDocumentController().saveDocument(filePath);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_list": {
+        try {
+          const result = await getDocumentController().listDocuments();
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_delete": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          const confirm = input.confirm as boolean | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          if (!confirm) {
+            return {
+              result: null,
+              error: "Set confirm: true to delete a document. This action cannot be undone.",
+            };
+          }
+          const result = await getDocumentController().deleteDocument(filePath);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
       }
 
       default:

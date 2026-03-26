@@ -65,11 +65,7 @@ server.tool(
     "Add Excalidraw elements to the active canvas without replacing existing content.",
     "PREFERRED for building diagrams: call multiple times for different sections (e.g. one call per layer or subsystem).",
     "Supports labeled shapes, arrows with bindings, and pseudo-elements (delete, cameraUpdate).",
-    "IMPORTANT — text positioning depends on textAlign:",
-    "  'left'   → x is the LEFT EDGE of the text element",
-    "  'center' → x is the CENTER POINT (x = container.x + container.width / 2)",
-    "  'right'  → x is the RIGHT EDGE",
-    "Setting x = container.x for center-aligned text will render it half outside the container.",
+    "For labeled shapes (rectangles, ellipses, etc.), use the 'label' property instead of a separate text element — Excalidraw handles positioning automatically.",
     "Diagrams are saved to disk automatically after each call.",
   ].join(" "),
   {
@@ -92,11 +88,7 @@ server.tool(
     "Replace ALL elements on the active canvas with the provided elements.",
     "Use draw_elements instead when building a diagram incrementally — it is faster and avoids generating the entire diagram JSON in one shot.",
     "Reserve set_elements for replacing or restoring a known complete canvas state.",
-    "IMPORTANT — text positioning depends on textAlign:",
-    "  'left'   → x is the LEFT EDGE of the text element",
-    "  'center' → x is the CENTER POINT (x = container.x + container.width / 2)",
-    "  'right'  → x is the RIGHT EDGE",
-    "Setting x = container.x for center-aligned text will render it half outside the container.",
+    "For labeled shapes (rectangles, ellipses, etc.), use the 'label' property instead of a separate text element — Excalidraw handles positioning automatically.",
     "Diagram is saved to disk automatically after the call.",
   ].join(" "),
   {
@@ -515,6 +507,229 @@ server.tool(
   },
   async ({ paths }) => {
     const res = await callBridge("set_selected_files", { paths });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── document_create ──────────────────────────────────────────────────────────
+server.tool(
+  "document_create",
+  "Create a new markdown document",
+  {
+    title: z.string().describe("Title of the new document (used as filename without extension)"),
+  },
+  async ({ title }) => {
+    const res = await callBridge("document_create", { title });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── document_open ────────────────────────────────────────────────────────────
+server.tool(
+  "document_open",
+  "Open a markdown document in a tab",
+  {
+    filePath: z.string().describe("Absolute path to the markdown document to open"),
+  },
+  async ({ filePath }) => {
+    const res = await callBridge("document_open", { filePath });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── document_get_content ─────────────────────────────────────────────────────
+server.tool(
+  "document_get_content",
+  "Get the full markdown content of an open document",
+  {
+    filePath: z.string().describe("Absolute path to the open document"),
+  },
+  async ({ filePath }) => {
+    const res = await callBridge("document_get_content", { filePath });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── document_get_sections ────────────────────────────────────────────────────
+server.tool(
+  "document_get_sections",
+  "Get the section tree (headings with IDs) of an open document",
+  {
+    filePath: z.string().describe("Absolute path to the open document"),
+  },
+  async ({ filePath }) => {
+    const res = await callBridge("document_get_sections", { filePath });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── document_set_content ─────────────────────────────────────────────────────
+server.tool(
+  "document_set_content",
+  "Replace the full content of an open document",
+  {
+    filePath: z.string().describe("Absolute path to the open document"),
+    content: z.string().describe("New markdown content to set"),
+  },
+  async ({ filePath, content }) => {
+    const res = await callBridge("document_set_content", { filePath, content });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── document_append ──────────────────────────────────────────────────────────
+server.tool(
+  "document_append",
+  "Append markdown content to the end of a document",
+  {
+    filePath: z.string().describe("Absolute path to the open document"),
+    content: z.string().describe("Markdown content to append"),
+  },
+  async ({ filePath, content }) => {
+    const res = await callBridge("document_append", { filePath, content });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── document_insert_after_section ────────────────────────────────────────────
+server.tool(
+  "document_insert_after_section",
+  "Insert content after a section identified by ID",
+  {
+    filePath: z.string().describe("Absolute path to the open document"),
+    sectionId: z.string().describe("The section ID to insert after (from document_get_sections)"),
+    content: z.string().describe("Markdown content to insert"),
+  },
+  async ({ filePath, sectionId, content }) => {
+    const res = await callBridge("document_insert_after_section", { filePath, sectionId, content });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── document_insert_after_heading ────────────────────────────────────────────
+server.tool(
+  "document_insert_after_heading",
+  "Insert content after a section identified by heading text",
+  {
+    filePath: z.string().describe("Absolute path to the open document"),
+    heading: z.string().describe("The heading text to insert after"),
+    content: z.string().describe("Markdown content to insert"),
+  },
+  async ({ filePath, heading, content }) => {
+    const res = await callBridge("document_insert_after_heading", { filePath, heading, content });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── document_replace_section ─────────────────────────────────────────────────
+server.tool(
+  "document_replace_section",
+  "Replace the content of a section",
+  {
+    filePath: z.string().describe("Absolute path to the open document"),
+    sectionId: z.string().describe("The section ID to replace (from document_get_sections)"),
+    content: z.string().describe("New markdown content for the section body"),
+  },
+  async ({ filePath, sectionId, content }) => {
+    const res = await callBridge("document_replace_section", { filePath, sectionId, content });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── document_delete_section ──────────────────────────────────────────────────
+server.tool(
+  "document_delete_section",
+  "Delete a section and its content",
+  {
+    filePath: z.string().describe("Absolute path to the open document"),
+    sectionId: z.string().describe("The section ID to delete (from document_get_sections)"),
+  },
+  async ({ filePath, sectionId }) => {
+    const res = await callBridge("document_delete_section", { filePath, sectionId });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── document_insert_diagram ──────────────────────────────────────────────────
+server.tool(
+  "document_insert_diagram",
+  [
+    "Export an open Excalidraw diagram as SVG and embed it into a document as an inline image.",
+    "IMPORTANT: the diagram must be open in a tab before calling this tool.",
+    "Workflow: 1) open_file_or_focus the .excalidraw file, 2) draw or verify the diagram, 3) call this tool.",
+    "The SVG is embedded as a base64 data URL so no external files are needed.",
+  ].join(" "),
+  {
+    filePath: z.string().describe("Absolute path to the target .md document"),
+    diagramPath: z
+      .string()
+      .describe("Absolute path to the .excalidraw file — must be open in a tab"),
+    caption: z.string().optional().describe("Optional caption displayed below the diagram"),
+  },
+  async ({ filePath, diagramPath, caption }) => {
+    const res = await callBridge("document_insert_diagram", { filePath, diagramPath, caption });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── document_save ────────────────────────────────────────────────────────────
+server.tool(
+  "document_save",
+  "Save a document to disk",
+  {
+    filePath: z.string().describe("Absolute path to the open document to save"),
+  },
+  async ({ filePath }) => {
+    const res = await callBridge("document_save", { filePath });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── document_list ────────────────────────────────────────────────────────────
+server.tool("document_list", "List all open documents", {}, async () => {
+  const res = await callBridge("document_list", {});
+  if (res.error) return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+  return { content: [{ type: "text", text: toText(res.result) }] };
+});
+
+// ─── document_delete ──────────────────────────────────────────────────────────
+server.tool(
+  "document_delete",
+  "Delete a document file and close its tab",
+  {
+    filePath: z.string().describe("Absolute path to the document to delete"),
+    confirm: z
+      .boolean()
+      .describe("Must be true to confirm deletion. This action cannot be undone."),
+  },
+  async ({ filePath, confirm }) => {
+    const res = await callBridge("document_delete", { filePath, confirm });
     if (res.error)
       return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
     return { content: [{ type: "text", text: toText(res.result) }] };

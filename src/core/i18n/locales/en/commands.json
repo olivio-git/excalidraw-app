@@ -15,6 +15,21 @@
     "home-overview": "Welcome",
     "settings": "Settings",
     "plugin-admin": "Plugin Administration",
-    "library-detail": "Library Detail"
+    "library-detail": "Library Detail",
+    "document-editor": "Document Editor"
+  },
+  "document": {
+    "new": "New Document",
+    "open": "Open Document",
+    "save": "Save Document",
+    "saveAll": "Save All Documents",
+    "close": "Close Document",
+    "rename": "Rename Document",
+    "unsavedChanges": {
+      "title": "Unsaved Changes",
+      "body": "This document has unsaved changes. Do you want to save before closing?",
+      "confirm": "Save",
+      "cancel": "Discard"
+    }
   }
 }

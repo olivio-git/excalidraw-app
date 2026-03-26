@@ -64,13 +64,13 @@ export const useKeybindingStore = create<KeybindingStore>()(
           ),
         }));
 
-        keybindingRegistry.unregister(firstKey as NormalizedKey, commandId);
+        keybindingRegistry.removeUserOverride(firstKey as NormalizedKey, commandId);
       },
 
       resetAll: () => {
         const { overrides } = get();
         for (const entry of overrides) {
-          keybindingRegistry.unregister(entry.chord[0], entry.commandId);
+          keybindingRegistry.removeUserOverride(entry.chord[0], entry.commandId);
         }
         set({ overrides: [] });
       },

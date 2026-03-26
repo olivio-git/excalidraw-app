@@ -553,7 +553,11 @@ server.tool(
 // ─── document_open ────────────────────────────────────────────────────────────
 server.tool(
   "document_open",
-  "Open a markdown document in a tab",
+  [
+    "Open a markdown document in a new tab (or focus its existing tab).",
+    "NOTE: opening a tab does not guarantee the editor is immediately rendered.",
+    "If you need to call document_set_block_color right after, follow with activate_tab to ensure the tab is focused and the editor is mounted.",
+  ].join(" "),
   {
     filePath: z.string().describe("Absolute path to the markdown document to open"),
   },
@@ -657,7 +661,11 @@ server.tool(
 // ─── document_set_content ─────────────────────────────────────────────────────
 server.tool(
   "document_set_content",
-  "Replace the full content of an open document",
+  [
+    "Replace the full markdown content of an open document.",
+    "WARNING: do NOT embed <span style='color:...'> or other HTML for styling — BlockNote strips inline HTML on parse.",
+    "To color a heading, use document_set_block_color instead.",
+  ].join(" "),
   {
     filePath: z
       .string()
@@ -863,11 +871,12 @@ server.tool(
   "document_set_block_color",
   [
     "Apply a text color or background color to a heading block in the live editor.",
+    "THIS IS THE CORRECT TOOL for coloring headings — do NOT use <span style='color:...'> or any HTML in markdown, it will not render.",
     "Uses BlockNote's native color system — values must be one of the named colors:",
     "default | gray | brown | orange | yellow | green | blue | purple | pink | red.",
-    "IMPORTANT: colors are applied to the in-memory editor only.",
-    "Since .md files do not support block colors, the color will NOT be persisted to disk — it is a visual-only change for the current session.",
-    "Get sectionId from document_get_sections. The document tab must be open.",
+    "IMPORTANT: colors are applied to the in-memory editor only and are NOT persisted to the .md file.",
+    "If you get 'Editor not mounted', call activate_tab with the filePath first, then retry.",
+    "Get sectionId from document_get_sections.",
   ].join(" "),
   {
     filePath: z

@@ -8,6 +8,10 @@ import type { documentFileService } from "./documentFileService";
 // Helpers
 // ---------------------------------------------------------------------------
 
+function stripHtml(text: string): string {
+  return text.replace(/<[^>]*>/g, "").trim();
+}
+
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -33,20 +37,24 @@ function parseSections(content: string): Section[] {
   const flushSection = (_endLine: number) => {
     if (!currentHeading) return;
     const bodyContent = bodyLines.join("\n").trim();
-    const slug = slugify(currentHeading.text);
+    // Strip HTML tags from heading text before slugifying so that headings
+    // with inline HTML (e.g. <span style="...">Title</span>) produce clean,
+    // stable IDs like "h1-title" instead of "h1-span-stylecolor-...titlespan".
+    const cleanText = stripHtml(currentHeading.text);
+    const slug = slugify(cleanText);
     const base = `h${currentHeading.level}-${slug}`;
 
     // Count prior sections with the same heading text + level to handle duplicates.
     // Unique headings → stable id (e.g. "h2-diagrama-del-flujo").
     // Duplicates → disambiguate with occurrence suffix ("h2-intro", "h2-intro-2", "h2-intro-3").
     const priorSameHeading = sections.filter(
-      (s) => s.heading === currentHeading!.text && s.level === currentHeading!.level
+      (s) => s.heading === cleanText && s.level === currentHeading!.level
     ).length;
     const id = priorSameHeading === 0 ? base : `${base}-${priorSameHeading + 1}`;
 
     sections.push({
       id,
-      heading: currentHeading.text,
+      heading: cleanText,
       level: currentHeading.level,
       content: bodyContent,
     });
@@ -87,24 +95,21 @@ function replaceSectionContent(
   if (idx === -1) return fullContent;
 
   const target = sections[idx];
-  const headingPrefix = "#".repeat(target.level);
-  const headingLine = `${headingPrefix} ${target.heading}`;
 
-  // How many sections BEFORE idx share the same heading text and level.
-  // This is the occurrence index we need to find in the raw lines — NOT the
-  // global idx, which counts all headings regardless of text/level.
   const targetOccurrence = sections
     .slice(0, idx)
     .filter((s) => s.heading === target.heading && s.level === target.level).length;
 
-  // Locate start of section in original content
+  // Locate the raw heading line in original content.
+  // Compare against stripped text so headings with inline HTML (e.g. <span>)
+  // are found correctly regardless of their raw markup.
   const lines = fullContent.split("\n");
   let sectionStart = -1;
   let sectionCount = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(/^(#{1,6})\s+(.+)$/);
-    if (m && m[1].length === target.level && m[2].trim() === target.heading) {
+    if (m && m[1].length === target.level && stripHtml(m[2].trim()) === target.heading) {
       if (sectionCount === targetOccurrence) {
         sectionStart = i;
         break;
@@ -114,6 +119,10 @@ function replaceSectionContent(
   }
 
   if (sectionStart === -1) return fullContent;
+
+  // Preserve the original heading line as-is (including any inline HTML).
+  // We only replace the BODY, never the heading line itself.
+  const originalHeadingLine = lines[sectionStart];
 
   // Find end of section body — stop at the NEXT heading of ANY level.
   // This makes replace/delete atomic: they only touch the immediate body text
@@ -133,7 +142,7 @@ function replaceSectionContent(
     return [...before, ...after].join("\n");
   }
 
-  return [...before, headingLine, newBody, ...after].join("\n");
+  return [...before, originalHeadingLine, newBody, ...after].join("\n");
 }
 
 // ---------------------------------------------------------------------------

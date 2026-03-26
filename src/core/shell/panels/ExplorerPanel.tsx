@@ -311,7 +311,9 @@ export const ExplorerPanel = () => {
         await refresh();
       } else {
         if (name.includes(".") && !fileHandlerRegistry.resolve(name)) return;
-        const handler = fileHandlerRegistry.getDefault();
+        const handler = name.includes(".")
+          ? fileHandlerRegistry.resolveOrDefault(name)
+          : fileHandlerRegistry.getDefault();
         const finalName = name.includes(".") ? name : `${name}.${handler.defaultExtension}`;
         const filePath = await handler.create(parentPath, finalName);
         await refresh();

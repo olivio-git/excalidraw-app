@@ -179,6 +179,34 @@ export interface DiagramPluginAPI {
   waitForInstance(instanceId: string, timeoutMs?: number): Promise<ExcalidrawImperativeAPI>;
 }
 
+// ---------------------------------------------------------------------------
+// Document sub-API
+// ---------------------------------------------------------------------------
+
+export interface Section {
+  id: string;
+  heading: string;
+  level: number;
+  content: string;
+}
+
+export interface DocumentAPI {
+  createDocument(title: string): Promise<string>;
+  openDocument(filePath: string): Promise<void>;
+  getContent(filePath: string): string | null;
+  getSections(filePath: string): Section[];
+  setContent(filePath: string, content: string): Promise<void>;
+  appendContent(filePath: string, content: string): Promise<void>;
+  insertAfterSection(filePath: string, sectionId: string, content: string): Promise<void>;
+  insertAfterHeading(filePath: string, heading: string, content: string): Promise<void>;
+  replaceSection(filePath: string, sectionId: string, content: string): Promise<void>;
+  deleteSection(filePath: string, sectionId: string): Promise<void>;
+  insertDiagram(filePath: string, diagramPath: string, caption?: string): Promise<void>;
+  saveDocument(filePath: string): Promise<void>;
+  listDocuments(): Promise<string[]>;
+  deleteDocument(filePath: string): Promise<void>;
+}
+
 /**
  * Public API surface that the host exposes to plugins.
  *
@@ -300,6 +328,13 @@ export interface PluginAPI {
    * kept for backwards compatibility and remain fully functional.
    */
   tabs: PluginTabsAPI;
+
+  /**
+   * Document editor sub-API.
+   * Provides CRUD operations over markdown documents, section manipulation,
+   * and diagram insertion.
+   */
+  document?: DocumentAPI;
 }
 
 export interface SidebarSection {

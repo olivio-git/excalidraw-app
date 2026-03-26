@@ -3,6 +3,10 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+
   :root {
     --border: 220 13% 91%;
     --input: 220 13% 91%;
@@ -214,4 +218,49 @@ input[type="number"].no-spinners::-webkit-outer-spin-button {
 
 input[type="number"].no-spinners {
   -moz-appearance: textfield;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   BlockNote theme integration
+   Override BlockNote's hardcoded --bn-colors-* to use our design system vars.
+   Using :root prefix to win the specificity battle against BlockNote's own
+   .bn-container (0,1,0) and .bn-container[data-color-scheme=dark] (0,2,0).
+   Our --background/--foreground/etc. already switch on the .dark class,
+   so no duplicate dark-mode block is needed.
+───────────────────────────────────────────────────────────────────────────── */
+:root .bn-container,
+:root .bn-container[data-color-scheme="dark"] {
+  --bn-colors-editor-background: hsl(var(--background));
+  --bn-colors-editor-text: hsl(var(--foreground));
+  --bn-colors-menu-background: hsl(var(--card));
+  --bn-colors-menu-text: hsl(var(--card-foreground));
+  --bn-colors-tooltip-background: hsl(var(--popover));
+  --bn-colors-tooltip-text: hsl(var(--popover-foreground));
+  --bn-colors-hovered-background: hsl(var(--accent));
+  --bn-colors-hovered-text: hsl(var(--accent-foreground));
+  --bn-colors-selected-background: hsl(var(--primary) / 0.15);
+  --bn-colors-selected-text: hsl(var(--foreground));
+  --bn-colors-disabled-background: hsl(var(--muted));
+  --bn-colors-disabled-text: hsl(var(--muted-foreground));
+  --bn-colors-shadow: hsl(var(--border) / 0.5);
+  --bn-colors-border: hsl(var(--border));
+  --bn-colors-side-menu: hsl(var(--muted-foreground));
+  --bn-font-family: var(--font-family-active);
+  --bn-border-radius: var(--border-radius-base);
+  /* Scope absolutely-positioned side menu children (prevents them from
+     positioning relative to SidebarProvider which spans the full window) */
+  position: relative;
+}
+
+/* Editor area transparent — background comes from the wrapper div */
+:root .bn-editor {
+  background-color: transparent;
+}
+
+/* Guarantee BlockNote Radix popovers/dropdowns render above the sidebar.
+   The `z-50` class is on the content inside, but the Radix wrapper div
+   itself has no z-index — it needs to be set to participate in the
+   root stacking context above everything else. */
+[data-radix-popper-content-wrapper] {
+  z-index: 50;
 }

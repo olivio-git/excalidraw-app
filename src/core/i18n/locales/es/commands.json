@@ -15,6 +15,21 @@
     "home-overview": "Bienvenida",
     "settings": "Configuración",
     "plugin-admin": "Administración de plugins",
-    "library-detail": "Detalle de biblioteca"
+    "library-detail": "Detalle de biblioteca",
+    "document-editor": "Editor de documentos"
+  },
+  "document": {
+    "new": "Nuevo documento",
+    "open": "Abrir documento",
+    "save": "Guardar documento",
+    "saveAll": "Guardar todos los documentos",
+    "close": "Cerrar documento",
+    "rename": "Renombrar documento",
+    "unsavedChanges": {
+      "title": "Cambios sin guardar",
+      "body": "Este documento tiene cambios sin guardar. ¿Querés guardar antes de cerrar?",
+      "confirm": "Guardar",
+      "cancel": "Descartar"
+    }
   }
 }

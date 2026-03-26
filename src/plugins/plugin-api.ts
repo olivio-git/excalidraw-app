@@ -30,9 +30,11 @@ import {
   updateTabsAfterMove,
   closeTabsForDeletedPath,
 } from "@/core/shell/panels/explorer-tab-sync";
+import { getDocumentController } from "@/features/document-editor/documentController.singleton";
 import type {
   ActiveTabInfo,
   CommandHandler,
+  DocumentAPI,
   FileStat,
   FileListEntry,
   TabInfo,
@@ -350,6 +352,13 @@ export function createPluginAPI(
       async writeText(path: string, content: string): Promise<void> {
         await writeTextFile(path, content);
       },
+    },
+
+    // -------------------------------------------------------------------------
+    // document sub-API
+    // -------------------------------------------------------------------------
+    get document(): DocumentAPI {
+      return getDocumentController();
     },
 
     // -------------------------------------------------------------------------

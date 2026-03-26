@@ -48,7 +48,11 @@ const server = new McpServer({
 // ─── get_elements ─────────────────────────────────────────────────────────────
 server.tool(
   "get_elements",
-  "Get all elements from the active Excalidraw diagram canvas. Returns a JSON array of Excalidraw elements.",
+  [
+    "Get all elements from the active Excalidraw diagram canvas. Returns a JSON array of Excalidraw elements.",
+    "ONLY works when the active tab is an Excalidraw diagram (routeId: 'excalidraw').",
+    "If the active tab is a document editor or any other route, this returns an error — use get_active_tab to check first.",
+  ].join(" "),
   {},
   async () => {
     const res = await callBridge("get_elements", {});
@@ -138,11 +142,22 @@ server.tool(
 );
 
 // ─── export_svg ───────────────────────────────────────────────────────────────
-server.tool("export_svg", "Export the current diagram as an SVG string.", {}, async () => {
-  const res = await callBridge("export_svg", {});
-  if (res.error) return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
-  return { content: [{ type: "text", text: toText(res.result) }] };
-});
+server.tool(
+  "export_svg",
+  [
+    "Export the current diagram as an SVG string. Intended for external use (saving to disk, clipboard, etc.).",
+    "WARNING: The SVG includes embedded base64 font data and can be very large (10k+ tokens).",
+    "If your goal is to embed the diagram into a markdown document, use document_insert_diagram instead —",
+    "it handles the SVG export and base64 embedding automatically without consuming context.",
+  ].join(" "),
+  {},
+  async () => {
+    const res = await callBridge("export_svg", {});
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
 
 // ─── open_file ────────────────────────────────────────────────────────────────
 server.tool(
@@ -201,11 +216,18 @@ server.tool(
 // ─── create_diagram ───────────────────────────────────────────────────────────
 server.tool(
   "create_diagram",
-  "Create a new empty .excalidraw diagram file in the workspace and open it in a new tab. Fails if the file already exists.",
+  [
+    "Create a new empty .excalidraw diagram file in the workspace and open it in a new tab. Fails if the file already exists.",
+    "The name is relative to the workspace root — do NOT include the workspace path in the name.",
+    "Examples: 'my-diagram', 'subfolder/my-diagram'. Parent directories are created automatically.",
+    "Use get_workspace_dir to check the workspace root before choosing a name.",
+  ].join(" "),
   {
     name: z
       .string()
-      .describe("File name (with or without .excalidraw extension), relative to workspace root"),
+      .describe(
+        "File name relative to workspace root (e.g. 'my-diagram' or 'subfolder/my-diagram'). Do NOT include the workspace directory path — just the name within it."
+      ),
   },
   async ({ name }) => {
     const res = await callBridge("create_diagram", { name });
@@ -546,12 +568,41 @@ server.tool(
 // ─── document_get_content ─────────────────────────────────────────────────────
 server.tool(
   "document_get_content",
-  "Get the full markdown content of an open document",
+  [
+    "Get the markdown content of an open document.",
+    "Embedded base64 images are replaced with '[embedded-image]' placeholders by default to avoid token overflow — pass includeDataUrls: true only when you need the raw bytes.",
+    "For large documents, use offset and limit to paginate by line number.",
+    "The response includes { content, offset, total, hasMore } when paginating.",
+    "When hasMore is true, fetch the next page with offset = offset + limit.",
+  ].join(" "),
   {
     filePath: z.string().describe("Absolute path to the open document"),
+    includeDataUrls: z
+      .boolean()
+      .optional()
+      .describe(
+        "If true, return raw base64 data: URLs instead of '[embedded-image]' placeholders. WARNING: can exceed token limits on documents with embedded diagrams. Only use if you need the actual image bytes."
+      ),
+    offset: z
+      .number()
+      .int()
+      .nonnegative()
+      .optional()
+      .describe("Line number to start reading from (0-based). Omit to read from the beginning."),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("Maximum number of lines to return. Omit to return all lines from offset."),
   },
-  async ({ filePath }) => {
-    const res = await callBridge("document_get_content", { filePath });
+  async ({ filePath, includeDataUrls, offset, limit }) => {
+    const res = await callBridge("document_get_content", {
+      filePath,
+      includeDataUrls,
+      offset,
+      limit,
+    });
     if (res.error)
       return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
     return { content: [{ type: "text", text: toText(res.result) }] };
@@ -561,12 +612,33 @@ server.tool(
 // ─── document_get_sections ────────────────────────────────────────────────────
 server.tool(
   "document_get_sections",
-  "Get the section tree (headings with IDs) of an open document",
+  [
+    "Get the section tree of an open document.",
+    "Each section has: id, heading, level, content (body text).",
+    "Embedded base64 images in section bodies are replaced with '[embedded-image]' placeholders by default.",
+    "Use headingsOnly: true to get only id/heading/level — sufficient for finding a section ID before replace/insert/delete.",
+  ].join(" "),
   {
     filePath: z.string().describe("Absolute path to the open document"),
+    headingsOnly: z
+      .boolean()
+      .optional()
+      .describe(
+        "If true, omit section body content (returns only id, heading, level). Use for large documents."
+      ),
+    includeDataUrls: z
+      .boolean()
+      .optional()
+      .describe(
+        "If true, return raw base64 data: URLs in section bodies instead of placeholders. WARNING: can exceed token limits."
+      ),
   },
-  async ({ filePath }) => {
-    const res = await callBridge("document_get_sections", { filePath });
+  async ({ filePath, headingsOnly, includeDataUrls }) => {
+    const res = await callBridge("document_get_sections", {
+      filePath,
+      headingsOnly,
+      includeDataUrls,
+    });
     if (res.error)
       return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
     return { content: [{ type: "text", text: toText(res.result) }] };
@@ -677,9 +749,12 @@ server.tool(
   "document_insert_diagram",
   [
     "Export an open Excalidraw diagram as SVG and embed it into a document as an inline image.",
+    "The SVG is embedded as a base64 data URL — no external files needed, no manual encoding required.",
     "IMPORTANT: the diagram must be open in a tab before calling this tool.",
     "Workflow: 1) open_file_or_focus the .excalidraw file, 2) draw or verify the diagram, 3) call this tool.",
-    "The SVG is embedded as a base64 data URL so no external files are needed.",
+    "Use sectionId to REPLACE an existing section with the diagram (from document_get_sections).",
+    "Omit sectionId to APPEND the diagram at the end of the document.",
+    "NEVER use export_svg + manual base64 encoding for this — always use this tool instead.",
   ].join(" "),
   {
     filePath: z.string().describe("Absolute path to the target .md document"),
@@ -687,9 +762,20 @@ server.tool(
       .string()
       .describe("Absolute path to the .excalidraw file — must be open in a tab"),
     caption: z.string().optional().describe("Optional caption displayed below the diagram"),
+    sectionId: z
+      .string()
+      .optional()
+      .describe(
+        "If provided, replaces the body of this section with the embedded diagram instead of appending. Get the ID from document_get_sections."
+      ),
   },
-  async ({ filePath, diagramPath, caption }) => {
-    const res = await callBridge("document_insert_diagram", { filePath, diagramPath, caption });
+  async ({ filePath, diagramPath, caption, sectionId }) => {
+    const res = await callBridge("document_insert_diagram", {
+      filePath,
+      diagramPath,
+      caption,
+      sectionId,
+    });
     if (res.error)
       return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
     return { content: [{ type: "text", text: toText(res.result) }] };

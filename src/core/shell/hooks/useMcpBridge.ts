@@ -88,6 +88,17 @@ export async function dispatchMcpTool(
   try {
     switch (tool) {
       case "get_elements": {
+        if (!instanceId) {
+          const { tabs, activeTabId } = useTabStore.getState();
+          const activeTab = tabs.find((t) => t.id === activeTabId);
+          const hint = activeTab
+            ? ` Active tab is "${activeTab.routeId}" (${activeTab.title}) — not an Excalidraw canvas.`
+            : " No tab is active.";
+          return {
+            result: null,
+            error: `No active diagram canvas.${hint} Open a .excalidraw file in a tab first.`,
+          };
+        }
         const elements = DiagramController.getElements(instanceId);
         return { result: JSON.stringify(elements), error: null };
       }
@@ -209,6 +220,13 @@ export async function dispatchMcpTool(
           return { result: null, error: "File already exists." };
         } catch {
           // File does not exist — proceed
+        }
+        // Auto-create parent directories so names like "subdir/my-diagram" work
+        const segments = name.split("/");
+        if (segments.length > 1) {
+          const parentRelative = segments.slice(0, -1).join("/");
+          const parentAbsolute = await join(workspaceDir, parentRelative);
+          await mkdir(parentAbsolute, { recursive: true });
         }
         await diagramFileService.createNewDiagram(workspaceDir, name);
         const handler = fileHandlerRegistry.resolveOrDefault(name);
@@ -687,8 +705,39 @@ export async function dispatchMcpTool(
           if (!isDocumentPathAllowed(filePath)) {
             return { result: null, error: "Path traversal not allowed" };
           }
-          const result = getDocumentController().getContent(filePath);
-          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+          const raw = getDocumentController().getContent(filePath);
+          if (raw === null) return { result: null, error: "Document not open or not found." };
+
+          // Strip embedded data: URLs by default to avoid token overflow.
+          // Pass includeDataUrls: true only when the raw bytes are actually needed.
+          const includeDataUrls = input.includeDataUrls === true;
+          const content = includeDataUrls
+            ? raw
+            : raw.replace(/!\[([^\]]*)\]\(data:[^)]{20,}\)/g, "![$1]([embedded-image])");
+
+          const offsetLines = typeof input.offset === "number" ? input.offset : 0;
+          const limitLines = typeof input.limit === "number" ? input.limit : undefined;
+
+          if (offsetLines > 0 || limitLines !== undefined) {
+            const lines = content.split("\n");
+            const total = lines.length;
+            const sliced =
+              limitLines !== undefined
+                ? lines.slice(offsetLines, offsetLines + limitLines)
+                : lines.slice(offsetLines);
+            const hasMore = offsetLines + sliced.length < total;
+            return {
+              result: JSON.stringify({
+                content: sliced.join("\n"),
+                offset: offsetLines,
+                total,
+                hasMore,
+              }),
+              error: null,
+            };
+          }
+
+          return { result: JSON.stringify(content), error: null };
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
           return { result: null, error };
@@ -702,8 +751,29 @@ export async function dispatchMcpTool(
           if (!isDocumentPathAllowed(filePath)) {
             return { result: null, error: "Path traversal not allowed" };
           }
-          const result = getDocumentController().getSections(filePath);
-          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+          const sections = getDocumentController().getSections(filePath);
+          const headingsOnly = input.headingsOnly === true;
+          const includeDataUrls = input.includeDataUrls === true;
+
+          if (headingsOnly) {
+            return {
+              result: JSON.stringify(
+                sections.map(({ id, heading, level }) => ({ id, heading, level }))
+              ),
+              error: null,
+            };
+          }
+
+          const result = includeDataUrls
+            ? sections
+            : sections.map((s) => ({
+                ...s,
+                content: s.content.replace(
+                  /!\[([^\]]*)\]\(data:[^)]{20,}\)/g,
+                  "![$1]([embedded-image])"
+                ),
+              }));
+          return { result: JSON.stringify(result), error: null };
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
           return { result: null, error };
@@ -831,6 +901,7 @@ export async function dispatchMcpTool(
           const filePath = input.filePath as string | undefined;
           const diagramPath = input.diagramPath as string | undefined;
           const caption = input.caption as string | undefined;
+          const sectionId = input.sectionId as string | undefined;
           if (!filePath) return { result: null, error: "filePath is required." };
           if (!isDocumentPathAllowed(filePath)) {
             return { result: null, error: "Path traversal not allowed" };
@@ -850,6 +921,13 @@ export async function dispatchMcpTool(
           const svgString = new XMLSerializer().serializeToString(svg);
           const base64 = btoa(unescape(encodeURIComponent(svgString)));
           const dataUrl = `data:image/svg+xml;base64,${base64}`;
+
+          if (sectionId) {
+            // Replace existing section content with the embedded diagram
+            const imageMarkdown = caption ? `![${caption}](${dataUrl})` : `![diagram](${dataUrl})`;
+            await getDocumentController().replaceSection(filePath, sectionId, imageMarkdown);
+            return { result: JSON.stringify({ ok: true, replaced: sectionId }), error: null };
+          }
 
           const result = await getDocumentController().insertDiagram(filePath, dataUrl, caption);
           return { result: JSON.stringify(result ?? { ok: true }), error: null };

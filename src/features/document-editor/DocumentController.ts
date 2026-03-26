@@ -30,12 +30,22 @@ function parseSections(content: string): Section[] {
   let currentHeading: { text: string; level: number; startLine: number } | null = null;
   let bodyLines: string[] = [];
 
-  const flushSection = (endLine: number) => {
+  const flushSection = (_endLine: number) => {
     if (!currentHeading) return;
     const bodyContent = bodyLines.join("\n").trim();
-    const idx = sections.length;
+    const slug = slugify(currentHeading.text);
+    const base = `h${currentHeading.level}-${slug}`;
+
+    // Count prior sections with the same heading text + level to handle duplicates.
+    // Unique headings → stable id (e.g. "h2-diagrama-del-flujo").
+    // Duplicates → disambiguate with occurrence suffix ("h2-intro", "h2-intro-2", "h2-intro-3").
+    const priorSameHeading = sections.filter(
+      (s) => s.heading === currentHeading!.text && s.level === currentHeading!.level
+    ).length;
+    const id = priorSameHeading === 0 ? base : `${base}-${priorSameHeading + 1}`;
+
     sections.push({
-      id: `heading-${slugify(currentHeading.text)}-${idx}`,
+      id,
       heading: currentHeading.text,
       level: currentHeading.level,
       content: bodyContent,
@@ -80,6 +90,13 @@ function replaceSectionContent(
   const headingPrefix = "#".repeat(target.level);
   const headingLine = `${headingPrefix} ${target.heading}`;
 
+  // How many sections BEFORE idx share the same heading text and level.
+  // This is the occurrence index we need to find in the raw lines — NOT the
+  // global idx, which counts all headings regardless of text/level.
+  const targetOccurrence = sections
+    .slice(0, idx)
+    .filter((s) => s.heading === target.heading && s.level === target.level).length;
+
   // Locate start of section in original content
   const lines = fullContent.split("\n");
   let sectionStart = -1;
@@ -88,7 +105,7 @@ function replaceSectionContent(
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(/^(#{1,6})\s+(.+)$/);
     if (m && m[1].length === target.level && m[2].trim() === target.heading) {
-      if (sectionCount === idx) {
+      if (sectionCount === targetOccurrence) {
         sectionStart = i;
         break;
       }
@@ -180,7 +197,7 @@ export class DocumentController implements DocumentAPI {
   }
 
   async setContent(filePath: string, content: string): Promise<void> {
-    this.store.getState().updateContent(filePath, content);
+    this.store.getState().setExternalContent(filePath, content);
     await this.fileService.writeDocumentFile(filePath, content);
     this.store.getState().markSaved(filePath);
   }

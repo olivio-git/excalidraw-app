@@ -1,13 +1,19 @@
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { useCreateBlockNote } from "@blocknote/react";
+import { save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { useTabContext } from "@/core/tabs/hooks/use-tab-context";
 import { useTabStore } from "@/core/tabs/store/tab-store";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { confirm } from "@/shared/lib/confirm";
+import { notify } from "@/shared/lib/notify";
 import { DocumentEditor } from "./DocumentEditor";
 import { DocumentEditorToolbar } from "./DocumentEditorToolbar";
 import { useDocumentPersistence } from "./hooks/useDocumentPersistence";
 import { getDocumentController } from "./documentController.singleton";
+import { documentSchema } from "./documentSchema";
 
 // ---------------------------------------------------------------------------
 // DocumentEditorContainer — smart container
@@ -17,8 +23,13 @@ import { getDocumentController } from "./documentController.singleton";
 // ---------------------------------------------------------------------------
 
 export default function DocumentEditorContainer() {
+  const { t } = useTranslation("common");
   const { tabId } = useTabContext();
   const tab = useTabStore((s) => s.getTab(tabId));
+
+  // Editor instance lives here so export handlers can call editor APIs directly.
+  // keepMounted: true in route config ensures this component stays alive.
+  const editor = useCreateBlockNote({ schema: documentSchema });
 
   // filePath is the document identifier — stored as instanceId by the file handler
   const filePath = (tab?.instanceId ?? tab?.metadata?.filePath ?? "") as string;
@@ -29,7 +40,8 @@ export default function DocumentEditorContainer() {
 
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
-  const { isSaving } = useDocumentPersistence(filePath);
+  // Auto-save side effects — return value not needed (toolbar no longer shows save status)
+  useDocumentPersistence(filePath);
 
   // ── Mount: open document if not already in store ─────────────────────────
   useEffect(() => {
@@ -64,13 +76,44 @@ export default function DocumentEditorContainer() {
     updateContent(filePath, markdown);
   };
 
-  // ── Explicit save ─────────────────────────────────────────────────────────
-  const handleSave = async () => {
-    if (!filePath) return;
+  // ── Sync isDirty to tab metadata — drives the dirty dot on the tab chip ──
+  useEffect(() => {
+    if (!tab || document?.isDirty === undefined) return;
+    const isDirty = document.isDirty;
+    if (tab.metadata?.isDirty !== isDirty) {
+      useTabStore.getState().updateTab(tabId, { metadata: { ...tab.metadata, isDirty } });
+    }
+  }, [document?.isDirty, tab, tabId]);
+
+  // ── Export handlers ───────────────────────────────────────────────────────
+  const handleExportHtml = async () => {
+    if (!document) return;
     try {
-      await getDocumentController().saveDocument(filePath);
+      const html = await editor.blocksToFullHTML(editor.document);
+      const path = await saveDialog({
+        defaultPath: `${document.title}.html`,
+        filters: [{ name: "HTML", extensions: ["html"] }],
+      });
+      if (!path) return;
+      await writeTextFile(path, html);
+      notify(t("documentEditor.exported"), { type: "success" });
     } catch (err) {
-      console.error("[DocumentEditorContainer] Save failed:", err);
+      console.error("[DocumentEditorContainer] Export HTML failed:", err);
+    }
+  };
+
+  const handleExportMarkdown = async () => {
+    if (!document) return;
+    try {
+      const path = await saveDialog({
+        defaultPath: `${document.title}.md`,
+        filters: [{ name: "Markdown", extensions: ["md"] }],
+      });
+      if (!path) return;
+      await writeTextFile(path, document.content);
+      notify(t("documentEditor.exported"), { type: "success" });
+    } catch (err) {
+      console.error("[DocumentEditorContainer] Export Markdown failed:", err);
     }
   };
 
@@ -130,13 +173,17 @@ export default function DocumentEditorContainer() {
   return (
     <div className="flex flex-col h-full w-full">
       <DocumentEditorToolbar
-        title={document.title}
-        isDirty={document.isDirty}
-        isSaving={isSaving}
-        onSave={handleSave}
+        onExportHtml={handleExportHtml}
+        onExportMarkdown={handleExportMarkdown}
       />
       <div className="flex-1 min-h-0">
-        <DocumentEditor content={document.content} onChange={handleChange} theme={resolvedTheme} />
+        <DocumentEditor
+          editor={editor}
+          content={document.content}
+          externalVersion={document.externalVersion}
+          onChange={handleChange}
+          theme={resolvedTheme}
+        />
       </div>
     </div>
   );

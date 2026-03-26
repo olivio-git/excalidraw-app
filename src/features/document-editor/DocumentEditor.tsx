@@ -1,38 +1,35 @@
 import "@blocknote/react/style.css";
 import { BlockNoteView } from "@blocknote/shadcn";
 import "@blocknote/shadcn/style.css";
-import { useCreateBlockNote, useEditorChange } from "@blocknote/react";
-import { BlockNoteSchema, defaultBlockSpecs } from "@blocknote/core";
+import { useEditorChange } from "@blocknote/react";
+import type { BlockNoteEditor } from "@blocknote/core";
 import { useEffect, useRef } from "react";
-import { DiagramEmbedBlock } from "./blocks/DiagramEmbedBlock";
+import type { DocumentSchema } from "./documentSchema";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
+type EditorInstance = BlockNoteEditor<
+  DocumentSchema["blockSchema"],
+  DocumentSchema["inlineContentSchema"],
+  DocumentSchema["styleSchema"]
+>;
+
 interface DocumentEditorProps {
+  editor: EditorInstance;
   content: string;
+  externalVersion: number;
   onChange: (markdown: string) => void;
   theme: "light" | "dark";
 }
 
 // ---------------------------------------------------------------------------
-// Custom schema — extends default block specs with DiagramEmbedBlock
-// ---------------------------------------------------------------------------
-
-// createReactBlockSpec returns a factory — must be called to get the spec object
-const documentSchema = BlockNoteSchema.create({
-  blockSpecs: {
-    ...defaultBlockSpecs,
-    diagramEmbed: DiagramEmbedBlock(),
-  },
-});
-
-// ---------------------------------------------------------------------------
 // DocumentEditor — pure presentational component
 //
-// Does NOT own persistence. The container manages save cycles.
-// BlockNote's built-in bubble menu handles formatting on text selection.
+// Does NOT own persistence or the editor instance — both are managed by
+// DocumentEditorContainer. Receives the editor as a prop so the container
+// can call editor.blocksToFullHTML() / blocksToMarkdownLossy() for exports.
 //
 // NOTE on tryParseMarkdownToBlocks:
 //   - It is SYNCHRONOUS in BlockNote 0.47.x (contrary to earlier notes).
@@ -41,16 +38,25 @@ const documentSchema = BlockNoteSchema.create({
 //     at the call-site of initialContent.
 // ---------------------------------------------------------------------------
 
-export function DocumentEditor({ content, onChange, theme }: DocumentEditorProps) {
-  const initializedRef = useRef(false);
-  const editor = useCreateBlockNote({ schema: documentSchema });
+export function DocumentEditor({
+  editor,
+  content,
+  externalVersion,
+  onChange,
+  theme,
+}: DocumentEditorProps) {
+  // Tracks the last externalVersion the editor was populated from.
+  // null = never populated (first mount). Re-populates when version changes (agent writes).
+  // Regular user edits go through onChange → updateContent (no version bump), so they skip this.
+  const lastAppliedVersionRef = useRef<number | null>(null);
 
-  // Populate editor with file content on first mount only.
-  // We guard with initializedRef so re-renders (e.g. theme changes) don't
-  // re-populate and clobber in-progress edits.
   useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
+    const isFirstMount = lastAppliedVersionRef.current === null;
+    const isExternalUpdate = lastAppliedVersionRef.current !== externalVersion;
+
+    if (!isFirstMount && !isExternalUpdate) return;
+
+    lastAppliedVersionRef.current = externalVersion;
 
     if (!content) return;
 
@@ -58,10 +64,9 @@ export function DocumentEditor({ content, onChange, theme }: DocumentEditorProps
     if (blocks.length > 0) {
       editor.replaceBlocks(editor.document, blocks);
     }
-  }, [editor, content]);
+  }, [editor, content, externalVersion]);
 
   // Subscribe to editor content changes and emit markdown upward.
-  // useEditorChange handles subscription cleanup on unmount automatically.
   useEditorChange(() => {
     const markdown = editor.blocksToMarkdownLossy();
     onChange(markdown);
@@ -69,7 +74,7 @@ export function DocumentEditor({ content, onChange, theme }: DocumentEditorProps
 
   return (
     <div className="h-full w-full overflow-y-auto bg-muted">
-      <div className="max-w-7xl mx-auto my-6 px-12 py-8 bg-background rounded-lg shadow-sm">
+      <div className="document-paper max-w-[794px] mx-auto mb-8 px-16 py-12 bg-background shadow-md">
         <BlockNoteView editor={editor} theme={theme} />
       </div>
     </div>

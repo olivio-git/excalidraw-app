@@ -7,6 +7,8 @@ export interface DocumentTab {
   content: string;
   isDirty: boolean;
   lastSavedAt: number | null;
+  /** Incremented on every external (agent/MCP) write. Used to force editor re-sync. */
+  externalVersion: number;
 }
 
 interface DocumentState {
@@ -14,6 +16,8 @@ interface DocumentState {
   activeDocumentId: string | null;
   openDocument: (filePath: string, content: string) => void;
   updateContent: (id: string, content: string) => void;
+  /** Like updateContent but increments externalVersion — use for agent/MCP writes. */
+  setExternalContent: (id: string, content: string) => void;
   markSaved: (id: string) => void;
   closeDocument: (id: string) => void;
   setActive: (id: string) => void;
@@ -41,6 +45,7 @@ export const useDocumentStore = create<DocumentState>()((set, get) => ({
       content,
       isDirty: false,
       lastSavedAt: null,
+      externalVersion: 0,
     };
     set((state) => ({
       documents: { ...state.documents, [filePath]: tab },
@@ -56,6 +61,19 @@ export const useDocumentStore = create<DocumentState>()((set, get) => ({
         documents: {
           ...state.documents,
           [id]: { ...doc, content, isDirty: true },
+        },
+      };
+    });
+  },
+
+  setExternalContent: (id: string, content: string) => {
+    set((state) => {
+      const doc = state.documents[id];
+      if (!doc) return state;
+      return {
+        documents: {
+          ...state.documents,
+          [id]: { ...doc, content, isDirty: true, externalVersion: doc.externalVersion + 1 },
         },
       };
     });

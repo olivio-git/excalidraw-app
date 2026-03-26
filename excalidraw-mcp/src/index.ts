@@ -739,7 +739,12 @@ server.tool(
 // ─── document_replace_section ─────────────────────────────────────────────────
 server.tool(
   "document_replace_section",
-  "Replace the content of a section",
+  [
+    "Replace the BODY of a section — the text directly under its heading, up to the next heading of any level.",
+    "ATOMIC: sub-sections (nested headings) are NEVER touched. Only the immediate body text is replaced.",
+    "To rename the heading itself, use document_set_content to rewrite the full document.",
+    "Get sectionId from document_get_sections.",
+  ].join(" "),
   {
     filePath: z
       .string()
@@ -747,7 +752,9 @@ server.tool(
         "Absolute path to the open document. Obtain this from document_list or document_create — do NOT guess or infer the path."
       ),
     sectionId: z.string().describe("The section ID to replace (from document_get_sections)"),
-    content: z.string().describe("New markdown content for the section body"),
+    content: z
+      .string()
+      .describe("New markdown content for the section body (excluding the heading line itself)"),
   },
   async ({ filePath, sectionId, content }) => {
     const res = await callBridge("document_replace_section", { filePath, sectionId, content });
@@ -760,7 +767,11 @@ server.tool(
 // ─── document_delete_section ──────────────────────────────────────────────────
 server.tool(
   "document_delete_section",
-  "Delete a section and its content",
+  [
+    "Delete a section's heading and its IMMEDIATE body — the text directly under it, up to the next heading of any level.",
+    "ATOMIC: sub-sections (nested headings) are NOT deleted, they are promoted up.",
+    "Get sectionId from document_get_sections.",
+  ].join(" "),
   {
     filePath: z
       .string()

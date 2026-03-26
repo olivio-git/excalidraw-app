@@ -115,11 +115,12 @@ function replaceSectionContent(
 
   if (sectionStart === -1) return fullContent;
 
-  // Find end of section (next heading of same or higher level, or EOF)
+  // Find end of section body — stop at the NEXT heading of ANY level.
+  // This makes replace/delete atomic: they only touch the immediate body text
+  // between this heading and the next child/sibling heading, never the subtree.
   let sectionEnd = lines.length;
   for (let i = sectionStart + 1; i < lines.length; i++) {
-    const m = lines[i].match(/^(#{1,6})\s/);
-    if (m && m[1].length <= target.level) {
+    if (/^#{1,6}\s/.test(lines[i])) {
       sectionEnd = i;
       break;
     }

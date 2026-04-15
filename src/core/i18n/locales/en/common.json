@@ -76,7 +76,25 @@
     "export": "Export",
     "exportHtml": "Export as HTML",
     "exportMarkdown": "Export as Markdown",
-    "exported": "File exported successfully"
+    "exported": "File exported successfully",
+    "pageSetup": "Page Setup",
+    "pageSetupTitle": "Page Setup",
+    "pageSize": "Page Size",
+    "orientation": "Orientation",
+    "margins": "Margins",
+    "zoom": "Zoom",
+    "portrait": "Portrait",
+    "landscape": "Landscape",
+    "marginNormal": "Normal (1\")",
+    "marginNarrow": "Narrow (0.5\")",
+    "marginWide": "Wide (1.5\")",
+    "marginCustom": "Custom",
+    "marginValue": "Margin: {{value}}px",
+    "zoomFit": "Fit to Width",
+    "actualSize": "Actual Size (100%)",
+    "resetDefaults": "Reset to Defaults",
+    "noDocumentSelected": "No document selected",
+    "loading": "Loading..."
   },
   "aiChat": {
     "header": "AI Chat",
@@ -90,14 +108,22 @@
     "stopGeneration": "Stop generation",
     "sendMessage": "Send (Enter)",
     "context": "Context",
-    "noDiagramActive": "No diagram active",
+    "noDiagramActive": "No active tab",
     "thinking": "Thinking…",
     "toolError": "Tool error",
+    "waitingForAnswer": "Type your answer...",
     "tools": {
       "draw_elements": "Drawing on canvas",
       "clear_canvas": "Clearing canvas",
       "get_elements": "Reading canvas",
-      "update_element": "Updating element"
-    }
+      "update_element": "Updating element",
+      "ask_user": "Waiting for answer"
+    },
+    "newConversation": "New conversation",
+    "conversations": "Conversations",
+    "deleteConversation": "Delete conversation",
+    "noConversations": "No conversations yet",
+    "conversationDeleted": "Conversation deleted",
+    "switchBlocked": "Cannot switch conversations while streaming"
   }
 }

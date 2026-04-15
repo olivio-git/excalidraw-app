@@ -83,8 +83,11 @@ async function* parseOpenAISseStream(
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  // Map index → accumulator
+  // Map index → accumulator (OpenAI native tool_calls format)
   const toolCallsByIndex = new Map<number, ToolCallAccumulator>();
+  // Qwen <tool_call> XML format state
+  let textBuffer = "";
+  let inToolCall = false;
 
   try {
     while (true) {
@@ -104,6 +107,11 @@ async function* parseOpenAISseStream(
         if (!line.startsWith("data: ")) continue;
         const data = line.slice(6).trim();
         if (data === "[DONE]") {
+          // Flush remaining text buffer
+          if (textBuffer && !inToolCall) {
+            yield { type: "text_delta", delta: textBuffer };
+            textBuffer = "";
+          }
           // Finalize any open tool calls
           for (const [, acc] of toolCallsByIndex) {
             if (acc.started) {
@@ -121,6 +129,13 @@ async function* parseOpenAISseStream(
           continue;
         }
 
+        // Surface provider-level errors (e.g. OpenRouter tool_use_failed)
+        if (chunk.error) {
+          const err = chunk.error as { message?: string };
+          yield { type: "error", message: err.message ?? "Provider error" };
+          return;
+        }
+
         const choices = chunk.choices as Array<Record<string, unknown>> | undefined;
         if (!choices || choices.length === 0) continue;
 
@@ -130,9 +145,55 @@ async function* parseOpenAISseStream(
 
         if (!delta) continue;
 
-        // Text content
+        // Text content — buffer to intercept <tool_call> blocks (Qwen native format)
         if (typeof delta.content === "string" && delta.content) {
-          yield { type: "text_delta", delta: delta.content };
+          textBuffer += delta.content;
+          // If we haven't entered a tool_call block yet, flush safe prefix as text
+          if (!inToolCall) {
+            const tagStart = textBuffer.indexOf("<tool_call>");
+            if (tagStart === -1) {
+              // No tool call tag anywhere — flush all but last few chars (partial tag guard)
+              const safe = textBuffer.length > 11 ? textBuffer.slice(0, -11) : "";
+              if (safe) {
+                yield { type: "text_delta", delta: safe };
+                textBuffer = textBuffer.slice(safe.length);
+              }
+            } else {
+              // Flush text before the tag
+              if (tagStart > 0) {
+                yield { type: "text_delta", delta: textBuffer.slice(0, tagStart) };
+              }
+              textBuffer = textBuffer.slice(tagStart);
+              inToolCall = true;
+            }
+          }
+          // If inside tool_call block, check for closing tag
+          if (inToolCall) {
+            const closeTag = "</tool_call>";
+            const closeIdx = textBuffer.indexOf(closeTag);
+            if (closeIdx !== -1) {
+              const inner = textBuffer.slice("<tool_call>".length, closeIdx).trim();
+              textBuffer = textBuffer.slice(closeIdx + closeTag.length);
+              inToolCall = false;
+              // Parse the tool call JSON
+              try {
+                const parsed = JSON.parse(inner) as { name?: string; arguments?: unknown };
+                if (parsed.name) {
+                  const tcId = `qwen-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+                  const argsStr =
+                    typeof parsed.arguments === "string"
+                      ? parsed.arguments
+                      : JSON.stringify(parsed.arguments ?? {});
+                  yield { type: "tool_use_start", toolCallId: tcId, toolName: parsed.name };
+                  yield { type: "tool_use_delta", toolCallId: tcId, delta: argsStr };
+                  yield { type: "tool_use_stop", toolCallId: tcId };
+                  toolCallsByIndex.clear(); // ensure no duplicate stop from finish_reason
+                }
+              } catch {
+                // Malformed tool call — discard silently
+              }
+            }
+          }
         }
 
         // Tool calls
@@ -205,10 +266,12 @@ async function* parseOpenAISseStream(
 export class OpenAICompatAdapter implements AIProvider {
   readonly name: AIProviderName;
   private readonly baseUrl: string;
+  private readonly extraHeaders: Record<string, string>;
 
-  constructor(name: AIProviderName, baseUrl: string) {
+  constructor(name: AIProviderName, baseUrl: string, extraHeaders: Record<string, string> = {}) {
     this.name = name;
     this.baseUrl = baseUrl;
+    this.extraHeaders = extraHeaders;
   }
 
   async *stream(
@@ -231,6 +294,7 @@ export class OpenAICompatAdapter implements AIProvider {
         headers: {
           Authorization: `Bearer ${config.apiKey}`,
           "content-type": "application/json",
+          ...this.extraHeaders,
         },
         body: JSON.stringify({
           model: config.model,

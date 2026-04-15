@@ -3,50 +3,18 @@ import { useAISettingsStore } from "@/features/settings/ai/ai-settings-store";
 import { DiagramController } from "@/core/diagram/DiagramController";
 import { AIProviderFactory } from "../providers/factory";
 import { StreamParser } from "../utils/stream-parser";
+import { resolveAIChatContext } from "../utils/context-resolver";
+import type { AIChatContext } from "../utils/context-resolver";
+import { getToolsForContext } from "../tools";
 import { executeAITool } from "../utils/tool-executor";
-import { buildExcalidrawSystemPrompt } from "../system-prompt";
+import { buildSystemPrompt } from "../system-prompt";
+import type { DiagramContextInfo, DocumentContextInfo } from "../system-prompt";
+import { useDocumentStore } from "@/stores/documentStore";
+import { getDocumentController } from "@/features/document-editor/documentController.singleton";
 import { useThemeStore } from "@/stores/themeStore";
-import type { AIToolDefinition, AIMessage } from "../providers/types";
-
-const TOOLS: AIToolDefinition[] = [
-  {
-    name: "draw_elements",
-    description: "Draw or replace elements on the Excalidraw canvas",
-    inputSchema: {
-      type: "object",
-      properties: {
-        elements: { type: "array", description: "Array of Excalidraw element objects" },
-      },
-      required: ["elements"],
-    },
-  },
-  {
-    name: "get_elements",
-    description: "Get all current elements from the canvas",
-    inputSchema: { type: "object", properties: {} },
-  },
-  {
-    name: "clear_canvas",
-    description: "Clear all elements from the canvas",
-    inputSchema: {
-      type: "object",
-      properties: { confirm: { type: "boolean" } },
-      required: ["confirm"],
-    },
-  },
-  {
-    name: "update_element",
-    description: "Update a single element by ID",
-    inputSchema: {
-      type: "object",
-      properties: {
-        elementId: { type: "string" },
-        updates: { type: "object" },
-      },
-      required: ["elementId", "updates"],
-    },
-  },
-];
+import type { AIMessage } from "../providers/types";
+import { useChatHistoryStore } from "../store/chat-history-store";
+import { createConversation, saveMessage } from "./useChatHistory";
 
 export function useAIChat() {
   const messages = useAIChatStore((s) => s.messages);
@@ -54,9 +22,25 @@ export function useAIChat() {
   const errorMessage = useAIChatStore((s) => s.errorMessage);
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
+  const answerPendingQuestion = (answer: string) => {
+    const { pendingQuestion, clearPendingQuestion } = useAIChatStore.getState();
+    if (!pendingQuestion) return;
+    clearPendingQuestion();
+    pendingQuestion.resolve(answer);
+  };
+
+  const cancelStream = () => {
+    const { abortController, pendingQuestion, clearPendingQuestion } = useAIChatStore.getState();
+    if (pendingQuestion) {
+      clearPendingQuestion();
+      pendingQuestion.reject(new DOMException("Aborted", "AbortError"));
+    }
+    abortController?.abort();
+  };
+
   const sendMessage = async (text: string) => {
     const currentStatus = useAIChatStore.getState().status;
-    if (currentStatus === "streaming") return;
+    if (currentStatus === "streaming" || currentStatus === "waiting_for_user") return;
 
     const {
       addMessage,
@@ -71,6 +55,9 @@ export function useAIChat() {
 
     addMessage({ role: "user", content: text });
 
+    // Resolve or create conversation for history persistence
+    let convId: string | null = useChatHistoryStore.getState().activeConversationId;
+
     const { provider, config } = useAISettingsStore.getState().getActiveConfig();
 
     if (!config.apiKey) {
@@ -78,8 +65,67 @@ export function useAIChat() {
       return;
     }
 
-    const activeInstanceId = DiagramController.getActiveInstanceId();
-    const snapshotElements = DiagramController.getElements(activeInstanceId);
+    const context: AIChatContext = resolveAIChatContext();
+
+    // Persist conversation and user message to history
+    const userMsg = useAIChatStore.getState().messages.at(-1)!;
+    if (convId === null) {
+      const newConvId = crypto.randomUUID();
+      const title = text.slice(0, 60) || "New conversation";
+      createConversation(newConvId, title, context.kind).catch(console.error);
+      useChatHistoryStore.getState().upsertConversation({
+        id: newConvId,
+        title,
+        contextKind: context.kind,
+        createdAt: userMsg.timestamp,
+        updatedAt: userMsg.timestamp,
+      });
+      useChatHistoryStore.getState().setActiveConversationId(newConvId);
+      convId = newConvId;
+    }
+    saveMessage({
+      id: userMsg.id,
+      conversationId: convId,
+      role: "user",
+      content: text,
+      toolCallsJson: null,
+      timestamp: userMsg.timestamp,
+    }).catch(console.error);
+
+    // Snapshot for rollback
+    const snapshotElements =
+      context.kind === "diagram" ? DiagramController.getElements(context.instanceId) : null;
+    const snapshotContent =
+      context.kind === "document"
+        ? (useDocumentStore.getState().documents[context.filePath]?.content ?? null)
+        : null;
+
+    // Build dynamic context info for system prompt
+    const customInstructions = useAISettingsStore.getState().customInstructions;
+
+    let diagramContext: DiagramContextInfo | undefined;
+    if (context.kind === "diagram") {
+      const elements = DiagramController.getElements(context.instanceId) ?? [];
+      const elementTypes: Record<string, number> = {};
+      for (const el of elements) {
+        const t = (el as { type: string }).type;
+        elementTypes[t] = (elementTypes[t] ?? 0) + 1;
+      }
+      diagramContext = { elementCount: elements.length, elementTypes };
+    }
+
+    let documentContext: DocumentContextInfo | undefined;
+    if (context.kind === "document") {
+      const doc = useDocumentStore.getState().documents[context.filePath];
+      if (doc) {
+        const sectionCount = getDocumentController().getSections(context.filePath).length;
+        documentContext = {
+          title: doc.title,
+          sectionCount,
+          charCount: doc.content.length,
+        };
+      }
+    }
 
     const controller = new AbortController();
     setAbortController(controller);
@@ -103,9 +149,14 @@ export function useAIChat() {
 
         const stream = aiProvider.stream(
           providerMessages,
-          buildExcalidrawSystemPrompt(resolvedTheme),
-          TOOLS,
-          { ...config, forceToolUse: iteration === 0 },
+          buildSystemPrompt(context, {
+            theme: resolvedTheme,
+            customInstructions,
+            diagramContext,
+            documentContext,
+          }),
+          getToolsForContext(context),
+          config,
           controller.signal
         );
 
@@ -149,13 +200,60 @@ export function useAIChat() {
                   parsedInput = {};
                 }
 
-                const result = await executeAITool(
-                  completedTool.name,
-                  parsedInput,
-                  activeInstanceId
-                );
+                // ── ask_user: pause loop, wait for user answer ──
+                if (completedTool.name === "ask_user") {
+                  const input = parsedInput as { question?: string };
+                  const question = input.question ?? "";
 
-                addMessage({
+                  const answerPromise = new Promise<string>((resolve, reject) => {
+                    useAIChatStore.getState().setPendingQuestion({
+                      toolCallId: chunk.toolCallId,
+                      question,
+                      resolve,
+                      reject,
+                    });
+                  });
+
+                  setStatus("waiting_for_user");
+                  const answer = await answerPromise;
+
+                  const toolMsgId = addMessage({
+                    role: "tool",
+                    content: answer,
+                    toolResults: [
+                      {
+                        toolCallId: chunk.toolCallId,
+                        result: answer,
+                        isError: false,
+                      },
+                    ],
+                  });
+
+                  const currentConvId = useChatHistoryStore.getState().activeConversationId;
+                  if (currentConvId) {
+                    const toolMsg = useAIChatStore
+                      .getState()
+                      .messages.find((m) => m.id === toolMsgId);
+                    if (toolMsg) {
+                      saveMessage({
+                        id: toolMsg.id,
+                        conversationId: currentConvId,
+                        role: "tool",
+                        content: answer,
+                        toolCallsJson: null,
+                        timestamp: toolMsg.timestamp,
+                      }).catch(console.error);
+                    }
+                  }
+
+                  setStatus("streaming");
+                  break;
+                }
+
+                // ── Normal tool execution ──
+                const result = await executeAITool(completedTool.name, parsedInput, context);
+
+                const toolMsgId = addMessage({
                   role: "tool",
                   content: result.result,
                   toolResults: [
@@ -166,16 +264,36 @@ export function useAIChat() {
                     },
                   ],
                 });
+                const currentConvId = useChatHistoryStore.getState().activeConversationId;
+                if (currentConvId) {
+                  const toolMsg = useAIChatStore
+                    .getState()
+                    .messages.find((m) => m.id === toolMsgId);
+                  if (toolMsg) {
+                    saveMessage({
+                      id: toolMsg.id,
+                      conversationId: currentConvId,
+                      role: "tool",
+                      content: result.result,
+                      toolCallsJson: null,
+                      timestamp: toolMsg.timestamp,
+                    }).catch(console.error);
+                  }
+                }
               }
               break;
             }
 
             case "error":
               setStatus("error", chunk.message);
-              DiagramController.setElements(
-                activeInstanceId,
-                snapshotElements as Parameters<typeof DiagramController.setElements>[1]
-              );
+              if (context.kind === "diagram" && snapshotElements) {
+                DiagramController.setElements(
+                  context.instanceId,
+                  snapshotElements as Parameters<typeof DiagramController.setElements>[1]
+                );
+              } else if (context.kind === "document" && snapshotContent !== null) {
+                getDocumentController().setContent(context.filePath, snapshotContent);
+              }
               break;
 
             case "done":
@@ -190,18 +308,67 @@ export function useAIChat() {
 
         // Finalize current assistant message and start a fresh one for next iteration
         updateMessage(assistantMsgId, { isStreaming: false });
+        {
+          const savedConvId = useChatHistoryStore.getState().activeConversationId;
+          if (savedConvId) {
+            const assistantMsg = useAIChatStore
+              .getState()
+              .messages.find((m) => m.id === assistantMsgId);
+            if (assistantMsg) {
+              saveMessage({
+                id: assistantMsg.id,
+                conversationId: savedConvId,
+                role: "assistant",
+                content: assistantMsg.content,
+                toolCallsJson: assistantMsg.toolCalls
+                  ? JSON.stringify(assistantMsg.toolCalls)
+                  : null,
+                timestamp: assistantMsg.timestamp,
+              }).catch(console.error);
+            }
+          }
+        }
         assistantMsgId = addMessage({ role: "assistant", content: "", isStreaming: true });
       }
 
       updateMessage(assistantMsgId, { isStreaming: false });
+      {
+        const savedConvId = useChatHistoryStore.getState().activeConversationId;
+        if (savedConvId) {
+          const assistantMsg = useAIChatStore
+            .getState()
+            .messages.find((m) => m.id === assistantMsgId);
+          if (assistantMsg) {
+            saveMessage({
+              id: assistantMsg.id,
+              conversationId: savedConvId,
+              role: "assistant",
+              content: assistantMsg.content,
+              toolCallsJson: assistantMsg.toolCalls ? JSON.stringify(assistantMsg.toolCalls) : null,
+              timestamp: assistantMsg.timestamp,
+            }).catch(console.error);
+          }
+        }
+      }
       setStatus("idle");
       setAbortController(null);
     } catch (err) {
+      // Reject pending question for non-abort errors
+      const { pendingQuestion } = useAIChatStore.getState();
+      if (pendingQuestion && !(err instanceof Error && err.name === "AbortError")) {
+        useAIChatStore.getState().clearPendingQuestion();
+        pendingQuestion.reject(err instanceof Error ? err : new Error(String(err)));
+      }
+
       if (err instanceof Error && err.name === "AbortError") {
-        DiagramController.setElements(
-          activeInstanceId,
-          snapshotElements as Parameters<typeof DiagramController.setElements>[1]
-        );
+        if (context.kind === "diagram" && snapshotElements) {
+          DiagramController.setElements(
+            context.instanceId,
+            snapshotElements as Parameters<typeof DiagramController.setElements>[1]
+          );
+        } else if (context.kind === "document" && snapshotContent !== null) {
+          getDocumentController().setContent(context.filePath, snapshotContent);
+        }
         updateMessage(assistantMsgId, { isStreaming: false });
         setStatus("idle");
         setAbortController(null);
@@ -213,9 +380,5 @@ export function useAIChat() {
     }
   };
 
-  const cancelStream = () => {
-    useAIChatStore.getState().abortController?.abort();
-  };
-
-  return { messages, status, errorMessage, sendMessage, cancelStream };
+  return { messages, status, errorMessage, sendMessage, cancelStream, answerPendingQuestion };
 }

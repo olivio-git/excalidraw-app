@@ -1,11 +1,19 @@
 import { create } from "zustand";
 import type { AIMessage, AIToolCall } from "../providers/types";
 
+export interface PendingQuestion {
+  toolCallId: string;
+  question: string;
+  resolve: (answer: string) => void;
+  reject: (error: Error) => void;
+}
+
 interface AIChatState {
   messages: AIMessage[];
-  status: "idle" | "streaming" | "error";
+  status: "idle" | "streaming" | "error" | "waiting_for_user";
   errorMessage: string | null;
   abortController: AbortController | null;
+  pendingQuestion: PendingQuestion | null;
 
   addMessage: (msg: Omit<AIMessage, "id" | "timestamp">) => string;
   updateMessage: (id: string, patch: Partial<AIMessage>) => void;
@@ -13,9 +21,15 @@ interface AIChatState {
   appendToolCallDelta: (id: string, toolCallId: string, delta: string) => void;
   addToolCall: (id: string, toolCall: Omit<AIToolCall, "isComplete">) => void;
   finalizeToolCall: (id: string, toolCallId: string) => void;
-  setStatus: (status: "idle" | "streaming" | "error", errorMessage?: string) => void;
+  setStatus: (
+    status: "idle" | "streaming" | "error" | "waiting_for_user",
+    errorMessage?: string
+  ) => void;
   setAbortController: (controller: AbortController | null) => void;
+  setPendingQuestion: (pq: PendingQuestion) => void;
+  clearPendingQuestion: () => void;
   clearMessages: () => void;
+  setMessages: (messages: AIMessage[]) => void;
 }
 
 export const useAIChatStore = create<AIChatState>()((set, _get) => ({
@@ -23,6 +37,7 @@ export const useAIChatStore = create<AIChatState>()((set, _get) => ({
   status: "idle",
   errorMessage: null,
   abortController: null,
+  pendingQuestion: null,
 
   addMessage: (msg: Omit<AIMessage, "id" | "timestamp">) => {
     const id = crypto.randomUUID();
@@ -86,7 +101,10 @@ export const useAIChatStore = create<AIChatState>()((set, _get) => ({
     }));
   },
 
-  setStatus: (status: "idle" | "streaming" | "error", errorMessage?: string) => {
+  setStatus: (
+    status: "idle" | "streaming" | "error" | "waiting_for_user",
+    errorMessage?: string
+  ) => {
     set({ status, errorMessage: errorMessage ?? null });
   },
 
@@ -94,7 +112,21 @@ export const useAIChatStore = create<AIChatState>()((set, _get) => ({
     set({ abortController: controller });
   },
 
-  clearMessages: () => {
-    set({ messages: [], status: "idle", errorMessage: null });
+  setPendingQuestion: (pq: PendingQuestion) => {
+    set({ pendingQuestion: pq });
   },
+
+  clearPendingQuestion: () => {
+    set({ pendingQuestion: null });
+  },
+
+  clearMessages: () => {
+    const pq = _get().pendingQuestion;
+    if (pq) {
+      pq.reject(new Error("Chat cleared"));
+    }
+    set({ messages: [], status: "idle", errorMessage: null, pendingQuestion: null });
+  },
+
+  setMessages: (messages) => set({ messages, status: "idle", errorMessage: null }),
 }));

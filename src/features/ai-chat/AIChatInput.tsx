@@ -4,17 +4,26 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { useAISettingsStore } from "@/features/settings/ai/ai-settings-store";
-import { DiagramController } from "@/core/diagram/DiagramController";
 import { useTabStore } from "@/core/tabs/store/tab-store";
+import { resolveAIChatContext } from "./utils/context-resolver";
 
 interface AIChatInputProps {
   onSend: (text: string) => void;
+  onAnswer?: (text: string) => void;
   onCancel: () => void;
   isStreaming: boolean;
+  isWaitingForUser?: boolean;
   disabled?: boolean;
 }
 
-export function AIChatInput({ onSend, onCancel, isStreaming, disabled }: AIChatInputProps) {
+export function AIChatInput({
+  onSend,
+  onAnswer,
+  onCancel,
+  isStreaming,
+  isWaitingForUser,
+  disabled,
+}: AIChatInputProps) {
   const { t } = useTranslation("common");
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -22,17 +31,21 @@ export function AIChatInput({ onSend, onCancel, isStreaming, disabled }: AIChatI
   const activeProvider = useAISettingsStore((s) => s.activeProvider);
   const providerModel = useAISettingsStore((s) => s.providers[s.activeProvider].model);
 
-  const activeInstanceId = DiagramController.getActiveInstanceId();
-  const tabs = useTabStore((s) => s.tabs);
-  const activeTab = tabs.find((t) => t.instanceId === activeInstanceId);
-  const contextLabel = activeTab?.title ?? (activeInstanceId ? activeInstanceId : null);
+  const activeTabId = useTabStore((s) => s.activeTabId);
+  const activeTab = useTabStore((s) => s.tabs.find((t) => t.id === activeTabId));
+  const context = resolveAIChatContext();
+  const contextLabel = context.kind !== "none" ? (activeTab?.title ?? null) : null;
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       const trimmed = value.trim();
       if (!trimmed || isStreaming || disabled) return;
-      onSend(trimmed);
+      if (isWaitingForUser && onAnswer) {
+        onAnswer(trimmed);
+      } else {
+        onSend(trimmed);
+      }
       setValue("");
     }
   };
@@ -40,10 +53,18 @@ export function AIChatInput({ onSend, onCancel, isStreaming, disabled }: AIChatI
   const handleSend = () => {
     const trimmed = value.trim();
     if (!trimmed || isStreaming || disabled) return;
-    onSend(trimmed);
+    if (isWaitingForUser && onAnswer) {
+      onAnswer(trimmed);
+    } else {
+      onSend(trimmed);
+    }
     setValue("");
     textareaRef.current?.focus();
   };
+
+  const placeholder = isWaitingForUser
+    ? t("aiChat.waitingForAnswer")
+    : t("aiChat.inputPlaceholder");
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -53,13 +74,14 @@ export function AIChatInput({ onSend, onCancel, isStreaming, disabled }: AIChatI
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={t("aiChat.inputPlaceholder")}
+          placeholder={placeholder}
           rows={3}
           disabled={isStreaming || disabled}
           className={cn(
             "flex-1 resize-none rounded-md border border-input bg-background px-2.5 py-1.5 text-xs",
             "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-            "disabled:cursor-not-allowed disabled:opacity-50"
+            "disabled:cursor-not-allowed disabled:opacity-50",
+            isWaitingForUser && "border-primary/50"
           )}
         />
 

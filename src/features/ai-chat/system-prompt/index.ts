@@ -81,7 +81,7 @@ You have workspace tools to create and open files:
 
 When the user asks to create a diagram or document: call the appropriate tool immediately — do NOT ask for confirmation.
 When the user asks to open a file: call workspace_list_files first if you don't know the path, then workspace_open_file.
-After creating or opening a file, it becomes the active tab. Tell the user they can now ask you to draw or write content.
+After creating or opening a file, it becomes the active tab and document/diagram editing tools become available. IMMEDIATELY continue and use those tools to fulfill the original request — do NOT stop and tell the user to ask you again.
 
 ## IMPORTANT
 

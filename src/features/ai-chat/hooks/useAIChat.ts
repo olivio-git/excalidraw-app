@@ -15,6 +15,7 @@ import { useThemeStore } from "@/stores/themeStore";
 import type { AIMessage } from "../providers/types";
 import { useChatHistoryStore } from "../store/chat-history-store";
 import { createConversation, saveMessage } from "./useChatHistory";
+import { prompt } from "@/shared/lib/prompt";
 
 export function useAIChat() {
   const messages = useAIChatStore((s) => s.messages);
@@ -65,7 +66,7 @@ export function useAIChat() {
       return;
     }
 
-    const context: AIChatContext = resolveAIChatContext();
+    let context: AIChatContext = resolveAIChatContext();
 
     // Persist conversation and user message to history
     const userMsg = useAIChatStore.getState().messages.at(-1)!;
@@ -200,22 +201,20 @@ export function useAIChat() {
                   parsedInput = {};
                 }
 
-                // ── ask_user: pause loop, wait for user answer ──
+                // ── ask_user: pause loop, show prompt modal ──
                 if (completedTool.name === "ask_user") {
                   const input = parsedInput as { question?: string };
                   const question = input.question ?? "";
 
-                  const answerPromise = new Promise<string>((resolve, reject) => {
-                    useAIChatStore.getState().setPendingQuestion({
-                      toolCallId: chunk.toolCallId,
-                      question,
-                      resolve,
-                      reject,
-                    });
-                  });
-
                   setStatus("waiting_for_user");
-                  const answer = await answerPromise;
+                  const result = await prompt({
+                    title: "The AI has a question",
+                    description: question || undefined,
+                    fields: [{ id: "answer", label: question || "Your answer", required: false }],
+                    confirmLabel: "Send",
+                    cancelLabel: "Cancel",
+                  });
+                  const answer = result?.answer ?? "";
 
                   const toolMsgId = addMessage({
                     role: "tool",
@@ -252,6 +251,34 @@ export function useAIChat() {
 
                 // ── Normal tool execution ──
                 const result = await executeAITool(completedTool.name, parsedInput, context);
+
+                // Re-resolve context after workspace tools that open/create a file
+                if (
+                  !result.isError &&
+                  (completedTool.name === "workspace_create_document" ||
+                    completedTool.name === "workspace_create_diagram" ||
+                    completedTool.name === "workspace_open_file")
+                ) {
+                  context = resolveAIChatContext();
+                  if (context.kind === "document") {
+                    const doc = useDocumentStore.getState().documents[context.filePath];
+                    if (doc) {
+                      documentContext = {
+                        title: doc.title,
+                        sectionCount: getDocumentController().getSections(context.filePath).length,
+                        charCount: doc.content.length,
+                      };
+                    }
+                  } else if (context.kind === "diagram") {
+                    const elements = DiagramController.getElements(context.instanceId) ?? [];
+                    const elTypes: Record<string, number> = {};
+                    for (const el of elements) {
+                      const t = (el as { type: string }).type;
+                      elTypes[t] = (elTypes[t] ?? 0) + 1;
+                    }
+                    diagramContext = { elementCount: elements.length, elementTypes: elTypes };
+                  }
+                }
 
                 const toolMsgId = addMessage({
                   role: "tool",

@@ -48,7 +48,11 @@ const server = new McpServer({
 // ─── get_elements ─────────────────────────────────────────────────────────────
 server.tool(
   "get_elements",
-  "Get all elements from the active Excalidraw diagram canvas. Returns a JSON array of Excalidraw elements.",
+  [
+    "Get all elements from the active Excalidraw diagram canvas. Returns a JSON array of Excalidraw elements.",
+    "ONLY works when the active tab is an Excalidraw diagram (routeId: 'excalidraw').",
+    "If the active tab is a document editor or any other route, this returns an error — use get_active_tab to check first.",
+  ].join(" "),
   {},
   async () => {
     const res = await callBridge("get_elements", {});
@@ -138,11 +142,22 @@ server.tool(
 );
 
 // ─── export_svg ───────────────────────────────────────────────────────────────
-server.tool("export_svg", "Export the current diagram as an SVG string.", {}, async () => {
-  const res = await callBridge("export_svg", {});
-  if (res.error) return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
-  return { content: [{ type: "text", text: toText(res.result) }] };
-});
+server.tool(
+  "export_svg",
+  [
+    "Export the current diagram as an SVG string. Intended for external use (saving to disk, clipboard, etc.).",
+    "WARNING: The SVG includes embedded base64 font data and can be very large (10k+ tokens).",
+    "If your goal is to embed the diagram into a markdown document, use document_insert_diagram instead —",
+    "it handles the SVG export and base64 embedding automatically without consuming context.",
+  ].join(" "),
+  {},
+  async () => {
+    const res = await callBridge("export_svg", {});
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
 
 // ─── open_file ────────────────────────────────────────────────────────────────
 server.tool(
@@ -201,11 +216,18 @@ server.tool(
 // ─── create_diagram ───────────────────────────────────────────────────────────
 server.tool(
   "create_diagram",
-  "Create a new empty .excalidraw diagram file in the workspace and open it in a new tab. Fails if the file already exists.",
+  [
+    "Create a new empty .excalidraw diagram file in the workspace and open it in a new tab. Fails if the file already exists.",
+    "The name is relative to the workspace root — do NOT include the workspace path in the name.",
+    "Examples: 'my-diagram', 'subfolder/my-diagram'. Parent directories are created automatically.",
+    "Use get_workspace_dir to check the workspace root before choosing a name.",
+  ].join(" "),
   {
     name: z
       .string()
-      .describe("File name (with or without .excalidraw extension), relative to workspace root"),
+      .describe(
+        "File name relative to workspace root (e.g. 'my-diagram' or 'subfolder/my-diagram'). Do NOT include the workspace directory path — just the name within it."
+      ),
   },
   async ({ name }) => {
     const res = await callBridge("create_diagram", { name });
@@ -531,7 +553,11 @@ server.tool(
 // ─── document_open ────────────────────────────────────────────────────────────
 server.tool(
   "document_open",
-  "Open a markdown document in a tab",
+  [
+    "Open a markdown document in a new tab (or focus its existing tab).",
+    "NOTE: opening a tab does not guarantee the editor is immediately rendered.",
+    "If you need to call document_set_block_color right after, follow with activate_tab to ensure the tab is focused and the editor is mounted.",
+  ].join(" "),
   {
     filePath: z.string().describe("Absolute path to the markdown document to open"),
   },
@@ -546,12 +572,46 @@ server.tool(
 // ─── document_get_content ─────────────────────────────────────────────────────
 server.tool(
   "document_get_content",
-  "Get the full markdown content of an open document",
+  [
+    "Get the markdown content of an open document.",
+    "IMPORTANT: filePath must be an absolute path obtained from document_list or document_create — never guess or construct the path.",
+    "Embedded base64 images are replaced with '[embedded-image]' placeholders by default to avoid token overflow — pass includeDataUrls: true only when you need the raw bytes.",
+    "For large documents, use offset and limit to paginate by line number.",
+    "The response includes { content, offset, total, hasMore } when paginating.",
+    "When hasMore is true, fetch the next page with offset = offset + limit.",
+  ].join(" "),
   {
-    filePath: z.string().describe("Absolute path to the open document"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document. Obtain this from document_list or document_create — do NOT guess or infer the path."
+      ),
+    includeDataUrls: z
+      .boolean()
+      .optional()
+      .describe(
+        "If true, return raw base64 data: URLs instead of '[embedded-image]' placeholders. WARNING: can exceed token limits on documents with embedded diagrams. Only use if you need the actual image bytes."
+      ),
+    offset: z
+      .number()
+      .int()
+      .nonnegative()
+      .optional()
+      .describe("Line number to start reading from (0-based). Omit to read from the beginning."),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("Maximum number of lines to return. Omit to return all lines from offset."),
   },
-  async ({ filePath }) => {
-    const res = await callBridge("document_get_content", { filePath });
+  async ({ filePath, includeDataUrls, offset, limit }) => {
+    const res = await callBridge("document_get_content", {
+      filePath,
+      includeDataUrls,
+      offset,
+      limit,
+    });
     if (res.error)
       return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
     return { content: [{ type: "text", text: toText(res.result) }] };
@@ -561,12 +621,37 @@ server.tool(
 // ─── document_get_sections ────────────────────────────────────────────────────
 server.tool(
   "document_get_sections",
-  "Get the section tree (headings with IDs) of an open document",
+  [
+    "Get the section tree of an open document.",
+    "Each section has: id, heading, level, content (body text).",
+    "Embedded base64 images in section bodies are replaced with '[embedded-image]' placeholders by default.",
+    "Use headingsOnly: true to get only id/heading/level — sufficient for finding a section ID before replace/insert/delete.",
+  ].join(" "),
   {
-    filePath: z.string().describe("Absolute path to the open document"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document. Obtain this from document_list or document_create — do NOT guess or infer the path."
+      ),
+    headingsOnly: z
+      .boolean()
+      .optional()
+      .describe(
+        "If true, omit section body content (returns only id, heading, level). Use for large documents."
+      ),
+    includeDataUrls: z
+      .boolean()
+      .optional()
+      .describe(
+        "If true, return raw base64 data: URLs in section bodies instead of placeholders. WARNING: can exceed token limits."
+      ),
   },
-  async ({ filePath }) => {
-    const res = await callBridge("document_get_sections", { filePath });
+  async ({ filePath, headingsOnly, includeDataUrls }) => {
+    const res = await callBridge("document_get_sections", {
+      filePath,
+      headingsOnly,
+      includeDataUrls,
+    });
     if (res.error)
       return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
     return { content: [{ type: "text", text: toText(res.result) }] };
@@ -576,9 +661,17 @@ server.tool(
 // ─── document_set_content ─────────────────────────────────────────────────────
 server.tool(
   "document_set_content",
-  "Replace the full content of an open document",
+  [
+    "Replace the full markdown content of an open document.",
+    "WARNING: do NOT embed <span style='color:...'> or other HTML for styling — BlockNote strips inline HTML on parse.",
+    "To color a heading, use document_set_block_color instead.",
+  ].join(" "),
   {
-    filePath: z.string().describe("Absolute path to the open document"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document. Obtain this from document_list or document_create — do NOT guess or infer the path."
+      ),
     content: z.string().describe("New markdown content to set"),
   },
   async ({ filePath, content }) => {
@@ -594,7 +687,11 @@ server.tool(
   "document_append",
   "Append markdown content to the end of a document",
   {
-    filePath: z.string().describe("Absolute path to the open document"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document. Obtain this from document_list or document_create — do NOT guess or infer the path."
+      ),
     content: z.string().describe("Markdown content to append"),
   },
   async ({ filePath, content }) => {
@@ -610,7 +707,11 @@ server.tool(
   "document_insert_after_section",
   "Insert content after a section identified by ID",
   {
-    filePath: z.string().describe("Absolute path to the open document"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document. Obtain this from document_list or document_create — do NOT guess or infer the path."
+      ),
     sectionId: z.string().describe("The section ID to insert after (from document_get_sections)"),
     content: z.string().describe("Markdown content to insert"),
   },
@@ -627,7 +728,11 @@ server.tool(
   "document_insert_after_heading",
   "Insert content after a section identified by heading text",
   {
-    filePath: z.string().describe("Absolute path to the open document"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document. Obtain this from document_list or document_create — do NOT guess or infer the path."
+      ),
     heading: z.string().describe("The heading text to insert after"),
     content: z.string().describe("Markdown content to insert"),
   },
@@ -642,11 +747,22 @@ server.tool(
 // ─── document_replace_section ─────────────────────────────────────────────────
 server.tool(
   "document_replace_section",
-  "Replace the content of a section",
+  [
+    "Replace the BODY of a section — the text directly under its heading, up to the next heading of any level.",
+    "ATOMIC: sub-sections (nested headings) are NEVER touched. Only the immediate body text is replaced.",
+    "To rename the heading itself, use document_set_content to rewrite the full document.",
+    "Get sectionId from document_get_sections.",
+  ].join(" "),
   {
-    filePath: z.string().describe("Absolute path to the open document"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document. Obtain this from document_list or document_create — do NOT guess or infer the path."
+      ),
     sectionId: z.string().describe("The section ID to replace (from document_get_sections)"),
-    content: z.string().describe("New markdown content for the section body"),
+    content: z
+      .string()
+      .describe("New markdown content for the section body (excluding the heading line itself)"),
   },
   async ({ filePath, sectionId, content }) => {
     const res = await callBridge("document_replace_section", { filePath, sectionId, content });
@@ -659,9 +775,17 @@ server.tool(
 // ─── document_delete_section ──────────────────────────────────────────────────
 server.tool(
   "document_delete_section",
-  "Delete a section and its content",
+  [
+    "Delete a section's heading and its IMMEDIATE body — the text directly under it, up to the next heading of any level.",
+    "ATOMIC: sub-sections (nested headings) are NOT deleted, they are promoted up.",
+    "Get sectionId from document_get_sections.",
+  ].join(" "),
   {
-    filePath: z.string().describe("Absolute path to the open document"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document. Obtain this from document_list or document_create — do NOT guess or infer the path."
+      ),
     sectionId: z.string().describe("The section ID to delete (from document_get_sections)"),
   },
   async ({ filePath, sectionId }) => {
@@ -677,9 +801,12 @@ server.tool(
   "document_insert_diagram",
   [
     "Export an open Excalidraw diagram as SVG and embed it into a document as an inline image.",
+    "The SVG is embedded as a base64 data URL — no external files needed, no manual encoding required.",
     "IMPORTANT: the diagram must be open in a tab before calling this tool.",
     "Workflow: 1) open_file_or_focus the .excalidraw file, 2) draw or verify the diagram, 3) call this tool.",
-    "The SVG is embedded as a base64 data URL so no external files are needed.",
+    "Use sectionId to REPLACE an existing section with the diagram (from document_get_sections).",
+    "Omit sectionId to APPEND the diagram at the end of the document.",
+    "NEVER use export_svg + manual base64 encoding for this — always use this tool instead.",
   ].join(" "),
   {
     filePath: z.string().describe("Absolute path to the target .md document"),
@@ -687,9 +814,20 @@ server.tool(
       .string()
       .describe("Absolute path to the .excalidraw file — must be open in a tab"),
     caption: z.string().optional().describe("Optional caption displayed below the diagram"),
+    sectionId: z
+      .string()
+      .optional()
+      .describe(
+        "If provided, replaces the body of this section with the embedded diagram instead of appending. Get the ID from document_get_sections."
+      ),
   },
-  async ({ filePath, diagramPath, caption }) => {
-    const res = await callBridge("document_insert_diagram", { filePath, diagramPath, caption });
+  async ({ filePath, diagramPath, caption, sectionId }) => {
+    const res = await callBridge("document_insert_diagram", {
+      filePath,
+      diagramPath,
+      caption,
+      sectionId,
+    });
     if (res.error)
       return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
     return { content: [{ type: "text", text: toText(res.result) }] };
@@ -701,7 +839,11 @@ server.tool(
   "document_save",
   "Save a document to disk",
   {
-    filePath: z.string().describe("Absolute path to the open document to save"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document to save. Obtain this from document_list — do NOT guess or infer the path."
+      ),
   },
   async ({ filePath }) => {
     const res = await callBridge("document_save", { filePath });
@@ -712,18 +854,93 @@ server.tool(
 );
 
 // ─── document_list ────────────────────────────────────────────────────────────
-server.tool("document_list", "List all open documents", {}, async () => {
-  const res = await callBridge("document_list", {});
-  if (res.error) return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
-  return { content: [{ type: "text", text: toText(res.result) }] };
-});
+server.tool(
+  "document_list",
+  "List all currently open documents. Returns an array of { filePath, title, isDirty } objects. Use this to obtain filePath values before calling any other document tool.",
+  {},
+  async () => {
+    const res = await callBridge("document_list", {});
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
+
+// ─── document_set_block_color ─────────────────────────────────────────────────
+server.tool(
+  "document_set_block_color",
+  [
+    "Apply a text color or background color to a heading block in the live editor.",
+    "THIS IS THE CORRECT TOOL for coloring headings — do NOT use <span style='color:...'> or any HTML in markdown, it will not render.",
+    "Uses BlockNote's native color system — values must be one of the named colors:",
+    "default | gray | brown | orange | yellow | green | blue | purple | pink | red.",
+    "IMPORTANT: colors are applied to the in-memory editor only and are NOT persisted to the .md file.",
+    "If you get 'Editor not mounted', call activate_tab with the filePath first, then retry.",
+    "Get sectionId from document_get_sections.",
+  ].join(" "),
+  {
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the open document. Obtain this from document_list — do NOT guess or infer the path."
+      ),
+    sectionId: z
+      .string()
+      .describe("The heading section ID to colorize (from document_get_sections)"),
+    textColor: z
+      .enum([
+        "default",
+        "gray",
+        "brown",
+        "orange",
+        "yellow",
+        "green",
+        "blue",
+        "purple",
+        "pink",
+        "red",
+      ])
+      .optional()
+      .describe("Named text color to apply to the heading block"),
+    backgroundColor: z
+      .enum([
+        "default",
+        "gray",
+        "brown",
+        "orange",
+        "yellow",
+        "green",
+        "blue",
+        "purple",
+        "pink",
+        "red",
+      ])
+      .optional()
+      .describe("Named background color to apply to the heading block"),
+  },
+  async ({ filePath, sectionId, textColor, backgroundColor }) => {
+    const res = await callBridge("document_set_block_color", {
+      filePath,
+      sectionId,
+      textColor,
+      backgroundColor,
+    });
+    if (res.error)
+      return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
+    return { content: [{ type: "text", text: toText(res.result) }] };
+  }
+);
 
 // ─── document_delete ──────────────────────────────────────────────────────────
 server.tool(
   "document_delete",
   "Delete a document file and close its tab",
   {
-    filePath: z.string().describe("Absolute path to the document to delete"),
+    filePath: z
+      .string()
+      .describe(
+        "Absolute path to the document to delete. Obtain this from document_list — do NOT guess or infer the path."
+      ),
     confirm: z
       .boolean()
       .describe("Must be true to confirm deletion. This action cannot be undone."),

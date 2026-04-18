@@ -1,102 +1,109 @@
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/components/ui/button";
-import { cn } from "@/shared/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/shared/components/ui/dropdown-menu";
+import { ChevronDown, FileText, ZoomIn, ZoomOut } from "lucide-react";
+import { usePageSettingsStore, PAGE_SIZES } from "@/stores/pageSettingsStore";
+import { PageSetupDialog } from "./PageSetupDialog";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 interface DocumentEditorToolbarProps {
-  title: string;
-  isDirty: boolean;
-  isSaving: boolean;
-  onSave: () => void;
+  onExportHtml: () => void;
+  onExportMarkdown: () => void;
 }
 
 // ---------------------------------------------------------------------------
-// Save status constants
-// ---------------------------------------------------------------------------
-
-const SAVE_STATUS = {
-  SAVING: "saving",
-  UNSAVED: "unsaved",
-  SAVED: "saved",
-} as const;
-
-type SaveStatus = (typeof SAVE_STATUS)[keyof typeof SAVE_STATUS];
-
-// ---------------------------------------------------------------------------
-// DocumentEditorToolbar — status bar + save action
+// DocumentEditorToolbar — export actions bar
 //
-// The rich formatting toolbar (bold, italic, etc.) is handled by BlockNote's
-// built-in bubble menu — no manual implementation needed here.
+// Transparent over bg-muted, constrained to A4 width, positioned above paper.
+// Rich text formatting is handled by BlockNote's built-in bubble menu.
 // ---------------------------------------------------------------------------
 
 export function DocumentEditorToolbar({
-  title,
-  isDirty,
-  isSaving,
-  onSave,
+  onExportHtml,
+  onExportMarkdown,
 }: DocumentEditorToolbarProps) {
-  const saveStatus: SaveStatus = isSaving
-    ? SAVE_STATUS.SAVING
-    : isDirty
-      ? SAVE_STATUS.UNSAVED
-      : SAVE_STATUS.SAVED;
+  const { t } = useTranslation("common");
+  const [pageSetupOpen, setPageSetupOpen] = useState(false);
+
+  const zoom = usePageSettingsStore((s) => s.zoom);
+  const setZoom = usePageSettingsStore((s) => s.setZoom);
+  const pageSize = usePageSettingsStore((s) => s.pageSize);
+  const orientation = usePageSettingsStore((s) => s.orientation);
 
   return (
-    <div className="flex items-center justify-between px-4 py-1.5 border-b border-border bg-background shrink-0">
-      {/* Document title */}
-      <span className="text-sm font-medium text-foreground truncate max-w-xs">{title}</span>
+    <>
+      <div className="document-toolbar bg-muted border-b border-border shrink-0">
+        <div className="max-w-[794px] w-full mx-auto flex items-center justify-between py-2 px-1">
+          {/* Left: page size indicator + page setup */}
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs gap-1"
+              onClick={() => setPageSetupOpen(true)}
+            >
+              <FileText className="size-3" />
+              {PAGE_SIZES[pageSize].label} {t(`documentEditor.${orientation}`)}
+            </Button>
+          </div>
 
-      {/* Right section: save status + save button */}
-      <div className="flex items-center gap-3">
-        <SaveStatusIndicator status={saveStatus} />
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onSave}
-          disabled={isSaving || !isDirty}
-          className="h-7 px-2 text-xs"
-        >
-          Save
-          <span className="ml-1 text-muted-foreground">Ctrl+S</span>
-        </Button>
+          {/* Right: zoom + export */}
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => setZoom(Math.max(0.25, zoom - 0.1))}
+            >
+              <ZoomOut className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs tabular-nums min-w-[3rem]"
+              onClick={() => setPageSetupOpen(true)}
+            >
+              {Math.round(zoom * 100)}%
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => setZoom(Math.min(2, zoom + 0.1))}
+            >
+              <ZoomIn className="size-3.5" />
+            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1">
+                  {t("documentEditor.export")}
+                  <ChevronDown className="size-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="border-none">
+                <DropdownMenuItem onClick={onExportHtml}>
+                  {t("documentEditor.exportHtml")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onExportMarkdown}>
+                  {t("documentEditor.exportMarkdown")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
       </div>
-    </div>
-  );
-}
 
-// ---------------------------------------------------------------------------
-// SaveStatusIndicator — sub-component
-// ---------------------------------------------------------------------------
-
-interface SaveStatusIndicatorProps {
-  status: SaveStatus;
-}
-
-function SaveStatusIndicator({ status }: SaveStatusIndicatorProps) {
-  if (status === SAVE_STATUS.SAVING) {
-    return (
-      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <span className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse" />
-        Saving...
-      </span>
-    );
-  }
-
-  if (status === SAVE_STATUS.UNSAVED) {
-    return (
-      <span className="flex items-center gap-1.5 text-xs text-yellow-500">
-        <span className="h-2 w-2 rounded-full bg-yellow-400" />
-        Unsaved changes
-      </span>
-    );
-  }
-
-  return (
-    <span className={cn("flex items-center gap-1.5 text-xs", "text-muted-foreground")}>
-      <span className="h-2 w-2 rounded-full bg-green-500" />
-      Saved
-    </span>
+      <PageSetupDialog open={pageSetupOpen} onOpenChange={setPageSetupOpen} />
+    </>
   );
 }

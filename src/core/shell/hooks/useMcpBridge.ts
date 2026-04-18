@@ -14,6 +14,7 @@ import { join } from "@tauri-apps/api/path";
 import { getFileStat, copyPath } from "@/core/shell/services/file.service";
 import { useExplorerStore, useExplorerSelectionStore } from "@/stores/explorerStore";
 import { getDocumentController } from "@/features/document-editor/documentController.singleton";
+import { documentEditorRegistry } from "@/features/document-editor/documentEditorRegistry";
 import type { SortOrder } from "@/core/shell/panels/explorer-types";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { AppState } from "@excalidraw/excalidraw/types";
@@ -88,6 +89,17 @@ export async function dispatchMcpTool(
   try {
     switch (tool) {
       case "get_elements": {
+        if (!instanceId) {
+          const { tabs, activeTabId } = useTabStore.getState();
+          const activeTab = tabs.find((t) => t.id === activeTabId);
+          const hint = activeTab
+            ? ` Active tab is "${activeTab.routeId}" (${activeTab.title}) — not an Excalidraw canvas.`
+            : " No tab is active.";
+          return {
+            result: null,
+            error: `No active diagram canvas.${hint} Open a .excalidraw file in a tab first.`,
+          };
+        }
         const elements = DiagramController.getElements(instanceId);
         return { result: JSON.stringify(elements), error: null };
       }
@@ -209,6 +221,13 @@ export async function dispatchMcpTool(
           return { result: null, error: "File already exists." };
         } catch {
           // File does not exist — proceed
+        }
+        // Auto-create parent directories so names like "subdir/my-diagram" work
+        const segments = name.split("/");
+        if (segments.length > 1) {
+          const parentRelative = segments.slice(0, -1).join("/");
+          const parentAbsolute = await join(workspaceDir, parentRelative);
+          await mkdir(parentAbsolute, { recursive: true });
         }
         await diagramFileService.createNewDiagram(workspaceDir, name);
         const handler = fileHandlerRegistry.resolveOrDefault(name);
@@ -687,8 +706,39 @@ export async function dispatchMcpTool(
           if (!isDocumentPathAllowed(filePath)) {
             return { result: null, error: "Path traversal not allowed" };
           }
-          const result = getDocumentController().getContent(filePath);
-          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+          const raw = getDocumentController().getContent(filePath);
+          if (raw === null) return { result: null, error: "Document not open or not found." };
+
+          // Strip embedded data: URLs by default to avoid token overflow.
+          // Pass includeDataUrls: true only when the raw bytes are actually needed.
+          const includeDataUrls = input.includeDataUrls === true;
+          const content = includeDataUrls
+            ? raw
+            : raw.replace(/!\[([^\]]*)\]\(data:[^)]{20,}\)/g, "![$1]([embedded-image])");
+
+          const offsetLines = typeof input.offset === "number" ? input.offset : 0;
+          const limitLines = typeof input.limit === "number" ? input.limit : undefined;
+
+          if (offsetLines > 0 || limitLines !== undefined) {
+            const lines = content.split("\n");
+            const total = lines.length;
+            const sliced =
+              limitLines !== undefined
+                ? lines.slice(offsetLines, offsetLines + limitLines)
+                : lines.slice(offsetLines);
+            const hasMore = offsetLines + sliced.length < total;
+            return {
+              result: JSON.stringify({
+                content: sliced.join("\n"),
+                offset: offsetLines,
+                total,
+                hasMore,
+              }),
+              error: null,
+            };
+          }
+
+          return { result: JSON.stringify(content), error: null };
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
           return { result: null, error };
@@ -702,8 +752,29 @@ export async function dispatchMcpTool(
           if (!isDocumentPathAllowed(filePath)) {
             return { result: null, error: "Path traversal not allowed" };
           }
-          const result = getDocumentController().getSections(filePath);
-          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+          const sections = getDocumentController().getSections(filePath);
+          const headingsOnly = input.headingsOnly === true;
+          const includeDataUrls = input.includeDataUrls === true;
+
+          if (headingsOnly) {
+            return {
+              result: JSON.stringify(
+                sections.map(({ id, heading, level }) => ({ id, heading, level }))
+              ),
+              error: null,
+            };
+          }
+
+          const result = includeDataUrls
+            ? sections
+            : sections.map((s) => ({
+                ...s,
+                content: s.content.replace(
+                  /!\[([^\]]*)\]\(data:[^)]{20,}\)/g,
+                  "![$1]([embedded-image])"
+                ),
+              }));
+          return { result: JSON.stringify(result), error: null };
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
           return { result: null, error };
@@ -831,6 +902,7 @@ export async function dispatchMcpTool(
           const filePath = input.filePath as string | undefined;
           const diagramPath = input.diagramPath as string | undefined;
           const caption = input.caption as string | undefined;
+          const sectionId = input.sectionId as string | undefined;
           if (!filePath) return { result: null, error: "filePath is required." };
           if (!isDocumentPathAllowed(filePath)) {
             return { result: null, error: "Path traversal not allowed" };
@@ -850,6 +922,13 @@ export async function dispatchMcpTool(
           const svgString = new XMLSerializer().serializeToString(svg);
           const base64 = btoa(unescape(encodeURIComponent(svgString)));
           const dataUrl = `data:image/svg+xml;base64,${base64}`;
+
+          if (sectionId) {
+            // Replace existing section content with the embedded diagram
+            const imageMarkdown = caption ? `![${caption}](${dataUrl})` : `![diagram](${dataUrl})`;
+            await getDocumentController().replaceSection(filePath, sectionId, imageMarkdown);
+            return { result: JSON.stringify({ ok: true, replaced: sectionId }), error: null };
+          }
 
           const result = await getDocumentController().insertDiagram(filePath, dataUrl, caption);
           return { result: JSON.stringify(result ?? { ok: true }), error: null };
@@ -900,6 +979,93 @@ export async function dispatchMcpTool(
           }
           const result = await getDocumentController().deleteDocument(filePath);
           return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_set_block_color": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+
+          const sectionId = input.sectionId as string | undefined;
+          if (!sectionId) return { result: null, error: "sectionId is required." };
+
+          const textColor = input.textColor as string | undefined;
+          const backgroundColor = input.backgroundColor as string | undefined;
+          if (!textColor && !backgroundColor) {
+            return {
+              result: null,
+              error: "At least one of textColor or backgroundColor is required.",
+            };
+          }
+
+          const editor = documentEditorRegistry.getEditor(filePath);
+          if (!editor) {
+            return {
+              result: null,
+              error:
+                "Editor not mounted for this document. The tab must be open and visible (keepMounted: true).",
+            };
+          }
+
+          // Resolve section → heading level + text from the controller
+          const sections = getDocumentController().getSections(filePath);
+          const sectionIdx = sections.findIndex((s) => s.id === sectionId);
+          if (sectionIdx === -1) {
+            return { result: null, error: `Section not found: ${sectionId}` };
+          }
+          const section = sections[sectionIdx];
+
+          // Occurrence index among sections with the same heading + level
+          const targetOccurrence = sections
+            .slice(0, sectionIdx)
+            .filter((s) => s.heading === section.heading && s.level === section.level).length;
+
+          // Walk top-level blocks to find the matching heading block.
+          // BlockNote markdown imports produce a flat block list — headings are top-level.
+          let occurrenceCount = 0;
+          let targetBlockId: string | undefined;
+          for (const block of editor.document as Array<{
+            id: string;
+            type: string;
+            props: Record<string, unknown>;
+            content: Array<{ type: string; text?: string }>;
+          }>) {
+            if (block.type === "heading" && block.props["level"] === section.level) {
+              const blockText = block.content
+                .filter((c) => c.type === "text")
+                .map((c) => c.text ?? "")
+                .join("");
+              if (blockText === section.heading) {
+                if (occurrenceCount === targetOccurrence) {
+                  targetBlockId = block.id;
+                  break;
+                }
+                occurrenceCount++;
+              }
+            }
+          }
+
+          if (!targetBlockId) {
+            return {
+              result: null,
+              error: `Could not find heading block for section "${sectionId}" in the editor. The editor content may not match the stored markdown.`,
+            };
+          }
+
+          const propUpdates: Record<string, string> = {};
+          if (textColor) propUpdates["textColor"] = textColor;
+          if (backgroundColor) propUpdates["backgroundColor"] = backgroundColor;
+
+          editor.updateBlock(targetBlockId, { props: propUpdates });
+
+          return { result: JSON.stringify({ ok: true, blockId: targetBlockId }), error: null };
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
           return { result: null, error };

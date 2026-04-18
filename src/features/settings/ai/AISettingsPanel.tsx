@@ -14,11 +14,26 @@ const PROVIDERS: { id: AIProviderName; label: string }[] = [
   { id: "groq", label: "Groq" },
   { id: "openai", label: "OpenAI" },
   { id: "gemini", label: "Gemini" },
+  { id: "openrouter", label: "OpenRouter" },
 ];
 
 const PROVIDER_MODELS: Record<AIProviderName, string[]> = {
-  anthropic: ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
-  groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
+  anthropic: [
+    "claude-sonnet-4-5-20250514",
+    "claude-opus-4-6",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5-20251001",
+  ],
+  groq: [
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "qwen/qwen3-32b",
+    "meta-llama/llama-4-maverick-17b-128e-instruct",
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "moonshotai/kimi-k2-instruct-0905",
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+  ],
   openai: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
   gemini: [
     "gemini-2.5-pro",
@@ -29,6 +44,18 @@ const PROVIDER_MODELS: Record<AIProviderName, string[]> = {
     "gemini-1.5-pro",
     "gemini-1.5-flash",
   ],
+  openrouter: [
+    "deepseek/deepseek-r1-0528",
+    "deepseek/deepseek-chat-v3-0324",
+    "qwen/qwen3-235b-a22b",
+    "qwen/qwen3-30b-a3b",
+    "anthropic/claude-sonnet-4-5",
+    "google/gemini-2.5-pro",
+    "meta-llama/llama-4-maverick",
+    "moonshotai/kimi-k2",
+    "microsoft/phi-4-reasoning-plus",
+    "mistralai/mistral-large-2411",
+  ],
 };
 
 const PROVIDER_KEY_PLACEHOLDER: Record<AIProviderName, string> = {
@@ -36,6 +63,7 @@ const PROVIDER_KEY_PLACEHOLDER: Record<AIProviderName, string> = {
   groq: "gsk_...",
   openai: "sk-...",
   gemini: "AIza...",
+  openrouter: "sk-or-v1-...",
 };
 
 type InlineStatus =
@@ -51,12 +79,15 @@ export function AISettingsPanel() {
   const setActiveProvider = useAISettingsStore((s) => s.setActiveProvider);
   const setProviderKey = useAISettingsStore((s) => s.setProviderKey);
   const setProviderModel = useAISettingsStore((s) => s.setProviderModel);
+  const customInstructions = useAISettingsStore((s) => s.customInstructions);
+  const setCustomInstructions = useAISettingsStore((s) => s.setCustomInstructions);
 
   const [localKey, setLocalKey] = useState<Record<AIProviderName, string>>({
     anthropic: "",
     groq: "",
     openai: "",
     gemini: "",
+    openrouter: "",
   });
   const [showKey, setShowKey] = useState(false);
   const [saveStatus, setSaveStatus] = useState<InlineStatus>({ type: "idle" });
@@ -208,6 +239,23 @@ export function AISettingsPanel() {
             ))}
           </select>
         </div>
+      </section>
+
+      {/* Custom instructions */}
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold">{t("ai.customInstructions.title")}</h2>
+        <p className="text-sm text-muted-foreground">{t("ai.customInstructions.description")}</p>
+        <textarea
+          value={customInstructions}
+          onChange={(e) => setCustomInstructions(e.target.value)}
+          placeholder={t("ai.customInstructions.placeholder")}
+          rows={4}
+          className={cn(
+            "flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground",
+            "placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring",
+            "resize-none transition-colors"
+          )}
+        />
       </section>
 
       {/* Actions */}

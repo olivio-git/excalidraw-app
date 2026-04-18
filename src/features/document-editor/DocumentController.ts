@@ -8,6 +8,10 @@ import type { documentFileService } from "./documentFileService";
 // Helpers
 // ---------------------------------------------------------------------------
 
+function stripHtml(text: string): string {
+  return text.replace(/<[^>]*>/g, "").trim();
+}
+
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -30,13 +34,27 @@ function parseSections(content: string): Section[] {
   let currentHeading: { text: string; level: number; startLine: number } | null = null;
   let bodyLines: string[] = [];
 
-  const flushSection = (endLine: number) => {
+  const flushSection = (_endLine: number) => {
     if (!currentHeading) return;
     const bodyContent = bodyLines.join("\n").trim();
-    const idx = sections.length;
+    // Strip HTML tags from heading text before slugifying so that headings
+    // with inline HTML (e.g. <span style="...">Title</span>) produce clean,
+    // stable IDs like "h1-title" instead of "h1-span-stylecolor-...titlespan".
+    const cleanText = stripHtml(currentHeading.text);
+    const slug = slugify(cleanText);
+    const base = `h${currentHeading.level}-${slug}`;
+
+    // Count prior sections with the same heading text + level to handle duplicates.
+    // Unique headings → stable id (e.g. "h2-diagrama-del-flujo").
+    // Duplicates → disambiguate with occurrence suffix ("h2-intro", "h2-intro-2", "h2-intro-3").
+    const priorSameHeading = sections.filter(
+      (s) => s.heading === cleanText && s.level === currentHeading!.level
+    ).length;
+    const id = priorSameHeading === 0 ? base : `${base}-${priorSameHeading + 1}`;
+
     sections.push({
-      id: `heading-${slugify(currentHeading.text)}-${idx}`,
-      heading: currentHeading.text,
+      id,
+      heading: cleanText,
       level: currentHeading.level,
       content: bodyContent,
     });
@@ -77,18 +95,22 @@ function replaceSectionContent(
   if (idx === -1) return fullContent;
 
   const target = sections[idx];
-  const headingPrefix = "#".repeat(target.level);
-  const headingLine = `${headingPrefix} ${target.heading}`;
 
-  // Locate start of section in original content
+  const targetOccurrence = sections
+    .slice(0, idx)
+    .filter((s) => s.heading === target.heading && s.level === target.level).length;
+
+  // Locate the raw heading line in original content.
+  // Compare against stripped text so headings with inline HTML (e.g. <span>)
+  // are found correctly regardless of their raw markup.
   const lines = fullContent.split("\n");
   let sectionStart = -1;
   let sectionCount = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(/^(#{1,6})\s+(.+)$/);
-    if (m && m[1].length === target.level && m[2].trim() === target.heading) {
-      if (sectionCount === idx) {
+    if (m && m[1].length === target.level && stripHtml(m[2].trim()) === target.heading) {
+      if (sectionCount === targetOccurrence) {
         sectionStart = i;
         break;
       }
@@ -98,11 +120,16 @@ function replaceSectionContent(
 
   if (sectionStart === -1) return fullContent;
 
-  // Find end of section (next heading of same or higher level, or EOF)
+  // Preserve the original heading line as-is (including any inline HTML).
+  // We only replace the BODY, never the heading line itself.
+  const originalHeadingLine = lines[sectionStart];
+
+  // Find end of section body — stop at the NEXT heading of ANY level.
+  // This makes replace/delete atomic: they only touch the immediate body text
+  // between this heading and the next child/sibling heading, never the subtree.
   let sectionEnd = lines.length;
   for (let i = sectionStart + 1; i < lines.length; i++) {
-    const m = lines[i].match(/^(#{1,6})\s/);
-    if (m && m[1].length <= target.level) {
+    if (/^#{1,6}\s/.test(lines[i])) {
       sectionEnd = i;
       break;
     }
@@ -115,7 +142,7 @@ function replaceSectionContent(
     return [...before, ...after].join("\n");
   }
 
-  return [...before, headingLine, newBody, ...after].join("\n");
+  return [...before, originalHeadingLine, newBody, ...after].join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -180,7 +207,7 @@ export class DocumentController implements DocumentAPI {
   }
 
   async setContent(filePath: string, content: string): Promise<void> {
-    this.store.getState().updateContent(filePath, content);
+    this.store.getState().setExternalContent(filePath, content);
     await this.fileService.writeDocumentFile(filePath, content);
     this.store.getState().markSaved(filePath);
   }
@@ -195,14 +222,45 @@ export class DocumentController implements DocumentAPI {
     if (current === null) throw new Error(`Document not open: ${filePath}`);
 
     const sections = parseSections(current);
-    const target = sections.find((s) => s.id === sectionId);
-    if (!target) throw new Error(`Section not found: ${sectionId}`);
+    const idx = sections.findIndex((s) => s.id === sectionId);
+    if (idx === -1) throw new Error(`Section not found: ${sectionId}`);
 
-    const headingPrefix = "#".repeat(target.level);
-    const headingLine = `${headingPrefix} ${target.heading}`;
-    const sectionBlock = target.content ? `${headingLine}\n${target.content}` : headingLine;
-    const insertion = `${sectionBlock}\n\n${content}`;
-    const updated = current.replace(sectionBlock, insertion);
+    const target = sections[idx];
+    const targetOccurrence = sections
+      .slice(0, idx)
+      .filter((s) => s.heading === target.heading && s.level === target.level).length;
+
+    // Locate the heading line by index — same strategy as replaceSectionContent.
+    const lines = current.split("\n");
+    let sectionStart = -1;
+    let sectionCount = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(/^(#{1,6})\s+(.+)$/);
+      if (m && m[1].length === target.level && stripHtml(m[2].trim()) === target.heading) {
+        if (sectionCount === targetOccurrence) {
+          sectionStart = i;
+          break;
+        }
+        sectionCount++;
+      }
+    }
+
+    if (sectionStart === -1) throw new Error(`Section heading not found in content: ${sectionId}`);
+
+    // Find end of section body — stop at next heading of ANY level.
+    let sectionEnd = lines.length;
+    for (let i = sectionStart + 1; i < lines.length; i++) {
+      if (/^#{1,6}\s/.test(lines[i])) {
+        sectionEnd = i;
+        break;
+      }
+    }
+
+    // Splice the new content in after the section body.
+    const before = lines.slice(0, sectionEnd);
+    const after = lines.slice(sectionEnd);
+    const updated = [...before, "", content, ...after].join("\n");
     await this.setContent(filePath, updated);
   }
 

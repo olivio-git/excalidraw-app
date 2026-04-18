@@ -92,6 +92,11 @@
       "title": "Modelo",
       "selectLabel": "Seleccionar modelo"
     },
+    "customInstructions": {
+      "title": "Instrucciones personalizadas",
+      "description": "Estas instrucciones se agregan a cada solicitud de IA. Úsalas para establecer preferencias persistentes como idioma, estilo o restricciones.",
+      "placeholder": "Ejemplo: Responde siempre en español. Usa azul como color principal para las formas."
+    },
     "actions": {
       "save": "Guardar",
       "testConnection": "Probar conexión",

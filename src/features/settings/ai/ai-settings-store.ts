@@ -11,10 +11,12 @@ interface ProviderSettings {
 interface AISettingsState {
   activeProvider: AIProviderName;
   providers: Record<AIProviderName, ProviderSettings>;
+  customInstructions: string;
 
   setActiveProvider: (provider: AIProviderName) => void;
   setProviderKey: (provider: AIProviderName, key: string) => void;
   setProviderModel: (provider: AIProviderName, model: string) => void;
+  setCustomInstructions: (instructions: string) => void;
   getActiveConfig: () => { provider: AIProviderName; config: AIProviderConfig };
 }
 
@@ -22,15 +24,21 @@ export const useAISettingsStore = create<AISettingsState>()(
   persist(
     (set, get) => ({
       activeProvider: "anthropic",
+      customInstructions: "",
       providers: {
-        anthropic: { apiKey: "", model: "claude-sonnet-4-5" },
-        groq: { apiKey: "", model: "llama-3.3-70b-versatile" },
+        anthropic: { apiKey: "", model: "claude-sonnet-4-5-20250514" },
+        groq: { apiKey: "", model: "openai/gpt-oss-120b" },
         openai: { apiKey: "", model: "gpt-4o" },
         gemini: { apiKey: "", model: "gemini-2.5-pro" },
+        openrouter: { apiKey: "", model: "deepseek/deepseek-r1-0528" },
       },
 
       setActiveProvider: (provider: AIProviderName) => {
         set({ activeProvider: provider });
+      },
+
+      setCustomInstructions: (instructions: string) => {
+        set({ customInstructions: instructions });
       },
 
       setProviderKey: (provider: AIProviderName, key: string) => {
@@ -66,6 +74,7 @@ export const useAISettingsStore = create<AISettingsState>()(
       partialize: (state) => ({
         activeProvider: state.activeProvider,
         providers: state.providers,
+        customInstructions: state.customInstructions,
       }),
       // Deep-merge so new providers added in future updates get their defaults
       // even when an older persisted state doesn't have them.

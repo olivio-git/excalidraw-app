@@ -264,3 +264,153 @@ input[type="number"].no-spinners {
 [data-radix-popper-content-wrapper] {
   z-index: 50;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Document editor — page simulation
+   Simulates a real document page (like Google Docs) with configurable size,
+   margins, shadows, and zoom. Print CSS keeps only the clean content.
+───────────────────────────────────────────────────────────────────────────── */
+
+/* Scrollable wrapper behind the page — provides the gray "canvas" background */
+.document-scroll {
+  background-color: hsl(var(--muted));
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+/* The "page" — white sheet with shadow, sized dynamically via CSS vars */
+.document-paper {
+  --page-width: 794px; /* A4 default at 96 DPI */
+  --page-height: auto;
+  --page-margin: 96px; /* 1 inch default */
+  background-color: hsl(var(--background));
+  width: var(--page-width);
+  min-height: var(--page-height);
+  max-width: 100%;
+  margin: 2rem auto;
+  padding: var(--page-margin);
+  box-shadow:
+    0 1px 1px hsl(var(--border) / 0.15),
+    0 4px 8px hsl(var(--border) / 0.1),
+    0 8px 24px hsl(var(--border) / 0.08);
+  border-radius: 2px;
+  position: relative;
+}
+
+/* Zoom wrapper — scales the page visually */
+.document-zoom-wrapper {
+  transform-origin: top center;
+  transition: transform 0.15s ease-out;
+}
+
+/* BlockNote editor inside the page — fill the available content width */
+.document-paper .bn-container {
+  width: 100%;
+}
+
+.document-paper .bn-editor {
+  padding: 0;
+  background-color: transparent;
+}
+
+/* Hide BlockNote's side menu in document editor */
+.document-paper .bn-side-menu {
+  display: none;
+}
+
+/* Ruler guides (optional visual aid — thin lines at margin edges) */
+.document-paper::before,
+.document-paper::after {
+  content: "";
+  position: absolute;
+  background-color: hsl(var(--border) / 0.3);
+  transition: opacity 0.15s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Top margin ruler */
+.document-paper.show-rulers::before {
+  opacity: 1;
+  top: var(--page-margin);
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+
+/* Left margin ruler */
+.document-paper.show-rulers::after {
+  opacity: 1;
+  left: var(--page-margin);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+/* Page break indicator — subtle dashed line between pages (future multi-page) */
+.page-break {
+  border-top: 2px dashed hsl(var(--border));
+  margin: 2rem auto;
+  width: var(--page-width, 794px);
+  position: relative;
+}
+
+.page-break::after {
+  content: "Page Break";
+  position: absolute;
+  top: -0.65rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: hsl(var(--muted));
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+}
+
+/* ── Print / PDF export — clean output, no chrome ─────────────────────────── */
+@page {
+  size: A4;
+  margin: 1in;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 1in;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .document-paper,
+  .document-paper * {
+    visibility: visible;
+  }
+
+  .document-paper {
+    position: absolute;
+    inset: 0;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0;
+    background-color: transparent;
+  }
+
+  /* Hide UI chrome */
+  .document-scroll,
+  .document-zoom-wrapper,
+  .document-toolbar,
+  .document-rulers {
+    display: none !important;
+  }
+
+  /* Ensure page breaks behave correctly */
+  .bn-container * {
+    page-break-inside: avoid;
+  }
+}

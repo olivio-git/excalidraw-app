@@ -72,6 +72,30 @@
     "browse": "Explorar",
     "noResults": "Ninguna biblioteca coincide con tu búsqueda."
   },
+  "documentEditor": {
+    "export": "Exportar",
+    "exportHtml": "Exportar como HTML",
+    "exportMarkdown": "Exportar como Markdown",
+    "exported": "Archivo exportado correctamente",
+    "pageSetup": "Configurar página",
+    "pageSetupTitle": "Configurar página",
+    "pageSize": "Tamaño de página",
+    "orientation": "Orientación",
+    "margins": "Márgenes",
+    "zoom": "Zoom",
+    "portrait": "Vertical",
+    "landscape": "Horizontal",
+    "marginNormal": "Normal (1\")",
+    "marginNarrow": "Estrecho (0.5\")",
+    "marginWide": "Amplio (1.5\")",
+    "marginCustom": "Personalizado",
+    "marginValue": "Margen: {{value}}px",
+    "zoomFit": "Ajustar al ancho",
+    "actualSize": "Tamaño real (100%)",
+    "resetDefaults": "Restablecer valores predeterminados",
+    "noDocumentSelected": "Ningún documento seleccionado",
+    "loading": "Cargando..."
+  },
   "aiChat": {
     "header": "Chat IA",
     "clearChat": "Limpiar chat",
@@ -84,14 +108,22 @@
     "stopGeneration": "Detener generación",
     "sendMessage": "Enviar (Enter)",
     "context": "Contexto",
-    "noDiagramActive": "Sin diagrama activo",
+    "noDiagramActive": "Sin pestaña activa",
     "thinking": "Pensando…",
     "toolError": "Error de herramienta",
+    "waitingForAnswer": "Escribe tu respuesta...",
     "tools": {
       "draw_elements": "Dibujando en el lienzo",
       "clear_canvas": "Limpiando el lienzo",
       "get_elements": "Leyendo el lienzo",
-      "update_element": "Actualizando elemento"
-    }
+      "update_element": "Actualizando elemento",
+      "ask_user": "Esperando respuesta"
+    },
+    "newConversation": "Nueva conversación",
+    "conversations": "Conversaciones",
+    "deleteConversation": "Eliminar conversación",
+    "noConversations": "Sin conversaciones aún",
+    "conversationDeleted": "Conversación eliminada",
+    "switchBlocked": "No se puede cambiar de conversación mientras se transmite"
   }
 }

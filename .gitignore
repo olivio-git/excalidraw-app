@@ -26,6 +26,9 @@ Thumbs.db
 # Claude Code config
 .claude/
 
+# AI tool configs
+.qwen/
+
 # Test coverage
 coverage/
 

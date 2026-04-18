@@ -19,6 +19,10 @@ export class AIProviderFactory {
         const { GeminiAdapter } = await import("./gemini-adapter");
         return new GeminiAdapter();
       }
+      case "openrouter": {
+        const { OpenRouterAdapter } = await import("./openrouter-adapter");
+        return new OpenRouterAdapter();
+      }
       default:
         throw new Error(`Unknown AI provider: ${name}`);
     }

@@ -51,9 +51,10 @@ const Tab = React.memo(
     const { t: tCommands } = useTranslation("commands");
     const workspaceDir = useWorkspaceStore((s) => s.workspaceDir);
 
-    // Route tabs get translated at render time. Diagram tabs use tab.title (the filename).
+    // File-based tabs (diagram, document-editor, etc.) use tab.title (the filename).
+    // Route tabs (settings, home, plugin-admin) get translated at render time.
     const displayTitle =
-      tab.routeId && tab.routeId !== "diagram"
+      tab.routeId && !tab.instanceId
         ? tCommands(`routes.${tab.routeId}`, { defaultValue: tab.title })
         : tab.title;
 

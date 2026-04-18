@@ -92,6 +92,11 @@
       "title": "Model",
       "selectLabel": "Select Model"
     },
+    "customInstructions": {
+      "title": "Custom Instructions",
+      "description": "These instructions are appended to every AI request. Use them to set persistent preferences like language, style, or constraints.",
+      "placeholder": "Example: Always respond in Spanish. Use blue as the primary color for shapes."
+    },
     "actions": {
       "save": "Save",
       "testConnection": "Test Connection",

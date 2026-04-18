@@ -16,6 +16,41 @@ import type { AIMessage } from "../providers/types";
 import { useChatHistoryStore } from "../store/chat-history-store";
 import { createConversation, saveMessage } from "./useChatHistory";
 import { prompt } from "@/shared/lib/prompt";
+import { confirm } from "@/shared/lib/confirm";
+
+// ---------------------------------------------------------------------------
+// Tool permission gate
+// ---------------------------------------------------------------------------
+
+const TOOLS_REQUIRING_PERMISSION = new Set([
+  "document_append",
+  "document_replace_section",
+  "document_insert_after_section",
+  "document_set_block_color",
+  "clear_canvas",
+]);
+
+function describeToolAction(name: string, input: unknown): string {
+  const i = input as Record<string, unknown>;
+  switch (name) {
+    case "document_append": {
+      const preview = String(i.content ?? "").slice(0, 100);
+      return `Append to document:\n"${preview}${preview.length >= 100 ? "…" : ""}"`;
+    }
+    case "document_replace_section":
+      return `Replace section "${i.heading}"`;
+    case "document_insert_after_section":
+      return `Insert content after "${i.heading}"`;
+    case "document_set_block_color":
+      return `Set color of "${i.heading}" to ${i.color}`;
+    case "clear_canvas":
+      return "Clear the entire canvas";
+    default:
+      return name;
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 export function useAIChat() {
   const messages = useAIChatStore((s) => s.messages);
@@ -208,9 +243,8 @@ export function useAIChat() {
 
                   setStatus("waiting_for_user");
                   const result = await prompt({
-                    title: "The AI has a question",
-                    description: question || undefined,
-                    fields: [{ id: "answer", label: question || "Your answer", required: false }],
+                    title: question || "The AI has a question",
+                    fields: [{ id: "answer", label: "Your answer", required: false }],
                     confirmLabel: "Send",
                     cancelLabel: "Cancel",
                   });
@@ -247,6 +281,30 @@ export function useAIChat() {
 
                   setStatus("streaming");
                   break;
+                }
+
+                // ── Permission gate for write tools ──
+                if (TOOLS_REQUIRING_PERMISSION.has(completedTool.name)) {
+                  const allowed = await confirm({
+                    title: "AI wants to make changes",
+                    description: describeToolAction(completedTool.name, parsedInput),
+                    confirmLabel: "Allow",
+                    cancelLabel: "Deny",
+                  });
+                  if (!allowed) {
+                    addMessage({
+                      role: "tool",
+                      content: "Action denied by user.",
+                      toolResults: [
+                        {
+                          toolCallId: chunk.toolCallId,
+                          result: "Action denied by user.",
+                          isError: true,
+                        },
+                      ],
+                    });
+                    break;
+                  }
                 }
 
                 // ── Normal tool execution ──

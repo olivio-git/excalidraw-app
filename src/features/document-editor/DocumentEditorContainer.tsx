@@ -7,8 +7,8 @@ import { useTabContext } from "@/core/tabs/hooks/use-tab-context";
 import { useTabStore } from "@/core/tabs/store/tab-store";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useThemeStore } from "@/stores/themeStore";
-import { confirm } from "@/shared/lib/confirm";
 import { notify } from "@/shared/lib/notify";
+import { contextKeyService } from "@/core/keybindings/context-key-service";
 import { DocumentEditor } from "./DocumentEditor";
 import { DocumentEditorToolbar } from "./DocumentEditorToolbar";
 import { useDocumentPersistence } from "./hooks/useDocumentPersistence";
@@ -52,6 +52,14 @@ export default function DocumentEditorContainer() {
       documentEditorRegistry.unregister(filePath);
     };
   }, [filePath, editor]);
+
+  // ── Set context key for keybinding when conditions ───────────────────────
+  useEffect(() => {
+    contextKeyService.set("documentEditorActive", true);
+    return () => {
+      contextKeyService.set("documentEditorActive", false);
+    };
+  }, []);
 
   // ── Mount: open document if not already in store ─────────────────────────
   useEffect(() => {
@@ -167,7 +175,7 @@ export default function DocumentEditorContainer() {
   if (!filePath) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-        No document selected
+        {t("documentEditor.noDocumentSelected")}
       </div>
     );
   }
@@ -175,7 +183,7 @@ export default function DocumentEditorContainer() {
   if (!document) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-        Loading...
+        {t("documentEditor.loading")}
       </div>
     );
   }
@@ -186,7 +194,7 @@ export default function DocumentEditorContainer() {
         onExportHtml={handleExportHtml}
         onExportMarkdown={handleExportMarkdown}
       />
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-auto">
         <DocumentEditor
           editor={editor}
           content={document.content}
@@ -198,6 +206,3 @@ export default function DocumentEditorContainer() {
     </div>
   );
 }
-
-// Suppress unused import warning — confirm is used in the TODO comment above
-void confirm;

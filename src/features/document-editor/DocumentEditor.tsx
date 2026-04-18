@@ -4,6 +4,7 @@ import "@blocknote/shadcn/style.css";
 import { useEditorChange } from "@blocknote/react";
 import type { BlockNoteEditor } from "@blocknote/core";
 import { useEffect, useRef } from "react";
+import { usePageSettingsStore } from "@/stores/pageSettingsStore";
 import type { DocumentSchema } from "./documentSchema";
 
 // ---------------------------------------------------------------------------
@@ -50,6 +51,13 @@ export function DocumentEditor({
   // Regular user edits go through onChange → updateContent (no version bump), so they skip this.
   const lastAppliedVersionRef = useRef<number | null>(null);
 
+  // Page settings — reactive
+  const pageWidthPx = usePageSettingsStore((s) => s.getPageWidthPx());
+  const pageHeightPx = usePageSettingsStore((s) => s.getPageHeightPx());
+  const margin = usePageSettingsStore((s) => s.margin);
+  const orientation = usePageSettingsStore((s) => s.orientation);
+  const zoom = usePageSettingsStore((s) => s.zoom);
+
   useEffect(() => {
     const isFirstMount = lastAppliedVersionRef.current === null;
     const isExternalUpdate = lastAppliedVersionRef.current !== externalVersion;
@@ -73,9 +81,20 @@ export function DocumentEditor({
   }, editor);
 
   return (
-    <div className="h-full w-full overflow-y-auto bg-muted">
-      <div className="document-paper max-w-[794px] mx-auto mb-8 px-16 py-12 bg-background shadow-md">
-        <BlockNoteView editor={editor} theme={theme} />
+    <div className="document-scroll h-full w-full">
+      <div className="document-zoom-wrapper" style={{ transform: `scale(${zoom})` }}>
+        <div
+          className="document-paper"
+          style={
+            {
+              "--page-width": `${pageWidthPx}px`,
+              "--page-margin": `${margin}px`,
+              "--page-height": orientation === "portrait" ? `${pageHeightPx}px` : "auto",
+            } as React.CSSProperties
+          }
+        >
+          <BlockNoteView editor={editor} theme={theme} />
+        </div>
       </div>
     </div>
   );

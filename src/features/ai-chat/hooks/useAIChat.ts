@@ -15,6 +15,42 @@ import { useThemeStore } from "@/stores/themeStore";
 import type { AIMessage } from "../providers/types";
 import { useChatHistoryStore } from "../store/chat-history-store";
 import { createConversation, saveMessage } from "./useChatHistory";
+import { prompt } from "@/shared/lib/prompt";
+import { confirm } from "@/shared/lib/confirm";
+
+// ---------------------------------------------------------------------------
+// Tool permission gate
+// ---------------------------------------------------------------------------
+
+const TOOLS_REQUIRING_PERMISSION = new Set([
+  "document_append",
+  "document_replace_section",
+  "document_insert_after_section",
+  "document_set_block_color",
+  "clear_canvas",
+]);
+
+function describeToolAction(name: string, input: unknown): string {
+  const i = input as Record<string, unknown>;
+  switch (name) {
+    case "document_append": {
+      const preview = String(i.content ?? "").slice(0, 100);
+      return `Append to document:\n"${preview}${preview.length >= 100 ? "…" : ""}"`;
+    }
+    case "document_replace_section":
+      return `Replace section "${i.heading}"`;
+    case "document_insert_after_section":
+      return `Insert content after "${i.heading}"`;
+    case "document_set_block_color":
+      return `Set color of "${i.heading}" to ${i.color}`;
+    case "clear_canvas":
+      return "Clear the entire canvas";
+    default:
+      return name;
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 export function useAIChat() {
   const messages = useAIChatStore((s) => s.messages);
@@ -65,7 +101,7 @@ export function useAIChat() {
       return;
     }
 
-    const context: AIChatContext = resolveAIChatContext();
+    let context: AIChatContext = resolveAIChatContext();
 
     // Persist conversation and user message to history
     const userMsg = useAIChatStore.getState().messages.at(-1)!;
@@ -200,22 +236,19 @@ export function useAIChat() {
                   parsedInput = {};
                 }
 
-                // ── ask_user: pause loop, wait for user answer ──
+                // ── ask_user: pause loop, show prompt modal ──
                 if (completedTool.name === "ask_user") {
                   const input = parsedInput as { question?: string };
                   const question = input.question ?? "";
 
-                  const answerPromise = new Promise<string>((resolve, reject) => {
-                    useAIChatStore.getState().setPendingQuestion({
-                      toolCallId: chunk.toolCallId,
-                      question,
-                      resolve,
-                      reject,
-                    });
-                  });
-
                   setStatus("waiting_for_user");
-                  const answer = await answerPromise;
+                  const result = await prompt({
+                    title: question || "The AI has a question",
+                    fields: [{ id: "answer", label: "Your answer", required: false }],
+                    confirmLabel: "Send",
+                    cancelLabel: "Cancel",
+                  });
+                  const answer = result?.answer ?? "";
 
                   const toolMsgId = addMessage({
                     role: "tool",
@@ -250,8 +283,60 @@ export function useAIChat() {
                   break;
                 }
 
+                // ── Permission gate for write tools ──
+                if (TOOLS_REQUIRING_PERMISSION.has(completedTool.name)) {
+                  const allowed = await confirm({
+                    title: "AI wants to make changes",
+                    description: describeToolAction(completedTool.name, parsedInput),
+                    confirmLabel: "Allow",
+                    cancelLabel: "Deny",
+                  });
+                  if (!allowed) {
+                    addMessage({
+                      role: "tool",
+                      content: "Action denied by user.",
+                      toolResults: [
+                        {
+                          toolCallId: chunk.toolCallId,
+                          result: "Action denied by user.",
+                          isError: true,
+                        },
+                      ],
+                    });
+                    break;
+                  }
+                }
+
                 // ── Normal tool execution ──
                 const result = await executeAITool(completedTool.name, parsedInput, context);
+
+                // Re-resolve context after workspace tools that open/create a file
+                if (
+                  !result.isError &&
+                  (completedTool.name === "workspace_create_document" ||
+                    completedTool.name === "workspace_create_diagram" ||
+                    completedTool.name === "workspace_open_file")
+                ) {
+                  context = resolveAIChatContext();
+                  if (context.kind === "document") {
+                    const doc = useDocumentStore.getState().documents[context.filePath];
+                    if (doc) {
+                      documentContext = {
+                        title: doc.title,
+                        sectionCount: getDocumentController().getSections(context.filePath).length,
+                        charCount: doc.content.length,
+                      };
+                    }
+                  } else if (context.kind === "diagram") {
+                    const elements = DiagramController.getElements(context.instanceId) ?? [];
+                    const elTypes: Record<string, number> = {};
+                    for (const el of elements) {
+                      const t = (el as { type: string }).type;
+                      elTypes[t] = (elTypes[t] ?? 0) + 1;
+                    }
+                    diagramContext = { elementCount: elements.length, elementTypes: elTypes };
+                  }
+                }
 
                 const toolMsgId = addMessage({
                   role: "tool",

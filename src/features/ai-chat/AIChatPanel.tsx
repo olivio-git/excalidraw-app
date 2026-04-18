@@ -15,6 +15,7 @@ import { notify } from "@/shared/lib/notify";
 import { useAIChatStore } from "./store/ai-chat-store";
 import { useAISettingsStore } from "@/features/settings/ai/ai-settings-store";
 import { useChatHistoryStore } from "./store/chat-history-store";
+import { useAIPermissionStore } from "./store/ai-permission-store";
 import { listConversations, loadConversation, deleteConversation } from "./hooks/useChatHistory";
 import { useAIChat } from "./hooks/useAIChat";
 import { AIChatMessage } from "./AIChatMessage";
@@ -54,6 +55,7 @@ export function AIChatPanel() {
   const handleNewConversation = () => {
     useAIChatStore.getState().setMessages([]);
     useChatHistoryStore.getState().setActiveConversationId(null);
+    useAIPermissionStore.getState().reset();
   };
 
   const handleSwitchConversation = async (id: string) => {
@@ -75,6 +77,7 @@ export function AIChatPanel() {
       }));
       useAIChatStore.getState().setMessages(msgs);
       setActiveConversationId(id);
+      useAIPermissionStore.getState().reset();
     } catch (e) {
       console.error(e);
     } finally {

@@ -81,6 +81,8 @@ export function AISettingsPanel() {
   const setProviderModel = useAISettingsStore((s) => s.setProviderModel);
   const customInstructions = useAISettingsStore((s) => s.customInstructions);
   const setCustomInstructions = useAISettingsStore((s) => s.setCustomInstructions);
+  const requireToolConfirmation = useAISettingsStore((s) => s.requireToolConfirmation);
+  const setRequireToolConfirmation = useAISettingsStore((s) => s.setRequireToolConfirmation);
 
   const [localKey, setLocalKey] = useState<Record<AIProviderName, string>>({
     anthropic: "",
@@ -256,6 +258,30 @@ export function AISettingsPanel() {
             "resize-none transition-colors"
           )}
         />
+      </section>
+
+      {/* Tool confirmation */}
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold">{t("ai.toolConfirmation.title")}</h2>
+        <div className="flex items-start justify-between gap-4 rounded-md border border-border px-4 py-3">
+          <div className="space-y-0.5">
+            <p className="text-sm font-medium">{t("ai.toolConfirmation.enableLabel")}</p>
+            <p className="text-xs text-muted-foreground">{t("ai.toolConfirmation.description")}</p>
+            {!requireToolConfirmation && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                {t("ai.toolConfirmation.disabledWarning")}
+              </p>
+            )}
+          </div>
+          <Button
+            variant={requireToolConfirmation ? "default" : "outline"}
+            size="sm"
+            className="shrink-0"
+            onClick={() => setRequireToolConfirmation(!requireToolConfirmation)}
+          >
+            {requireToolConfirmation ? t("aiChat.on") : t("aiChat.off")}
+          </Button>
+        </div>
       </section>
 
       {/* Actions */}

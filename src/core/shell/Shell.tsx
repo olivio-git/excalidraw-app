@@ -16,6 +16,7 @@ import CommandPalette from "@/features/command-palette/CommandPalette";
 import { useThemeStore } from "@/stores/themeStore";
 import { ConfirmDialog } from "@/shared/lib/confirm";
 import { PromptDialog } from "@/shared/lib/prompt";
+import { ToolPermissionDialog } from "@/features/ai-chat/components/ToolPermissionDialog";
 
 export default function Shell() {
   useKeybindingBridge();
@@ -27,6 +28,7 @@ export default function Shell() {
       <Toaster position="bottom-right" theme={resolvedTheme} richColors />
       <ConfirmDialog />
       <PromptDialog />
+      <ToolPermissionDialog />
       {/* Command palette — always mounted, manages its own open/close state */}
       <CommandPalette />
       {/* TitleBar at the very top, full width, with TabBar inside */}

@@ -16,39 +16,8 @@ import type { AIMessage } from "../providers/types";
 import { useChatHistoryStore } from "../store/chat-history-store";
 import { createConversation, saveMessage } from "./useChatHistory";
 import { prompt } from "@/shared/lib/prompt";
-import { confirm } from "@/shared/lib/confirm";
-
-// ---------------------------------------------------------------------------
-// Tool permission gate
-// ---------------------------------------------------------------------------
-
-const TOOLS_REQUIRING_PERMISSION = new Set([
-  "document_append",
-  "document_replace_section",
-  "document_insert_after_section",
-  "document_set_block_color",
-  "clear_canvas",
-]);
-
-function describeToolAction(name: string, input: unknown): string {
-  const i = input as Record<string, unknown>;
-  switch (name) {
-    case "document_append": {
-      const preview = String(i.content ?? "").slice(0, 100);
-      return `Append to document:\n"${preview}${preview.length >= 100 ? "…" : ""}"`;
-    }
-    case "document_replace_section":
-      return `Replace section "${i.heading}"`;
-    case "document_insert_after_section":
-      return `Insert content after "${i.heading}"`;
-    case "document_set_block_color":
-      return `Set color of "${i.heading}" to ${i.color}`;
-    case "clear_canvas":
-      return "Clear the entire canvas";
-    default:
-      return name;
-  }
-}
+import { useToolPermission } from "./useToolPermission";
+import { useAIPermissionStore } from "../store/ai-permission-store";
 
 // ---------------------------------------------------------------------------
 
@@ -57,6 +26,8 @@ export function useAIChat() {
   const status = useAIChatStore((s) => s.status);
   const errorMessage = useAIChatStore((s) => s.errorMessage);
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
+
+  const { checkPermission } = useToolPermission();
 
   const answerPendingQuestion = (answer: string) => {
     const { pendingQuestion, clearPendingQuestion } = useAIChatStore.getState();
@@ -71,6 +42,7 @@ export function useAIChat() {
       clearPendingQuestion();
       pendingQuestion.reject(new DOMException("Aborted", "AbortError"));
     }
+    useAIPermissionStore.getState()._cancel();
     abortController?.abort();
   };
 
@@ -176,7 +148,9 @@ export function useAIChat() {
       const aiProvider = await AIProviderFactory.create(provider);
 
       // Agentic loop — keep calling the model while it returns tool calls
-      for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+      let deniedInCurrentTurn = false;
+
+      agenticLoop: for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
         parser.reset();
 
         // Build messages excluding the current placeholder assistant message
@@ -197,8 +171,9 @@ export function useAIChat() {
         );
 
         let hadToolCalls = false;
+        deniedInCurrentTurn = false;
 
-        for await (const chunk of stream) {
+        chunkLoop: for await (const chunk of stream) {
           switch (chunk.type) {
             case "text_delta":
               appendTextDelta(assistantMsgId, chunk.delta);
@@ -284,27 +259,21 @@ export function useAIChat() {
                 }
 
                 // ── Permission gate for write tools ──
-                if (TOOLS_REQUIRING_PERMISSION.has(completedTool.name)) {
-                  const allowed = await confirm({
-                    title: "AI wants to make changes",
-                    description: describeToolAction(completedTool.name, parsedInput),
-                    confirmLabel: "Allow",
-                    cancelLabel: "Deny",
+                const outcome = await checkPermission(completedTool.name, parsedInput);
+                if (outcome.decision === "deny") {
+                  addMessage({
+                    role: "tool",
+                    content: "Action denied by user.",
+                    toolResults: [
+                      {
+                        toolCallId: chunk.toolCallId,
+                        result: "Action denied by user.",
+                        isError: true,
+                      },
+                    ],
                   });
-                  if (!allowed) {
-                    addMessage({
-                      role: "tool",
-                      content: "Action denied by user.",
-                      toolResults: [
-                        {
-                          toolCallId: chunk.toolCallId,
-                          result: "Action denied by user.",
-                          isError: true,
-                        },
-                      ],
-                    });
-                    break;
-                  }
+                  deniedInCurrentTurn = true;
+                  break chunkLoop;
                 }
 
                 // ── Normal tool execution ──
@@ -387,6 +356,9 @@ export function useAIChat() {
 
           if (chunk.type === "error" || chunk.type === "done") break;
         }
+
+        // If permission was denied, stop the agentic loop cleanly
+        if (deniedInCurrentTurn) break agenticLoop;
 
         // If no tool calls in this iteration, the model is done
         if (!hadToolCalls) break;

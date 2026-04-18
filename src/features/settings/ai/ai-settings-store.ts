@@ -12,11 +12,13 @@ interface AISettingsState {
   activeProvider: AIProviderName;
   providers: Record<AIProviderName, ProviderSettings>;
   customInstructions: string;
+  requireToolConfirmation: boolean;
 
   setActiveProvider: (provider: AIProviderName) => void;
   setProviderKey: (provider: AIProviderName, key: string) => void;
   setProviderModel: (provider: AIProviderName, model: string) => void;
   setCustomInstructions: (instructions: string) => void;
+  setRequireToolConfirmation: (v: boolean) => void;
   getActiveConfig: () => { provider: AIProviderName; config: AIProviderConfig };
 }
 
@@ -25,6 +27,7 @@ export const useAISettingsStore = create<AISettingsState>()(
     (set, get) => ({
       activeProvider: "anthropic",
       customInstructions: "",
+      requireToolConfirmation: true,
       providers: {
         anthropic: { apiKey: "", model: "claude-sonnet-4-5-20250514" },
         groq: { apiKey: "", model: "openai/gpt-oss-120b" },
@@ -39,6 +42,10 @@ export const useAISettingsStore = create<AISettingsState>()(
 
       setCustomInstructions: (instructions: string) => {
         set({ customInstructions: instructions });
+      },
+
+      setRequireToolConfirmation: (v: boolean) => {
+        set({ requireToolConfirmation: v });
       },
 
       setProviderKey: (provider: AIProviderName, key: string) => {
@@ -75,6 +82,7 @@ export const useAISettingsStore = create<AISettingsState>()(
         activeProvider: state.activeProvider,
         providers: state.providers,
         customInstructions: state.customInstructions,
+        requireToolConfirmation: state.requireToolConfirmation,
       }),
       // Deep-merge so new providers added in future updates get their defaults
       // even when an older persisted state doesn't have them.

@@ -103,6 +103,17 @@
       "saved": "Guardado",
       "connected": "Conectado",
       "noApiKey": "No hay clave de API configurada"
+    },
+    "toolConfirmation": {
+      "title": "Requerir confirmación para herramientas de escritura",
+      "description": "Mostrar un diálogo de permiso antes de que la IA modifique documentos o diagramas.",
+      "enableLabel": "Activar confirmación de herramientas",
+      "enabledHint": "La IA solicitará confirmación antes de modificar documentos o diagramas.",
+      "disabledWarning": "La IA puede modificar documentos y diagramas sin solicitar confirmación."
     }
+  },
+  "aiChat": {
+    "on": "Activado",
+    "off": "Desactivado"
   }
 }

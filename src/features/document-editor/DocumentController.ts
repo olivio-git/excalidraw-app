@@ -222,14 +222,45 @@ export class DocumentController implements DocumentAPI {
     if (current === null) throw new Error(`Document not open: ${filePath}`);
 
     const sections = parseSections(current);
-    const target = sections.find((s) => s.id === sectionId);
-    if (!target) throw new Error(`Section not found: ${sectionId}`);
+    const idx = sections.findIndex((s) => s.id === sectionId);
+    if (idx === -1) throw new Error(`Section not found: ${sectionId}`);
 
-    const headingPrefix = "#".repeat(target.level);
-    const headingLine = `${headingPrefix} ${target.heading}`;
-    const sectionBlock = target.content ? `${headingLine}\n${target.content}` : headingLine;
-    const insertion = `${sectionBlock}\n\n${content}`;
-    const updated = current.replace(sectionBlock, insertion);
+    const target = sections[idx];
+    const targetOccurrence = sections
+      .slice(0, idx)
+      .filter((s) => s.heading === target.heading && s.level === target.level).length;
+
+    // Locate the heading line by index — same strategy as replaceSectionContent.
+    const lines = current.split("\n");
+    let sectionStart = -1;
+    let sectionCount = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(/^(#{1,6})\s+(.+)$/);
+      if (m && m[1].length === target.level && stripHtml(m[2].trim()) === target.heading) {
+        if (sectionCount === targetOccurrence) {
+          sectionStart = i;
+          break;
+        }
+        sectionCount++;
+      }
+    }
+
+    if (sectionStart === -1) throw new Error(`Section heading not found in content: ${sectionId}`);
+
+    // Find end of section body — stop at next heading of ANY level.
+    let sectionEnd = lines.length;
+    for (let i = sectionStart + 1; i < lines.length; i++) {
+      if (/^#{1,6}\s/.test(lines[i])) {
+        sectionEnd = i;
+        break;
+      }
+    }
+
+    // Splice the new content in after the section body.
+    const before = lines.slice(0, sectionEnd);
+    const after = lines.slice(sectionEnd);
+    const updated = [...before, "", content, ...after].join("\n");
     await this.setContent(filePath, updated);
   }
 

@@ -15,8 +15,7 @@ export function getToolsForContext(context: AIChatContext): AIToolDefinition[] {
     case "diagram":
       return [...DIAGRAM_TOOLS, ...WORKSPACE_TOOLS, ...COMMON_TOOLS];
     case "document":
-      // ask_user excluded: document flows are write→save, no mid-flow questions needed
-      return [...DOCUMENT_TOOLS, ...WORKSPACE_TOOLS];
+      return [...DOCUMENT_TOOLS, ...WORKSPACE_TOOLS, ...COMMON_TOOLS];
     case "none":
       // ask_user excluded: workspace flows are create/open only, no questions needed
       return [...WORKSPACE_TOOLS];

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { AIMessage, AIToolCall } from "../providers/types";
+import { useAIPermissionStore } from "./ai-permission-store";
 
 export interface PendingQuestion {
   toolCallId: string;
@@ -126,6 +127,8 @@ export const useAIChatStore = create<AIChatState>()((set, _get) => ({
       pq.reject(new Error("Chat cleared"));
     }
     set({ messages: [], status: "idle", errorMessage: null, pendingQuestion: null });
+    useAIPermissionStore.getState()._cancel();
+    useAIPermissionStore.getState().reset();
   },
 
   setMessages: (messages) => set({ messages, status: "idle", errorMessage: null }),

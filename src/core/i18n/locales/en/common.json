@@ -124,6 +124,29 @@
     "deleteConversation": "Delete conversation",
     "noConversations": "No conversations yet",
     "conversationDeleted": "Conversation deleted",
-    "switchBlocked": "Cannot switch conversations while streaming"
+    "switchBlocked": "Cannot switch conversations while streaming",
+    "permission": {
+      "title": "Tool Permission Request",
+      "allowOnce": "Allow Once",
+      "allowAlways": "Allow Always",
+      "deny": "Deny",
+      "sessionScopeHint": "Allow Always applies only to this session.",
+      "tools": {
+        "document_append": { "description": "Append content to the document" },
+        "document_replace_section": { "description": "Replace section \"{{heading}}\"" },
+        "document_insert_after_section": {
+          "description": "Insert content after section \"{{heading}}\""
+        },
+        "document_save": { "description": "Save the document" },
+        "draw_elements": { "description": "Draw {{count}} element(s) on the canvas" },
+        "clear_canvas": { "description": "Clear all elements from the canvas" },
+        "update_element": { "description": "Update element {{id}}" },
+        "set_elements": { "description": "Replace canvas with {{count}} element(s)" },
+        "workspace_create_diagram": { "description": "Create diagram \"{{name}}\"" },
+        "workspace_create_document": { "description": "Create document \"{{title}}\"" },
+        "workspace_open_file": { "description": "Open file {{filePath}}" },
+        "generic": { "description": "Execute tool \"{{name}}\"" }
+      }
+    }
   }
 }

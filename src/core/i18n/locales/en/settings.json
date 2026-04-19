@@ -103,6 +103,17 @@
       "saved": "Saved",
       "connected": "Connected",
       "noApiKey": "No API key configured"
+    },
+    "toolConfirmation": {
+      "title": "Require confirmation for write tools",
+      "description": "Show a permission dialog before the AI modifies documents or diagrams.",
+      "enableLabel": "Enable tool confirmation",
+      "enabledHint": "The AI will ask before modifying documents or diagrams.",
+      "disabledWarning": "The AI can modify documents and diagrams without asking."
     }
+  },
+  "aiChat": {
+    "on": "On",
+    "off": "Off"
   }
 }

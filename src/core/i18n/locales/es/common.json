@@ -124,6 +124,29 @@
     "deleteConversation": "Eliminar conversación",
     "noConversations": "Sin conversaciones aún",
     "conversationDeleted": "Conversación eliminada",
-    "switchBlocked": "No se puede cambiar de conversación mientras se transmite"
+    "switchBlocked": "No se puede cambiar de conversación mientras se transmite",
+    "permission": {
+      "title": "Solicitud de permiso de herramienta",
+      "allowOnce": "Permitir una vez",
+      "allowAlways": "Permitir siempre",
+      "deny": "Denegar",
+      "sessionScopeHint": "Permitir siempre aplica únicamente a esta sesión.",
+      "tools": {
+        "document_append": { "description": "Agregar contenido al documento" },
+        "document_replace_section": { "description": "Reemplazar la sección \"{{heading}}\"" },
+        "document_insert_after_section": {
+          "description": "Insertar contenido después de la sección \"{{heading}}\""
+        },
+        "document_save": { "description": "Guardar el documento" },
+        "draw_elements": { "description": "Dibujar {{count}} elemento(s) en el lienzo" },
+        "clear_canvas": { "description": "Eliminar todos los elementos del lienzo" },
+        "update_element": { "description": "Actualizar elemento {{id}}" },
+        "set_elements": { "description": "Reemplazar el lienzo con {{count}} elemento(s)" },
+        "workspace_create_diagram": { "description": "Crear diagrama \"{{name}}\"" },
+        "workspace_create_document": { "description": "Crear documento \"{{title}}\"" },
+        "workspace_open_file": { "description": "Abrir archivo {{filePath}}" },
+        "generic": { "description": "Ejecutar herramienta \"{{name}}\"" }
+      }
+    }
   }
 }

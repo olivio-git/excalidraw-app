@@ -107,8 +107,11 @@ export async function dispatchMcpTool(
       case "draw_elements":
       case "clear_canvas":
       case "update_element": {
-        const res = await executeAITool(tool, input, instanceId);
-        if (!res.isError && instanceId) {
+        if (!instanceId) {
+          return { result: null, error: "No active diagram canvas. Open a diagram tab first." };
+        }
+        const res = await executeAITool(tool, input, { kind: "diagram", instanceId });
+        if (!res.isError) {
           const api = DiagramController.getApi(instanceId);
           if (api) {
             await saveMcpDiagram(instanceId, api.getSceneElements());

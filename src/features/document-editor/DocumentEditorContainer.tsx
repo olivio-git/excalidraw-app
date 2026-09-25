@@ -1,20 +1,33 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCreateBlockNote } from "@blocknote/react";
-import { save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { save as saveDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { useTabContext } from "@/core/tabs/hooks/use-tab-context";
 import { useTabStore } from "@/core/tabs/store/tab-store";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { notify } from "@/shared/lib/notify";
-import { contextKeyService } from "@/core/keybindings/context-key-service";
+import { registerTabCloseHandler } from "@/core/tabs/tab-lifecycle";
+import { tabGroup } from "@/core/tabs/store/editor-layout";
+import {
+  createFileReference,
+  isLocalFileReference,
+  openFileReference,
+} from "@/core/shell/services/file-navigation";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { DocumentEditor } from "./DocumentEditor";
 import { DocumentEditorToolbar } from "./DocumentEditorToolbar";
 import { useDocumentPersistence } from "./hooks/useDocumentPersistence";
 import { getDocumentController } from "./documentController.singleton";
 import { documentSchema } from "./documentSchema";
 import { documentEditorRegistry } from "./documentEditorRegistry";
+import { encodeDocument, isRichNote, projectDocument, type DocumentBlock } from "./note-format";
+import { openFileInWorkbench } from "@/core/shell/services/file-navigation";
+import { DocumentOutline } from "./DocumentOutline";
+import { DocumentHostContext } from "./DocumentHostContext";
+import { headingSlug } from "@/core/shell/services/workspace-references";
 
 // ---------------------------------------------------------------------------
 // DocumentEditorContainer — smart container
@@ -25,7 +38,10 @@ import { documentEditorRegistry } from "./documentEditorRegistry";
 
 export default function DocumentEditorContainer() {
   const { t } = useTranslation("common");
-  const { tabId } = useTabContext();
+  const { tabId, isActive } = useTabContext();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [loadError, setLoadError] = useState<{ path: string; message: string } | null>(null);
+  const [outlineOpen, setOutlineOpen] = useState(false);
   const tab = useTabStore((s) => s.getTab(tabId));
 
   // Editor instance lives here so export handlers can call editor APIs directly.
@@ -36,13 +52,15 @@ export default function DocumentEditorContainer() {
   const filePath = (tab?.instanceId ?? tab?.metadata?.filePath ?? "") as string;
 
   const document = useDocumentStore((s) => (filePath ? s.documents[filePath] : undefined));
-  const updateContent = useDocumentStore((s) => s.updateContent);
+  const updateEditorContent = useDocumentStore((s) => s.updateEditorContent);
   const setActive = useDocumentStore((s) => s.setActive);
 
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
   // Auto-save side effects — return value not needed (toolbar no longer shows save status)
-  useDocumentPersistence(filePath);
+  const persistence = useDocumentPersistence(filePath);
+  const pauseAutosave = persistence.pause;
+  const { t: tTabs } = useTranslation("tabs");
 
   // ── Register editor instance for MCP bridge access ───────────────────────
   useEffect(() => {
@@ -53,31 +71,85 @@ export default function DocumentEditorContainer() {
     };
   }, [filePath, editor]);
 
-  // ── Set context key for keybinding when conditions ───────────────────────
+  // Only the focused editor determines command/AI context, even with two visible panes.
   useEffect(() => {
-    contextKeyService.set("documentEditorActive", true);
-    return () => {
-      contextKeyService.set("documentEditorActive", false);
-    };
-  }, []);
+    if (isActive && filePath) setActive(filePath);
+  }, [isActive, filePath, setActive]);
+
+  useEffect(
+    () =>
+      registerTabCloseHandler(
+        tabId,
+        async () => {
+          const store = useDocumentStore.getState();
+          if (store.documents[filePath]?.isDirty)
+            await getDocumentController().saveDocument(filePath);
+          await getDocumentController().waitForSaves(filePath);
+          return !useDocumentStore.getState().documents[filePath]?.isDirty;
+        },
+        async () => {
+          const resume = pauseAutosave();
+          try {
+            await getDocumentController().waitForSaves(filePath, true);
+            return resume;
+          } catch (error) {
+            resume();
+            throw error;
+          }
+        }
+      ),
+    [tabId, filePath, pauseAutosave]
+  );
 
   // ── Mount: open document if not already in store ─────────────────────────
   useEffect(() => {
     if (!filePath) return;
-
-    // Activate this document in the store
-    setActive(filePath);
+    let current = true;
 
     // If not loaded yet, open it from disk
     const alreadyOpen = useDocumentStore.getState().documents[filePath];
     if (!alreadyOpen) {
       getDocumentController()
-        .openDocument(filePath)
+        .openDocument(filePath, false)
         .catch((err: unknown) => {
-          console.error("[DocumentEditorContainer] Failed to open document:", err);
+          if (current) setLoadError({ path: filePath, message: String(err) });
         });
     }
-  }, [filePath, setActive]);
+    return () => {
+      current = false;
+    };
+  }, [filePath]);
+
+  const navigationAnchor = tab?.metadata?.navigationAnchor as
+    | { text: string; id: string }
+    | undefined;
+  useEffect(() => {
+    if (!navigationAnchor || !document || !isActive) return;
+    const frame = requestAnimationFrame(() => {
+      const slug = (text: string) =>
+        text
+          .toLowerCase()
+          .trim()
+          .replace(/[^\p{L}\p{N}\s-]/gu, "")
+          .replace(/\s+/g, "-");
+      const target = Array.from(
+        rootRef.current?.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6, [data-id]") ?? []
+      ).find(
+        (element) =>
+          element.dataset.id === navigationAnchor.text ||
+          (/^H[1-6]$/.test(element.tagName) &&
+            slug(element.textContent ?? "") === slug(navigationAnchor.text))
+      );
+      target?.scrollIntoView({ block: "start", behavior: "smooth" });
+      const current = useTabStore.getState().getTab(tabId);
+      if (current?.metadata?.navigationAnchor?.id === navigationAnchor.id) {
+        useTabStore
+          .getState()
+          .updateTab(tabId, { metadata: { ...current.metadata, navigationAnchor: undefined } });
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [navigationAnchor, document, isActive, tabId]);
 
   // ── Sync tab title from document store ───────────────────────────────────
   // Task 2.7: update tab title when document loads
@@ -89,9 +161,9 @@ export default function DocumentEditorContainer() {
   }, [document?.title, tab, tabId]);
 
   // ── onChange: update store (persistence hook handles auto-save) ──────────
-  const handleChange = (markdown: string) => {
+  const handleChange = (markdown: string, blocks: DocumentBlock[]) => {
     if (!filePath) return;
-    updateContent(filePath, markdown);
+    updateEditorContent(filePath, markdown, blocks);
   };
 
   // ── Sync isDirty to tab metadata — drives the dirty dot on the tab chip ──
@@ -135,11 +207,7 @@ export default function DocumentEditorContainer() {
     }
   };
 
-  // ── Unsaved-changes guard ─────────────────────────────────────────────────
-  // Task 2.8: Warn on tab close if dirty
-  // NOTE: There is no useBeforeTabClose hook in the current tab system.
-  // The tab store's removeTab fires without a pre-close hook.
-  // Implementing a browser beforeunload guard as a fallback, plus a TODO.
+  // Keep the window-level fallback in addition to the tab save-before-close handler.
   useEffect(() => {
     if (!document?.isDirty) return;
 
@@ -155,22 +223,6 @@ export default function DocumentEditorContainer() {
     };
   }, [document?.isDirty]);
 
-  // TODO (Phase 3): Hook into tab close event to show confirm() dialog before close.
-  // Currently the tab store's removeTab does not emit a pre-close event.
-  // Proposed: add a `onBeforeRemove` callback to TabInstance that the tab system
-  // invokes before removing. If it returns false, the remove is cancelled.
-  // When that exists, implement:
-  //
-  // useBeforeTabClose(tabId, async () => {
-  //   if (!useDocumentStore.getState().documents[filePath]?.isDirty) return true;
-  //   return await confirm({
-  //     title: t("document.unsavedChanges.title"),
-  //     description: t("document.unsavedChanges.description"),
-  //     confirmLabel: t("document.unsavedChanges.discard"),
-  //     variant: "destructive",
-  //   });
-  // });
-
   // ── Loading state ─────────────────────────────────────────────────────────
   if (!filePath) {
     return (
@@ -183,26 +235,204 @@ export default function DocumentEditorContainer() {
   if (!document) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-        {t("documentEditor.loading")}
+        {loadError?.path === filePath ? (
+          <p role="alert" className="max-w-full break-words p-4 text-destructive">
+            {loadError.message}
+          </p>
+        ) : (
+          t("documentEditor.loading")
+        )}
       </div>
     );
   }
 
+  const richNote = isRichNote(filePath);
+  const copyBlockLink = async (id: string, heading?: string) => {
+    try {
+      if (richNote) await getDocumentController().saveDocument(filePath);
+      const anchor = richNote ? id : headingSlug(heading ?? "");
+      const href = `${createFileReference(filePath, useWorkspaceStore.getState().workspaceDir)}#${encodeURIComponent(anchor)}`;
+      await navigator.clipboard.writeText(href);
+      notify(t("connected.linkCopied"), { type: "success" });
+    } catch (error) {
+      notify(String(error), { type: "error" });
+    }
+  };
   return (
-    <div className="flex flex-col h-full w-full">
-      <DocumentEditorToolbar
-        onExportHtml={handleExportHtml}
-        onExportMarkdown={handleExportMarkdown}
-      />
-      <div className="flex-1 min-h-0 overflow-auto">
-        <DocumentEditor
-          editor={editor}
-          content={document.content}
-          externalVersion={document.externalVersion}
-          onChange={handleChange}
-          theme={resolvedTheme}
+    <DocumentHostContext.Provider value={{ filePath, groupId: tab ? tabGroup(tab) : "primary" }}>
+      <div
+        ref={rootRef}
+        className="flex flex-col h-full w-full"
+        onClickCapture={(event) => {
+          const anchor =
+            event.target instanceof Element
+              ? event.target.closest<HTMLAnchorElement>("a[href]")
+              : null;
+          const href = anchor?.getAttribute("href");
+          if (!href) return;
+          if (isLocalFileReference(href)) {
+            event.preventDefault();
+            event.stopPropagation();
+            void openFileReference(href, filePath, {
+              beside: event.ctrlKey || event.metaKey || event.shiftKey,
+              groupId: tab ? tabGroup(tab) : undefined,
+            }).catch((error: unknown) => notify(String(error), { type: "error" }));
+          } else if (/^https?:\/\//i.test(href)) {
+            event.preventDefault();
+            event.stopPropagation();
+            void openUrl(href).catch((error: unknown) => notify(String(error), { type: "error" }));
+          }
+        }}
+      >
+        <DocumentEditorToolbar
+          richNote={richNote}
+          outlineOpen={outlineOpen}
+          onToggleOutline={() => setOutlineOpen((value) => !value)}
+          onCopyBlockLink={() => void copyBlockLink(editor.getTextCursorPosition().block.id)}
+          onSaveAsNote={async () => {
+            try {
+              const chosen = await saveDialog({
+                defaultPath: filePath.replace(/\.[^./\\]+$/, ".note"),
+                filters: [{ name: t("connected.richNote"), extensions: ["note"] }],
+              });
+              if (!chosen) return;
+              const target = /\.note$/i.test(chosen) ? chosen : `${chosen}.note`;
+              if (target === filePath) {
+                await getDocumentController().saveDocument(filePath);
+                return;
+              }
+              if (
+                useTabStore.getState().tabs.some((item) => item.instanceId === target) ||
+                useDocumentStore.getState().documents[target]?.isDirty
+              )
+                throw new Error(t("connected.targetOpen"));
+              const raw = encodeDocument(target, {
+                content: projectDocument(editor),
+                blocks: editor.document,
+                documentId: crypto.randomUUID(),
+              });
+              await writeTextFile(target, raw);
+              useDocumentStore.getState().closeDocument(target);
+              useDocumentStore.getState().openDocument(target, raw, false);
+              openFileInWorkbench(target);
+            } catch (error) {
+              notify(String(error), { type: "error" });
+            }
+          }}
+          onInsertDiagram={async () => {
+            try {
+              const workspaceDir = useWorkspaceStore.getState().workspaceDir;
+              const path = await openDialog({
+                multiple: false,
+                defaultPath: workspaceDir ?? undefined,
+                filters: [{ name: "Excalidraw", extensions: ["excalidraw"] }],
+              });
+              if (typeof path !== "string") return;
+              editor.insertBlocks(
+                [
+                  {
+                    type: "diagramEmbed",
+                    props: {
+                      diagramPath: createFileReference(path, workspaceDir),
+                      caption: path.split(/[\\/]/).pop() ?? "",
+                    },
+                  },
+                ],
+                editor.getTextCursorPosition().block,
+                "after"
+              );
+            } catch (error) {
+              notify(String(error), { type: "error" });
+            }
+          }}
+          onInsertFileLink={async () => {
+            try {
+              const workspaceDir = useWorkspaceStore.getState().workspaceDir;
+              const path = await openDialog({
+                multiple: false,
+                defaultPath: workspaceDir ?? undefined,
+                filters: [
+                  { name: "Documents and diagrams", extensions: ["md", "note", "excalidraw"] },
+                ],
+              });
+              if (typeof path !== "string") return;
+              editor.focus();
+              editor.insertInlineContent([
+                {
+                  type: "link",
+                  href: createFileReference(path, workspaceDir),
+                  content: path.split(/[\\/]/).pop() ?? path,
+                },
+              ]);
+            } catch (error) {
+              notify(String(error), { type: "error" });
+            }
+          }}
+          onExportHtml={handleExportHtml}
+          onExportMarkdown={handleExportMarkdown}
         />
+        <div className="flex-1 min-h-0 overflow-auto">
+          <DocumentEditor
+            editor={editor}
+            filePath={filePath}
+            content={document.content}
+            blocks={document.blocks}
+            externalVersion={document.externalVersion}
+            onChange={handleChange}
+            onInitialize={(markdown, blocks) =>
+              updateEditorContent(
+                filePath,
+                isRichNote(filePath) ? markdown : document.content,
+                blocks,
+                true
+              )
+            }
+            theme={resolvedTheme}
+          />
+        </div>
+        {outlineOpen && (
+          <DocumentOutline
+            blocks={document.blocks ?? []}
+            onClose={() => setOutlineOpen(false)}
+            onCopy={(id, title) => void copyBlockLink(id, title)}
+            onJump={(id) => {
+              editor.setTextCursorPosition(id, "start");
+              Array.from(rootRef.current?.querySelectorAll<HTMLElement>("[data-id]") ?? [])
+                .find((element) => element.dataset.id === id)
+                ?.scrollIntoView({ block: "start", behavior: "smooth" });
+              editor.focus();
+            }}
+          />
+        )}
+        <div
+          role="status"
+          className="flex h-6 shrink-0 items-center justify-end gap-2 border-t border-border/50 px-3 text-[10px] text-muted-foreground"
+        >
+          <span className="mr-auto">
+            {t(richNote ? "connected.richNote" : "connected.markdown")}
+          </span>
+          {persistence.error && document.isDirty ? (
+            <>
+              <span className="truncate text-destructive">{tTabs("workbench.saveError")}</span>
+              <button
+                onClick={() => {
+                  void getDocumentController()
+                    .saveDocument(filePath)
+                    .catch((error: unknown) => notify(String(error), { type: "error" }));
+                }}
+              >
+                {tTabs("workbench.retry")}
+              </button>
+            </>
+          ) : persistence.isSaving ? (
+            tTabs("workbench.saving")
+          ) : document.isDirty ? (
+            tTabs("workbench.pendingSave")
+          ) : (
+            tTabs("workbench.saved")
+          )}
+        </div>
       </div>
-    </div>
+    </DocumentHostContext.Provider>
   );
 }

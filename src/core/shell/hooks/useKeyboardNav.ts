@@ -16,10 +16,21 @@ export function useKeyboardNav(
   creating: boolean,
   cancelAction: () => void
 ) {
-  const { flatNodes, expandedPaths, onOpen, onStartRename, onDelete, onToggle } = options;
+  const {
+    flatNodes,
+    expandedPaths,
+    onOpen,
+    onStartRename,
+    onDelete,
+    onToggle,
+    selectedPaths,
+    setSelectedPaths,
+    onBatchDelete,
+  } = options;
 
   // Track whether the panel container is focused
   const hasFocusRef = useRef(false);
+  const rangeAnchor = useRef<string | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -47,6 +58,13 @@ export function useKeyboardNav(
     const handler = (e: KeyboardEvent) => {
       // Gate: only handle if panel has focus
       if (!hasFocusRef.current) return;
+      if (e.defaultPrevented) return;
+      const target = e.target instanceof HTMLElement ? e.target : document.activeElement;
+      if (
+        target instanceof HTMLElement &&
+        target.closest("input, textarea, [contenteditable='true'], [role='menu']")
+      )
+        return;
 
       // If an inline input is active (rename / create), only Escape is handled
       if (renamingPath !== null || creating) {
@@ -57,10 +75,35 @@ export function useKeyboardNav(
         return;
       }
 
-      // Skip modifier combos (Ctrl+C, etc.)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        setSelectedPaths(new Set(flatNodes.map((node) => node.path)));
+        return;
+      }
+      // Clipboard shortcuts are handled by the container.
       if (e.ctrlKey || e.metaKey) return;
 
       const currentIndex = flatNodes.findIndex((n) => n.path === focusedPath);
+      const moveTo = (index: number) => {
+        const node = flatNodes[index];
+        if (!node) return;
+        if (e.shiftKey) {
+          if (!rangeAnchor.current) rangeAnchor.current = focusedPath ?? node.path;
+          const anchor = flatNodes.findIndex((item) => item.path === rangeAnchor.current);
+          setSelectedPaths(
+            new Set(
+              flatNodes
+                .slice(Math.min(Math.max(0, anchor), index), Math.max(anchor, index) + 1)
+                .map((item) => item.path)
+            )
+          );
+        } else {
+          rangeAnchor.current = null;
+          setSelectedPaths(new Set([node.path]));
+        }
+        setFocusedPath(node.path);
+      };
+      if (!e.shiftKey) rangeAnchor.current = null;
 
       switch (e.key) {
         case "ArrowDown": {
@@ -68,7 +111,7 @@ export function useKeyboardNav(
           if (flatNodes.length === 0) return;
           const nextIndex =
             currentIndex === -1 ? 0 : Math.min(currentIndex + 1, flatNodes.length - 1);
-          setFocusedPath(flatNodes[nextIndex].path);
+          moveTo(nextIndex);
           break;
         }
 
@@ -77,7 +120,7 @@ export function useKeyboardNav(
           if (flatNodes.length === 0) return;
           const prevIndex =
             currentIndex === -1 ? flatNodes.length - 1 : Math.max(currentIndex - 1, 0);
-          setFocusedPath(flatNodes[prevIndex].path);
+          moveTo(prevIndex);
           break;
         }
 
@@ -93,7 +136,7 @@ export function useKeyboardNav(
             // Move focus to first child (next in flat list)
             const nextIndex = currentIndex + 1;
             if (nextIndex < flatNodes.length && flatNodes[nextIndex].depth > node.depth) {
-              setFocusedPath(flatNodes[nextIndex].path);
+              moveTo(nextIndex);
             }
           }
           break;
@@ -108,7 +151,7 @@ export function useKeyboardNav(
             onToggle(node.path);
           } else if (node.parentPath !== null) {
             // Move focus to parent
-            setFocusedPath(node.parentPath);
+            moveTo(flatNodes.findIndex((item) => item.path === node.parentPath));
           }
           break;
         }
@@ -134,17 +177,30 @@ export function useKeyboardNav(
 
         case "Delete": {
           e.preventDefault();
+          if (selectedPaths.size > 1 && onBatchDelete) {
+            onBatchDelete([...selectedPaths]);
+            break;
+          }
           if (currentIndex === -1) return;
           const node = flatNodes[currentIndex];
           onDelete(node.path, node.isDir);
           break;
         }
 
+        case "Home":
+          e.preventDefault();
+          moveTo(0);
+          break;
+        case "End":
+          e.preventDefault();
+          moveTo(flatNodes.length - 1);
+          break;
+
         case "Escape": {
           e.preventDefault();
           cancelAction();
           // Clear selection and focus when no inline input is active
-          options.setSelectedPaths?.(new Set());
+          setSelectedPaths(new Set());
           setFocusedPath(null);
           break;
         }
@@ -165,5 +221,8 @@ export function useKeyboardNav(
     onToggle,
     setFocusedPath,
     cancelAction,
+    setSelectedPaths,
+    selectedPaths,
+    onBatchDelete,
   ]);
 }

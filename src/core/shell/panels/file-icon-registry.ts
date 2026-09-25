@@ -1,5 +1,5 @@
 import type React from "react";
-import { FileText, FileCode, FileImage, FileJson } from "lucide-react";
+import { FileText, FileCode, FileImage, FileJson, NotebookPen } from "lucide-react";
 import { ExcalidrawFileIcon } from "@/shared/icons/ExcalidrawFileIcon";
 
 type IconComponent = React.ComponentType<{ className?: string }>;
@@ -27,6 +27,7 @@ export const fileIconRegistry = new FileIconRegistryClass();
 // Built-in defaults
 fileIconRegistry.register("excalidraw", ExcalidrawFileIcon, ""); // color baked into SVG
 fileIconRegistry.register("md", FileCode, "text-blue-400");
+fileIconRegistry.register("note", NotebookPen, "text-violet-400");
 fileIconRegistry.register("mdx", FileCode, "text-blue-400");
 fileIconRegistry.register("json", FileJson, "text-yellow-400");
 fileIconRegistry.register("png", FileImage, "text-purple-400");

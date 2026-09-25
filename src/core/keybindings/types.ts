@@ -80,6 +80,8 @@ export interface KeybindingDeclaration {
   /** Raw key string before normalization. E.g. "Ctrl+Shift+K" or "ctrl+k ctrl+b" */
   key: string;
   when?: WhenExpression;
+  /** Opt in for commands such as save while a text editor has focus. */
+  allowInInput?: boolean;
 }
 
 /**

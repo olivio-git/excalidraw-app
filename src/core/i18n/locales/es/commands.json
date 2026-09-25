@@ -19,6 +19,7 @@
     "document-editor": "Editor de documentos"
   },
   "document": {
+    "newNote": "Nueva nota enriquecida",
     "new": "Nuevo documento",
     "open": "Abrir documento",
     "save": "Guardar documento",

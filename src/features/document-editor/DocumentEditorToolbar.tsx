@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
-import { ChevronDown, FileText, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronDown, FileText, ZoomIn, ZoomOut, Link, ListTree, Shapes, Copy } from "lucide-react";
 import { usePageSettingsStore, PAGE_SIZES } from "@/stores/pageSettingsStore";
 import { PageSetupDialog } from "./PageSetupDialog";
 
@@ -18,6 +18,13 @@ import { PageSetupDialog } from "./PageSetupDialog";
 interface DocumentEditorToolbarProps {
   onExportHtml: () => void;
   onExportMarkdown: () => void;
+  onInsertFileLink: () => void;
+  richNote: boolean;
+  outlineOpen: boolean;
+  onToggleOutline: () => void;
+  onSaveAsNote: () => void;
+  onInsertDiagram: () => void;
+  onCopyBlockLink: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -30,8 +37,16 @@ interface DocumentEditorToolbarProps {
 export function DocumentEditorToolbar({
   onExportHtml,
   onExportMarkdown,
+  onInsertFileLink,
+  richNote,
+  outlineOpen,
+  onToggleOutline,
+  onSaveAsNote,
+  onInsertDiagram,
+  onCopyBlockLink,
 }: DocumentEditorToolbarProps) {
   const { t } = useTranslation("common");
+  const { t: tTabs } = useTranslation("tabs");
   const [pageSetupOpen, setPageSetupOpen] = useState(false);
 
   const zoom = usePageSettingsStore((s) => s.zoom);
@@ -42,9 +57,55 @@ export function DocumentEditorToolbar({
   return (
     <>
       <div className="document-toolbar bg-muted border-b border-border shrink-0">
-        <div className="max-w-[794px] w-full mx-auto flex items-center justify-between py-2 px-1">
+        <div className="max-w-[794px] w-full mx-auto flex flex-wrap gap-1 items-center justify-between py-2 px-1">
           {/* Left: page size indicator + page setup */}
           <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              title={t("connected.outline")}
+              aria-label={t("connected.outline")}
+              aria-pressed={outlineOpen}
+              onClick={onToggleOutline}
+            >
+              <ListTree className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={onInsertFileLink}
+              title={tTabs("workbench.insertFileLink")}
+              aria-label={tTabs("workbench.insertFileLink")}
+            >
+              <Link className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              disabled={!richNote}
+              title={t(richNote ? "connected.insertDiagram" : "connected.needRichNote")}
+              aria-label={t("connected.insertDiagram")}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={onInsertDiagram}
+            >
+              <Shapes className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              disabled={!richNote}
+              title={t(richNote ? "connected.copyBlockLink" : "connected.needRichNote")}
+              aria-label={t("connected.copyBlockLink")}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={onCopyBlockLink}
+            >
+              <Copy className="size-3.5" />
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -91,6 +152,9 @@ export function DocumentEditorToolbar({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="border-none">
+                <DropdownMenuItem onClick={onSaveAsNote}>
+                  {t("connected.saveAsNote")}
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={onExportHtml}>
                   {t("documentEditor.exportHtml")}
                 </DropdownMenuItem>

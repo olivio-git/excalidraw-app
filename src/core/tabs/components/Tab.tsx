@@ -11,7 +11,10 @@ import {
 import { cn } from "@/shared/lib/utils";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Pin, X } from "lucide-react";
+import { Pin, X, Columns2 } from "lucide-react";
+import { useTabStore } from "../store/tab-store";
+import { otherGroup, tabGroup } from "../store/editor-layout";
+import { createFileReference } from "@/core/shell/services/file-navigation";
 import React, { useMemo } from "react";
 import type { TabInstance } from "../types";
 import { RouteRegistry } from "@/core/routing/route-registry";
@@ -91,6 +94,36 @@ const Tab = React.memo(
               onMouseDown={handleMiddleClick}
               {...attributes}
               {...listeners}
+              role="tab"
+              aria-selected={isActive}
+              data-tab-button={tab.id}
+              tabIndex={isActive ? 0 : -1}
+              onKeyDown={(event) => {
+                if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey)
+                  return;
+                if (isDragging || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+                  listeners?.onKeyDown?.(event);
+                  return;
+                }
+                event.preventDefault();
+                const siblings = useTabStore
+                  .getState()
+                  .tabs.filter((item) => tabGroup(item) === tabGroup(tab));
+                const current = siblings.findIndex((item) => item.id === tab.id);
+                const next =
+                  event.key === "Home"
+                    ? 0
+                    : event.key === "End"
+                      ? siblings.length - 1
+                      : (current + (event.key === "ArrowLeft" ? -1 : 1) + siblings.length) %
+                        siblings.length;
+                const target = siblings[next];
+                if (!target) return;
+                onTabClick(target);
+                Array.from(document.querySelectorAll<HTMLElement>("[data-tab-button]"))
+                  .find((element) => element.dataset.tabButton === target.id)
+                  ?.focus();
+              }}
               className={cn(
                 "group relative flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium transition-colors",
                 "hover:bg-accent",
@@ -139,6 +172,7 @@ const Tab = React.memo(
                         onCloseTab(e, tab.id);
                       }}
                       onMouseDown={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => e.stopPropagation()}
                       className={cn(
                         "flex-shrink-0 rounded-sm opacity-0 group-hover:opacity-100 hover:bg-border p-0.5 transition-opacity cursor-pointer",
                         isActive && "opacity-100"
@@ -154,6 +188,15 @@ const Tab = React.memo(
             </Button>
           </ContextMenuTrigger>
           <ContextMenuContent className="border-none">
+            <ContextMenuItem
+              onClick={() =>
+                useTabStore.getState().moveTabToGroup(tab.id, otherGroup(tabGroup(tab)))
+              }
+            >
+              <Columns2 className="size-4" />
+              {t("workbench.moveToOtherGroup")}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
             {tab.isPinned ? (
               <ContextMenuItem onClick={() => onUnpin(tab.id)}>{t("tab.unpinTab")}</ContextMenuItem>
             ) : (
@@ -162,6 +205,16 @@ const Tab = React.memo(
             {tab.instanceId && (
               <>
                 <ContextMenuSeparator />
+                <ContextMenuItem
+                  onClick={() => {
+                    void navigator.clipboard
+                      .writeText(createFileReference(tab.instanceId!, workspaceDir))
+                      .then(() => notify(t("workbench.referenceCopied"), { type: "success" }))
+                      .catch((error: unknown) => notify(String(error), { type: "error" }));
+                  }}
+                >
+                  {t("workbench.copyReference")}
+                </ContextMenuItem>
                 <ContextMenuItem
                   onClick={() => {
                     void navigator.clipboard.writeText(tab.instanceId!);

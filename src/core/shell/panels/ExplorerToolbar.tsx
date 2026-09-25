@@ -1,13 +1,17 @@
 import {
-  Plus,
+  FilePlus2,
   RefreshCw,
-  ChevronsUpDown,
+  FoldVertical,
   FolderPlus,
   ArrowUpAZ,
   ArrowDownAZ,
   Layers,
   Eye,
-  EyeOff,
+  MoreHorizontal,
+  LocateFixed,
+  FolderOpen,
+  Search,
+  Check,
 } from "lucide-react";
 import type { RefObject } from "react";
 import { useTranslation } from "react-i18next";
@@ -25,166 +29,118 @@ import { useExplorerStore } from "@/stores/explorerStore";
 import { PanelSearch } from "@/shared/common/PanelSearch";
 import type { SortOrder } from "./explorer-types";
 
-// ---------------------------------------------------------------------------
-// ExplorerToolbar — toolbar for the file explorer panel
-// ---------------------------------------------------------------------------
-
 interface ExplorerToolbarProps {
   onNewFile: () => void;
   onNewFolder: () => void;
   onRefresh: () => void;
   onCollapseAll: () => void;
+  onRevealActive: () => void;
+  onOpenWorkspace: () => void;
+  onQuickOpen: () => void;
+  canRevealActive: boolean;
+  loading: boolean;
   filterQuery: string;
   onFilterChange: (query: string) => void;
   filterResultCount?: number;
   searchRef?: RefObject<HTMLInputElement | null>;
 }
 
-const SORT_ICONS: Record<SortOrder, React.ComponentType<{ className?: string }>> = {
-  "type-first": Layers,
-  "name-asc": ArrowUpAZ,
-  "name-desc": ArrowDownAZ,
-};
-
-export const ExplorerToolbar = ({
-  onNewFile,
-  onNewFolder,
-  onRefresh,
-  onCollapseAll,
-  filterQuery,
-  onFilterChange,
-  filterResultCount,
-  searchRef,
-}: ExplorerToolbarProps) => {
+export const ExplorerToolbar = ({ searchRef, ...props }: ExplorerToolbarProps) => {
   const { t } = useTranslation("explorer");
   const sortOrder = useExplorerStore((s) => s.sortOrder);
   const setSortOrder = useExplorerStore((s) => s.setSortOrder);
   const showDotfiles = useExplorerStore((s) => s.showDotfiles);
   const setShowDotfiles = useExplorerStore((s) => s.setShowDotfiles);
-
-  const sortLabels: Record<SortOrder, string> = {
-    "type-first": t("sort.typeFirst"),
-    "name-asc": t("sort.nameAsc"),
-    "name-desc": t("sort.nameDesc"),
-  };
-
-  const SortIcon = SORT_ICONS[sortOrder];
-  const isFiltering = filterQuery.length > 0;
-
+  const sortOptions = [
+    { value: "type-first", label: t("sort.typeFirst"), icon: Layers },
+    { value: "name-asc", label: t("sort.nameAsc"), icon: ArrowUpAZ },
+    { value: "name-desc", label: t("sort.nameDesc"), icon: ArrowDownAZ },
+  ] satisfies { value: SortOrder; label: string; icon: typeof Layers }[];
+  const actions = [
+    { label: t("toolbar.newFile"), icon: FilePlus2, run: props.onNewFile },
+    { label: t("toolbar.newFolder"), icon: FolderPlus, run: props.onNewFolder },
+    {
+      label: t("toolbar.refresh"),
+      icon: RefreshCw,
+      run: props.onRefresh,
+      disabled: props.loading,
+      spin: props.loading,
+    },
+    { label: t("toolbar.collapseAll"), icon: FoldVertical, run: props.onCollapseAll },
+    {
+      label: t("toolbar.revealActive"),
+      icon: LocateFixed,
+      run: props.onRevealActive,
+      disabled: !props.canRevealActive,
+    },
+  ];
   return (
-    <div className="flex flex-col border-b border-border/50 shrink-0">
-      {/* Action buttons row */}
-      <div className="flex items-center justify-end px-2 py-1 gap-0.5">
-        <TooltipWrapper tooltip={t("toolbar.newFile")} side="top">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onNewFile}
-            className="size-6 text-muted-foreground hover:text-foreground"
-          >
-            <Plus className="size-3.5" />
-          </Button>
-        </TooltipWrapper>
-
-        <TooltipWrapper tooltip={t("toolbar.newFolder")} side="top">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onNewFolder}
-            className="size-6 text-muted-foreground hover:text-foreground"
-          >
-            <FolderPlus className="size-3.5" />
-          </Button>
-        </TooltipWrapper>
-
-        <TooltipWrapper tooltip={t("toolbar.refresh")} side="top">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onRefresh}
-            className="size-6 text-muted-foreground hover:text-foreground"
-          >
-            <RefreshCw className="size-3.5" />
-          </Button>
-        </TooltipWrapper>
-
-        <TooltipWrapper tooltip={t("toolbar.collapseAll")} side="top">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onCollapseAll}
-            className="size-6 text-muted-foreground hover:text-foreground"
-          >
-            <ChevronsUpDown className="size-3.5" />
-          </Button>
-        </TooltipWrapper>
-
-        {/* Sort order dropdown */}
-        <DropdownMenu>
-          <TooltipWrapper tooltip={`${t("toolbar.sortPrefix")}${sortLabels[sortOrder]}`} side="top">
+    <div className="shrink-0 border-b border-border/60 pb-2">
+      <div className="flex min-h-10 items-center justify-between gap-1 px-2">
+        <span className="truncate text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          {t("toolbar.files")}
+        </span>
+        <div className="flex shrink-0 items-center">
+          {actions.map(({ label, icon: Icon, run, disabled, spin }) => (
+            <TooltipWrapper key={label} tooltip={label} side="bottom">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={label}
+                disabled={disabled}
+                onClick={run}
+                className="size-6 rounded-sm text-muted-foreground hover:text-foreground"
+              >
+                <Icon className={cn("size-3.5", spin && "animate-spin")} />
+              </Button>
+            </TooltipWrapper>
+          ))}
+          <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-6 text-muted-foreground hover:text-foreground"
+                className="size-6 text-muted-foreground"
+                aria-label={t("toolbar.more")}
               >
-                <SortIcon className="size-3.5" />
+                <MoreHorizontal className="size-4" />
               </Button>
             </DropdownMenuTrigger>
-          </TooltipWrapper>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={() => setSortOrder("type-first")}
-              className={sortOrder === "type-first" ? "text-primary" : undefined}
-            >
-              <Layers className="size-3.5" />
-              {t("sort.typeFirst")}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => setSortOrder("name-asc")}
-              className={sortOrder === "name-asc" ? "text-primary" : undefined}
-            >
-              <ArrowUpAZ className="size-3.5" />
-              {t("sort.nameAsc")}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => setSortOrder("name-desc")}
-              className={sortOrder === "name-desc" ? "text-primary" : undefined}
-            >
-              <ArrowDownAZ className="size-3.5" />
-              {t("sort.nameDesc")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Dotfiles toggle */}
-        <TooltipWrapper
-          tooltip={showDotfiles ? t("toolbar.hideDotfiles") : t("toolbar.showDotfiles")}
-          side="top"
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowDotfiles(!showDotfiles)}
-            className={cn(
-              "size-6 hover:text-foreground",
-              showDotfiles ? "text-primary" : "text-muted-foreground"
-            )}
-          >
-            {showDotfiles ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
-          </Button>
-        </TooltipWrapper>
+            <DropdownMenuContent align="end" className="min-w-52">
+              <DropdownMenuItem onClick={props.onQuickOpen}>
+                <Search />
+                {t("quickOpen.dialogTitle")}
+                <span className="ml-auto text-xs text-muted-foreground">Ctrl+P</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={props.onOpenWorkspace}>
+                <FolderOpen />
+                {t("panel.openFolder")}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {sortOptions.map(({ value, label, icon: Icon }) => (
+                <DropdownMenuItem key={value} onClick={() => setSortOrder(value)}>
+                  <Icon />
+                  {label}
+                  {sortOrder === value && <Check className="ml-auto size-3.5" />}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowDotfiles(!showDotfiles)}>
+                <Eye />
+                {t("toolbar.showDotfiles")}
+                {showDotfiles && <Check className="ml-auto size-3.5" />}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
-
-      {/* Inline search row */}
-      <div className="px-2 pb-1.5">
+      <div className="px-2">
         <PanelSearch
           ref={searchRef}
-          value={filterQuery}
-          onChange={onFilterChange}
+          value={props.filterQuery}
+          onChange={props.onFilterChange}
           placeholder={t("toolbar.filterPlaceholder")}
-          resultCount={filterResultCount}
+          resultCount={props.filterResultCount}
         />
       </div>
     </div>

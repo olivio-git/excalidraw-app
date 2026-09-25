@@ -1,105 +1,62 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { copyFile, rename, stat } from "@tauri-apps/plugin-fs";
-import { join, dirname, basename } from "@tauri-apps/api/path";
+import { rename, lstat } from "@tauri-apps/plugin-fs";
+import { dirname, basename } from "@tauri-apps/api/path";
 import { notify } from "@/shared/lib/notify";
 import { updateTabsAfterMove } from "@/core/shell/panels/explorer-tab-sync";
+import {
+  availableDestination,
+  copyEntry,
+  isSameOrDescendant,
+  topLevelPaths,
+} from "@/core/shell/panels/explorer-file-operations";
 import type { ClipboardState, UseFileClipboardReturn } from "@/core/shell/panels/explorer-types";
-
-// ---------------------------------------------------------------------------
-// useFileClipboard — Cut / Copy / Paste for explorer nodes
-// ---------------------------------------------------------------------------
-
-async function fileExists(path: string): Promise<boolean> {
-  try {
-    await stat(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Resolve a non-colliding destination path.
- * If `destDir/srcName` already exists, appends " copy", " copy 2", etc.
- * until a free slot is found. No user confirmation needed.
- */
-async function resolveDestPath(srcPath: string, destDir: string): Promise<string> {
-  const name = await basename(srcPath);
-  const dotIndex = name.lastIndexOf(".");
-  const hasExt = dotIndex > 0;
-  const ext = hasExt ? name.slice(dotIndex) : "";
-  const base = hasExt ? name.slice(0, dotIndex) : name;
-
-  // Try original name first
-  let candidate = await join(destDir, name);
-  if (!(await fileExists(candidate))) return candidate;
-
-  // Try "base copy.ext", "base copy 2.ext", ...
-  let i = 1;
-  while (true) {
-    const suffix = i === 1 ? " copy" : ` copy ${i}`;
-    candidate = await join(destDir, `${base}${suffix}${ext}`);
-    if (!(await fileExists(candidate))) return candidate;
-    i++;
-  }
-}
+import { prepareResourceMove } from "@/core/tabs/tab-lifecycle";
 
 export function useFileClipboard(onRefresh: () => Promise<void>): UseFileClipboardReturn {
   const { t } = useTranslation("explorer");
   const [clipboardState, setClipboardState] = useState<ClipboardState>(null);
+  const pasting = useRef(false);
 
-  const cut = (paths: string[]) => {
-    setClipboardState({ op: "cut", paths });
-  };
-
-  const copy = (paths: string[]) => {
-    setClipboardState({ op: "copy", paths });
-  };
+  const cut = (paths: string[]) => setClipboardState({ op: "cut", paths: topLevelPaths(paths) });
+  const copy = (paths: string[]) => setClipboardState({ op: "copy", paths: topLevelPaths(paths) });
 
   const paste = async (targetDir: string) => {
-    if (!clipboardState) return;
-
+    if (!clipboardState || !targetDir || pasting.current) return;
+    pasting.current = true;
     const { op, paths } = clipboardState;
-    let anySuccess = false;
-
-    for (const srcPath of paths) {
-      const destPath = await resolveDestPath(srcPath, targetDir);
-      const name = await basename(srcPath);
-
-      try {
-        if (op === "copy") {
-          await copyFile(srcPath, destPath);
-        } else {
-          // cut = move (rename across dirs)
-          const srcDir = await dirname(srcPath);
-          if (srcDir !== targetDir) {
-            await rename(srcPath, destPath);
-            updateTabsAfterMove(srcPath, destPath);
+    const failed: string[] = [];
+    let changed = false;
+    try {
+      for (const source of paths) {
+        try {
+          if (isSameOrDescendant(targetDir, source)) throw new Error(t("clipboard.invalidTarget"));
+          if (op === "cut" && (await dirname(source)) === targetDir) continue;
+          const info = await lstat(source);
+          const destination = await availableDestination(source, targetDir, info.isDirectory);
+          if (op === "copy") await copyEntry(source, destination);
+          else {
+            await prepareResourceMove(source);
+            await rename(source, destination);
+            updateTabsAfterMove(source, destination);
           }
+          changed = true;
+        } catch (error) {
+          failed.push(source);
+          const name = await basename(source);
+          notify(t("clipboard.errorPasting", { name, message: String(error) }), { type: "error" });
         }
-        anySuccess = true;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        notify(t("clipboard.errorPasting", { name, message: msg }), { type: "error" });
       }
-    }
-
-    if (anySuccess) {
-      // After cut, clear clipboard; after copy, keep it (like most file managers)
       if (op === "cut") {
-        setClipboardState(null);
+        // Do not discard failed moves, or a newer clipboard captured during this operation.
+        setClipboardState((current) =>
+          current !== clipboardState ? current : failed.length ? { op, paths: failed } : null
+        );
       }
-      await onRefresh();
+      if (changed) await onRefresh();
+    } finally {
+      pasting.current = false;
     }
-  };
-
-  const isCut = (path: string): boolean => {
-    return clipboardState?.op === "cut" && clipboardState.paths.includes(path);
-  };
-
-  const clear = () => {
-    setClipboardState(null);
   };
 
   return {
@@ -107,7 +64,7 @@ export function useFileClipboard(onRefresh: () => Promise<void>): UseFileClipboa
     cut,
     copy,
     paste,
-    isCut,
-    clear,
+    isCut: (path) => clipboardState?.op === "cut" && clipboardState.paths.includes(path),
+    clear: () => setClipboardState(null),
   };
 }

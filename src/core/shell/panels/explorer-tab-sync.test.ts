@@ -11,7 +11,7 @@ import {
 // ---------------------------------------------------------------------------
 vi.mock("./file-handler-registry", () => ({
   fileHandlerRegistry: {
-    resolveOrDefault: vi.fn((name: string) => ({
+    resolveOrDefault: vi.fn(() => ({
       routeId: "diagram",
       defaultExtension: "excalidraw",
       create: vi.fn(),
@@ -71,7 +71,7 @@ describe("updateTabsAfterRename", () => {
   });
 
   it("does not affect tabs that do not match oldPath", () => {
-    const idA = addFileTab("/ws/a.excalidraw", "a");
+    addFileTab("/ws/a.excalidraw", "a");
     const idB = addFileTab("/ws/b.excalidraw", "b");
 
     updateTabsAfterRename("/ws/a.excalidraw", "/ws/a-renamed.excalidraw");
@@ -97,6 +97,19 @@ describe("updateTabsAfterRename", () => {
 // ---------------------------------------------------------------------------
 
 describe("updateTabsAfterMove", () => {
+  it("updates nested open files after a folder move without touching sibling prefixes", () => {
+    const id = addFileTab("/ws/folder/sub/file.excalidraw", "file");
+    const sibling = addFileTab("/ws/folder-other/keep.excalidraw", "keep");
+    updateTabsAfterMove("/ws/folder", "/ws/renamed");
+    expect(useTabStore.getState().getTab(id)).toMatchObject({
+      title: "file",
+      instanceId: "/ws/renamed/sub/file.excalidraw",
+      metadata: { filePath: "/ws/renamed/sub/file.excalidraw" },
+    });
+    expect(useTabStore.getState().getTab(sibling)?.metadata?.filePath).toBe(
+      "/ws/folder-other/keep.excalidraw"
+    );
+  });
   it("updates tab path after a move (same behavior as rename)", () => {
     const id = addFileTab("/ws/folder-a/file.excalidraw", "file");
 

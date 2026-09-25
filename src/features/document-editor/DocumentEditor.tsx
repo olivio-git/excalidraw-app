@@ -2,26 +2,22 @@ import "@blocknote/react/style.css";
 import { BlockNoteView } from "@blocknote/shadcn";
 import "@blocknote/shadcn/style.css";
 import { useEditorChange } from "@blocknote/react";
-import type { BlockNoteEditor } from "@blocknote/core";
 import { useEffect, useRef } from "react";
 import { usePageSettingsStore } from "@/stores/pageSettingsStore";
-import type { DocumentSchema } from "./documentSchema";
+import { projectDocument, type DocumentBlock, type DocumentEditorInstance } from "./note-format";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type EditorInstance = BlockNoteEditor<
-  DocumentSchema["blockSchema"],
-  DocumentSchema["inlineContentSchema"],
-  DocumentSchema["styleSchema"]
->;
-
 interface DocumentEditorProps {
-  editor: EditorInstance;
+  editor: DocumentEditorInstance;
+  filePath: string;
   content: string;
+  blocks: DocumentBlock[] | null;
   externalVersion: number;
-  onChange: (markdown: string) => void;
+  onChange: (markdown: string, blocks: DocumentBlock[]) => void;
+  onInitialize: (markdown: string, blocks: DocumentBlock[]) => void;
   theme: "light" | "dark";
 }
 
@@ -41,15 +37,20 @@ interface DocumentEditorProps {
 
 export function DocumentEditor({
   editor,
+  filePath,
   content,
+  blocks,
   externalVersion,
   onChange,
+  onInitialize,
   theme,
 }: DocumentEditorProps) {
   // Tracks the last externalVersion the editor was populated from.
   // null = never populated (first mount). Re-populates when version changes (agent writes).
   // Regular user edits go through onChange → updateContent (no version bump), so they skip this.
-  const lastAppliedVersionRef = useRef<number | null>(null);
+  const lastAppliedVersionRef = useRef<{ path: string; version: number } | null>(null);
+  const applying = useRef(false);
+  const lastSnapshot = useRef("");
 
   // Page settings — reactive
   const pageWidthPx = usePageSettingsStore((s) => s.getPageWidthPx());
@@ -59,25 +60,33 @@ export function DocumentEditor({
   const zoom = usePageSettingsStore((s) => s.zoom);
 
   useEffect(() => {
-    const isFirstMount = lastAppliedVersionRef.current === null;
-    const isExternalUpdate = lastAppliedVersionRef.current !== externalVersion;
-
-    if (!isFirstMount && !isExternalUpdate) return;
-
-    lastAppliedVersionRef.current = externalVersion;
-
-    if (!content) return;
-
-    const blocks = editor.tryParseMarkdownToBlocks(content);
-    if (blocks.length > 0) {
-      editor.replaceBlocks(editor.document, blocks);
+    const previous = lastAppliedVersionRef.current;
+    if (previous?.path === filePath && previous.version === externalVersion) return;
+    applying.current = true;
+    try {
+      const next = blocks ?? editor.tryParseMarkdownToBlocks(content);
+      editor.replaceBlocks(editor.document, next.length ? next : [{ type: "paragraph" }]);
+      lastAppliedVersionRef.current = { path: filePath, version: externalVersion };
+      lastSnapshot.current = JSON.stringify(editor.document);
+      onInitialize(projectDocument(editor), editor.document);
+    } finally {
+      applying.current = false;
     }
-  }, [editor, content, externalVersion]);
+  }, [editor, filePath, content, blocks, externalVersion, onInitialize]);
 
   // Subscribe to editor content changes and emit markdown upward.
   useEditorChange(() => {
-    const markdown = editor.blocksToMarkdownLossy();
-    onChange(markdown);
+    if (
+      applying.current ||
+      lastAppliedVersionRef.current?.path !== filePath ||
+      lastAppliedVersionRef.current.version !== externalVersion
+    )
+      return;
+    const snapshot = JSON.stringify(editor.document);
+    if (snapshot === lastSnapshot.current) return;
+    lastSnapshot.current = snapshot;
+    const markdown = projectDocument(editor);
+    onChange(markdown, editor.document);
   }, editor);
 
   return (

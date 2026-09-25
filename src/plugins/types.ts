@@ -119,6 +119,10 @@ export interface TabInfo {
   isDirty: boolean;
   isPinned: boolean;
   routeId: string;
+  groupId: import("@/core/tabs/types").EditorGroupId;
+  isVisible: boolean;
+  isActive: boolean;
+  isClosable: boolean;
 }
 
 /**
@@ -133,10 +137,13 @@ export interface PluginTabsAPI {
   open(filePath: string): void;
   /**
    * Close a tab by id.
-   * Respects the pinned/closable constraints unless force is true.
+   * Legacy synchronous, clean-only close. Use closeAndSave for dirty resources.
+   * The legacy force option never bypasses unsaved content or pinned constraints.
    * Returns true if the tab was actually closed.
    */
   close(tabId: string, options?: { force?: boolean }): boolean;
+  /** Flush a document or diagram before closing. Returns false if blocked or saving failed. */
+  closeAndSave(tabId: string): Promise<boolean>;
   /**
    * Activate (focus) a tab by id.
    * Returns true if the tab was found.
@@ -144,10 +151,10 @@ export interface PluginTabsAPI {
   activate(tabId: string): boolean;
   /**
    * Save a specific tab (by tabId) or the active tab if omitted.
-   * Only works for diagram tabs — returns false for non-diagram tabs.
+   * Supports document and diagram tabs.
    */
   save(tabId?: string): Promise<boolean>;
-  /** Save all dirty diagram tabs. Returns a summary of how many succeeded or failed. */
+  /** Save all dirty document and diagram tabs. */
   saveAll(): Promise<{ saved: number; failed: number }>;
   /**
    * Subscribe to active-tab changes.
@@ -335,6 +342,12 @@ export interface PluginAPI {
    * and diagram insertion.
    */
   document?: DocumentAPI;
+  /** Resource-targeted automation, shared with MCP. */
+  workbench: typeof import("@/core/automation/workbench").workbenchActions;
+  /** Native .note blocks, optimistic revisions and live embeds. */
+  notes: typeof import("@/core/automation/notes").noteActions;
+  /** Asynchronous reference index snapshots; refresh, then poll/query. */
+  references: Omit<typeof import("@/core/automation/references").referenceActions, "dispose">;
 }
 
 export interface SidebarSection {

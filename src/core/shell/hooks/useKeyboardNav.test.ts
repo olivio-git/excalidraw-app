@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { useRef } from "react";
 import { useKeyboardNav } from "./useKeyboardNav";
 import type { FlatNode, UseKeyboardNavOptions } from "@/core/shell/panels/explorer-types";
 
@@ -85,7 +84,7 @@ describe("useKeyboardNav", () => {
       ...overrides,
     };
 
-    const { unmount } = renderHook(() => {
+    const { unmount, rerender } = renderHook(() => {
       const ref = { current: container };
       useKeyboardNav(
         ref,
@@ -108,6 +107,7 @@ describe("useKeyboardNav", () => {
       cancelAction,
       setFocusedPath,
       getFocusedPath: () => focusedPath,
+      rerender,
       unmount: () => {
         unmount();
         document.body.removeChild(container);
@@ -115,12 +115,70 @@ describe("useKeyboardNav", () => {
     };
   }
 
+  it("leaves editing shortcuts and arrow keys to text inputs", () => {
+    const { container, setFocusedPath, onDelete, unmount } = setup({}, "/ws/b.ts");
+    const input = document.createElement("input");
+    container.appendChild(input);
+    input.focus();
+    for (const key of ["ArrowDown", "Delete", "Home", "End"]) {
+      const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+      input.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+    }
+    expect(setFocusedPath).not.toHaveBeenCalled();
+    expect(onDelete).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("selects all visible entries with Ctrl+A", () => {
+    const { container, setSelectedPaths, unmount } = setup();
+    act(() => fireKey(container, "a", { ctrlKey: true }));
+    expect(setSelectedPaths).toHaveBeenCalledWith(new Set(makeNodes().map((node) => node.path)));
+    unmount();
+  });
+
+  it("extends and shrinks a keyboard range from a fixed anchor", () => {
+    const { container, setSelectedPaths, rerender, unmount } = setup({}, "/ws/dir");
+    act(() => fireKey(container, "ArrowDown", { shiftKey: true }));
+    rerender();
+    act(() => fireKey(container, "ArrowDown", { shiftKey: true }));
+    expect(setSelectedPaths).toHaveBeenLastCalledWith(
+      new Set(["/ws/dir", "/ws/dir/a.ts", "/ws/b.ts"])
+    );
+    rerender();
+    act(() => fireKey(container, "ArrowUp", { shiftKey: true }));
+    expect(setSelectedPaths).toHaveBeenLastCalledWith(new Set(["/ws/dir", "/ws/dir/a.ts"]));
+    unmount();
+  });
+
+  it("deletes the whole selection in one batch", () => {
+    const onBatchDelete = vi.fn();
+    const { container, onDelete, unmount } = setup(
+      { selectedPaths: new Set(["/ws/b.ts", "/ws/c.ts"]), onBatchDelete },
+      "/ws/b.ts"
+    );
+    act(() => fireKey(container, "Delete"));
+    expect(onBatchDelete).toHaveBeenCalledWith(["/ws/b.ts", "/ws/c.ts"]);
+    expect(onDelete).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("moves focus and selection with Home and End", () => {
+    const { container, setFocusedPath, setSelectedPaths, unmount } = setup({}, "/ws/b.ts");
+    act(() => fireKey(container, "End"));
+    expect(setFocusedPath).toHaveBeenLastCalledWith("/ws/c.ts");
+    expect(setSelectedPaths).toHaveBeenLastCalledWith(new Set(["/ws/c.ts"]));
+    act(() => fireKey(container, "Home"));
+    expect(setFocusedPath).toHaveBeenLastCalledWith("/ws/dir");
+    unmount();
+  });
+
   // -------------------------------------------------------------------------
   // Focus guard: keys should be no-ops when container does NOT have focus
   // -------------------------------------------------------------------------
   describe("focus guard", () => {
     it("ignores ArrowDown when container does not have focus", () => {
-      const { container, setFocusedPath, unmount } = setup();
+      const { setFocusedPath, unmount } = setup();
 
       // Do NOT fire focusin — container has no focus
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));

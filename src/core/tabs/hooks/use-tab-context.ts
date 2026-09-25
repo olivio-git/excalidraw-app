@@ -3,6 +3,7 @@ import { createContext, useContext } from "react";
 interface TabContextValue {
   tabId: string;
   isActive: boolean;
+  isVisible?: boolean;
 }
 
 export const TabContext = createContext<TabContextValue | null>(null);

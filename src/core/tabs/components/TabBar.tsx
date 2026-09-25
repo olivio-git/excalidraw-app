@@ -1,18 +1,6 @@
-import { Button } from "@/shared/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/shared/components/ui/dropdown-menu";
-import { ScrollArea, ScrollBar } from "@/shared/components/ui/scroll-area";
-import { cn } from "@/shared/lib/utils";
-import { useTabStore } from "../store/tab-store";
-import type { TabInstance } from "../types";
-import { RouteRegistry } from "@/core/routing/route-registry";
-import { useTabsSettingsStore } from "@/stores/tabsSettingsStore";
-import { useHomeDir } from "@/shared/hooks/useHomeDir";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { ChevronDown, Check, X } from "lucide-react";
 import {
   closestCenter,
   DndContext,
@@ -28,121 +16,70 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
-import * as Tabs from "@radix-ui/react-tabs";
-import { ChevronDown, Check, Plus } from "lucide-react";
-import React, { useCallback, useState } from "react";
-import { useNavigate } from "react-router";
+import { Button } from "@/shared/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/shared/components/ui/dropdown-menu";
+import { useTabsSettingsStore } from "@/stores/tabsSettingsStore";
+import { useHomeDir } from "@/shared/hooks/useHomeDir";
+import { cn } from "@/shared/lib/utils";
+import { useTabStore } from "../store/tab-store";
+import { tabGroup } from "../store/editor-layout";
+import { EDITOR_GROUP, type EditorGroupId } from "../types";
+import { requestCloseTab, requestCloseTabs } from "../tab-lifecycle";
 import Tab from "./Tab";
 
 interface TabBarProps {
   className?: string;
   alwaysVisible?: boolean;
+  groupId?: EditorGroupId;
 }
 
-// No hay tabs abiertas
-const EmptyTabBar = React.memo(({ onNewTab }: { onNewTab: () => void }) => (
-  <div data-tauri-drag-region className="flex items-center h-8 px-2 gap-2">
-    <span className="text-xs text-muted-foreground">No tabs open</span>
-    {/* <Button
-      variant="ghost"
-      size="sm"
-      onClick={onNewTab}
-      className="h-6 px-2 text-xs hover:bg-accent"
-    >
-      <Plus className="size-3 mr-1" />
-      New tab
-    </Button> */}
-  </div>
-));
-EmptyTabBar.displayName = "EmptyTabBar";
-
-const TabBar: React.FC<TabBarProps> = ({ className, alwaysVisible = false }) => {
-  const navigate = useNavigate();
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
-  const tabs = useTabStore((s) => s.tabs);
-  const activeTabId = useTabStore((s) => s.activeTabId);
-  const allowCloseLastTab = useTabsSettingsStore((s) => s.allowCloseLastTab);
+export default function TabBar({
+  className,
+  alwaysVisible = false,
+  groupId = EDITOR_GROUP.PRIMARY,
+}: TabBarProps) {
+  const { t } = useTranslation("tabs");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const allTabs = useTabStore((state) => state.tabs);
+  const activeId = useTabStore((state) => state.groupActiveTabIds[groupId]);
+  const splitDirection = useTabStore((state) => state.splitDirection);
+  const allowCloseLastTab = useTabsSettingsStore((state) => state.allowCloseLastTab);
   const homeDir = useHomeDir();
-  const setActiveTab = useTabStore((s) => s.setActiveTab);
-  const removeTab = useTabStore((s) => s.removeTab);
-  const reorderTabs = useTabStore((s) => s.reorderTabs);
-  const closeOtherTabs = useTabStore((s) => s.closeOtherTabs);
-  const closeAllTabs = useTabStore((s) => s.closeAllTabs);
-  const closeTabsToRight = useTabStore((s) => s.closeTabsToRight);
-  const pinTab = useTabStore((s) => s.pinTab);
-  const unpinTab = useTabStore((s) => s.unpinTab);
-
+  const tabs = allTabs.filter((tab) => tabGroup(tab) === groupId);
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
-
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event;
-      if (over && active.id !== over.id) {
-        const oldIndex = tabs.findIndex((tab) => tab.id === active.id);
-        const newIndex = tabs.findIndex((tab) => tab.id === over.id);
-        if (oldIndex !== -1 && newIndex !== -1) {
-          reorderTabs(oldIndex, newIndex);
-        }
-      }
-    },
-    [tabs, reorderTabs]
-  );
-
-  const handleTabClick = useCallback(
-    (tab: TabInstance) => {
-      setActiveTab(tab.id);
-      const url = tab.instanceId
-        ? `${tab.path}?file=${encodeURIComponent(tab.instanceId)}`
-        : tab.path;
-      navigate(url);
-    },
-    [setActiveTab, navigate]
-  );
-
-  const handleCloseTab = useCallback(
-    (e: React.MouseEvent, tabId: string) => {
-      e.stopPropagation();
-      const state = useTabStore.getState();
-      const wasActive = state.activeTabId === tabId;
-      removeTab(tabId);
-
-      if (wasActive) {
-        const newState = useTabStore.getState();
-        if (newState.activeTabId) {
-          const activeTab = newState.tabs.find((t) => t.id === newState.activeTabId);
-          if (activeTab) {
-            const url = activeTab.instanceId
-              ? `${activeTab.path}?file=${encodeURIComponent(activeTab.instanceId)}`
-              : activeTab.path;
-            navigate(url);
-          }
-        } else {
-          navigate("/");
-        }
-      }
-    },
-    [removeTab, navigate]
-  );
-
-  const handleCloseAll = useCallback(() => {
-    closeAllTabs();
-  }, [closeAllTabs]);
-
-  const handleNewTab = useCallback(() => {
-    navigate("/");
-  }, [navigate]);
-
-  if (tabs.length === 0 && !alwaysVisible) return null;
-  if (tabs.length === 0) return <EmptyTabBar onNewTab={handleNewTab} />;
-
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
+    const from = allTabs.findIndex((tab) => tab.id === active.id);
+    const to = allTabs.findIndex((tab) => tab.id === over.id);
+    if (from >= 0 && to >= 0) useTabStore.getState().reorderTabs(from, to);
+  };
+  if (!tabs.length)
+    return alwaysVisible ? (
+      <div className="flex h-full items-center gap-2 px-3 text-xs text-muted-foreground">
+        <span className="min-w-0 flex-1 truncate">{t("workbench.emptyGroup")}</span>
+        {splitDirection && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-6 shrink-0"
+            aria-label={t("workbench.closeEmptyGroup")}
+            title={t("workbench.closeEmptyGroup")}
+            onClick={() => useTabStore.getState().closeEmptyGroup(groupId)}
+          >
+            <X className="size-3.5" />
+          </Button>
+        )}
+      </div>
+    ) : null;
   return (
     <DndContext
       sensors={sensors}
@@ -150,85 +87,78 @@ const TabBar: React.FC<TabBarProps> = ({ className, alwaysVisible = false }) => 
       onDragEnd={handleDragEnd}
       modifiers={[restrictToHorizontalAxis, restrictToParentElement]}
     >
-      <Tabs.Root
-        value={activeTabId || undefined}
-        onValueChange={setActiveTab}
-        className={cn("flex items-center bg-background w-full h-full", className)}
-      >
-        <div className="flex-1 overflow-hidden min-w-0">
-          <ScrollArea className="w-max max-w-full">
-            <SortableContext
-              items={tabs.map((tab) => tab.id)}
-              strategy={horizontalListSortingStrategy}
+      <div className={cn("flex h-full min-w-0 items-center bg-background", className)}>
+        <div
+          role="tablist"
+          aria-label={t("workbench.openTabs")}
+          className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1 py-0.5"
+        >
+          <SortableContext
+            items={tabs.map((tab) => tab.id)}
+            strategy={horizontalListSortingStrategy}
+          >
+            {tabs.map((tab) => (
+              <Tab
+                key={tab.id}
+                tab={tab}
+                isActive={tab.id === activeId}
+                isLastTab={allTabs.length === 1 && !allowCloseLastTab}
+                homeDir={homeDir}
+                onTabClick={(item) => useTabStore.getState().setActiveTab(item.id)}
+                onCloseTab={(event, id) => {
+                  event.stopPropagation();
+                  void requestCloseTab(id);
+                }}
+                onCloseOthers={(id) => {
+                  void requestCloseTabs(
+                    tabs.filter((item) => item.id !== id).map((item) => item.id)
+                  );
+                }}
+                onCloseAll={() => {
+                  void requestCloseTabs(
+                    tabs
+                      .filter(
+                        (item) =>
+                          allowCloseLastTab || allTabs.length > tabs.length || item.id !== activeId
+                      )
+                      .map((item) => item.id)
+                  );
+                }}
+                onCloseToRight={(id) => {
+                  void requestCloseTabs(
+                    tabs.slice(tabs.findIndex((item) => item.id === id) + 1).map((item) => item.id)
+                  );
+                }}
+                onPin={(id) => useTabStore.getState().pinTab(id)}
+                onUnpin={(id) => useTabStore.getState().unpinTab(id)}
+              />
+            ))}
+          </SortableContext>
+        </div>
+        <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 shrink-0"
+              aria-label={t("workbench.openTabs")}
             >
-              <Tabs.List
-                data-tauri-drag-region
-                className="flex items-center gap-1 px-2 py-1 min-h-full"
+              <ChevronDown className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="max-h-80 min-w-48 overflow-y-auto">
+            {tabs.map((tab) => (
+              <DropdownMenuItem
+                key={tab.id}
+                onClick={() => useTabStore.getState().setActiveTab(tab.id)}
               >
-                {tabs.map((tab) => (
-                  <Tabs.Trigger key={tab.id} value={tab.id} asChild>
-                    <Tab
-                      tab={tab}
-                      isActive={tab.id === activeTabId}
-                      isLastTab={tabs.length === 1 && !allowCloseLastTab}
-                      homeDir={homeDir}
-                      onTabClick={handleTabClick}
-                      onCloseTab={handleCloseTab}
-                      onCloseOthers={closeOtherTabs}
-                      onCloseAll={handleCloseAll}
-                      onCloseToRight={closeTabsToRight}
-                      onPin={pinTab}
-                      onUnpin={unpinTab}
-                    />
-                  </Tabs.Trigger>
-                ))}
-              </Tabs.List>
-            </SortableContext>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
-        </div>
-
-        <div className="flex-shrink-0 border-l border-border px-2">
-          <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="size-7 p-0 hover:bg-accent">
-                <ChevronDown className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64 max-h-96 overflow-y-auto">
-              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                Open tabs ({tabs.length})
-              </div>
-              <DropdownMenuSeparator />
-              {tabs.map((tab) => {
-                const TabIcon = tab.icon ?? RouteRegistry.getRoute(tab.routeId)?.icon;
-                return (
-                  <DropdownMenuItem
-                    key={tab.id}
-                    onClick={() => handleTabClick(tab)}
-                    className={cn(
-                      "flex items-center gap-2 cursor-pointer",
-                      "hover:bg-accent focus:bg-accent",
-                      tab.id === activeTabId &&
-                        "bg-primary/10 text-primary hover:bg-primary/15 focus:bg-primary/20"
-                    )}
-                  >
-                    {TabIcon && <TabIcon className="size-3 flex-shrink-0" />}
-                    <span className="flex-1 truncate text-xs">
-                      {tab.title || tab.path.split("/").pop() || "Untitled"}
-                    </span>
-                    {tab.id === activeTabId && (
-                      <Check className="size-3 text-primary flex-shrink-0" />
-                    )}
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </Tabs.Root>
+                <span className="flex-1 truncate">{tab.title}</span>
+                {tab.id === activeId && <Check className="size-3" />}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </DndContext>
   );
-};
-
-export default React.memo(TabBar);
+}

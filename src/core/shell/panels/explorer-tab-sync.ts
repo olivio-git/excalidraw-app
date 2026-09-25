@@ -1,5 +1,8 @@
 import { useTabStore } from "@/core/tabs/store/tab-store";
 import { fileHandlerRegistry } from "./file-handler-registry";
+import { isSameOrDescendant } from "./explorer-file-operations";
+import { useDocumentStore } from "@/stores/documentStore";
+import { useDiagramStore } from "@/core/diagram/store/diagram-store";
 
 // ---------------------------------------------------------------------------
 // Tab synchronization helpers for file-system operations
@@ -12,17 +15,20 @@ import { fileHandlerRegistry } from "./file-handler-registry";
  * Used after rename and move operations.
  */
 export function updateTabsAfterRename(oldPath: string, newPath: string): void {
+  useDocumentStore.getState().moveDocuments(oldPath, newPath);
+  useDiagramStore.getState().moveDiagrams(oldPath, newPath);
   const { tabs, updateTab } = useTabStore.getState();
-  const name = newPath.split("/").pop() ?? newPath;
-  const handler = fileHandlerRegistry.resolveOrDefault(name);
-  const title = handler.displayName ? handler.displayName(name) : name;
-
   tabs.forEach((tab) => {
-    if (tab.metadata?.filePath === oldPath) {
+    const filePath = tab.metadata?.filePath;
+    if (typeof filePath === "string" && isSameOrDescendant(filePath, oldPath)) {
+      const updatedPath = newPath + filePath.slice(oldPath.length);
+      const name = updatedPath.split(/[\\/]/).pop() ?? updatedPath;
+      const handler = fileHandlerRegistry.resolveOrDefault(name);
+      const title = handler.displayName ? handler.displayName(name) : name;
       updateTab(tab.id, {
         title,
-        instanceId: newPath,
-        metadata: { ...tab.metadata, filePath: newPath },
+        instanceId: updatedPath,
+        metadata: { ...tab.metadata, filePath: updatedPath },
       });
     }
   });

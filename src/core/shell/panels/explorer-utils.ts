@@ -119,16 +119,20 @@ export function sortEntries(entries: FileEntry[], order: SortOrder): FileEntry[]
     case "type-first":
       sorted.sort((a, b) => {
         if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
-        return a.name.localeCompare(b.name);
+        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
       });
       break;
 
     case "name-asc":
-      sorted.sort((a, b) => a.name.localeCompare(b.name));
+      sorted.sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" })
+      );
       break;
 
     case "name-desc":
-      sorted.sort((a, b) => b.name.localeCompare(a.name));
+      sorted.sort((a, b) =>
+        b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: "base" })
+      );
       break;
 
     default:
@@ -191,7 +195,7 @@ export function formatDate(timestamp: number): string {
  */
 export function filterTree(entries: FileEntry[], query: string): FileEntry[] {
   if (!query.trim()) return entries;
-  const lower = query.toLowerCase();
+  const lower = query.trim().toLowerCase();
 
   const filtered: FileEntry[] = [];
   for (const entry of entries) {

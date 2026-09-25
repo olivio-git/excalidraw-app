@@ -10,6 +10,7 @@ import {
 import { cn } from "@/shared/lib/utils";
 import { flattenAll, filterIndex } from "./explorer-utils";
 import { fileIconRegistry } from "./file-icon-registry";
+import { fileHandlerRegistry } from "./file-handler-registry";
 import type { FileEntry, FlatNode } from "./explorer-types";
 
 // ---------------------------------------------------------------------------
@@ -22,7 +23,7 @@ interface QuickOpenDialogProps {
   onClose: () => void;
   tree: FileEntry[];
   workspaceDir: string;
-  onOpenFile: (path: string, name: string) => void;
+  onOpenFile: (path: string, name: string, beside?: boolean) => void;
 }
 
 // Inner component — remounted on each open via `key` so state resets cleanly
@@ -44,7 +45,7 @@ const QuickOpenContent = ({
 
   // Filter — only files (not dirs) for quick open, top 10
   const results = filterIndex(
-    allNodes.filter((n) => !n.isDir),
+    allNodes.filter((n) => !n.isDir && fileHandlerRegistry.resolve(n.name)),
     query
   ).slice(0, 10);
 
@@ -64,8 +65,8 @@ const QuickOpenContent = ({
     item?.scrollIntoView({ block: "nearest" });
   }, [safeIndex]);
 
-  const handleSelect = (node: FlatNode) => {
-    onOpenFile(node.path, node.name);
+  const handleSelect = (node: FlatNode, beside = false) => {
+    onOpenFile(node.path, node.name, beside);
     onClose();
   };
 
@@ -88,7 +89,7 @@ const QuickOpenContent = ({
         break;
       case "Enter":
         e.preventDefault();
-        if (results[safeIndex]) handleSelect(results[safeIndex]);
+        if (results[safeIndex]) handleSelect(results[safeIndex], e.shiftKey);
         break;
       case "Escape":
         e.preventDefault();
@@ -155,6 +156,7 @@ const QuickOpenContent = ({
         <div className="flex items-center gap-3 px-3 py-1.5 border-t border-border/50 text-[10px] text-muted-foreground">
           <span>{t("quickOpen.navHint")}</span>
           <span>{t("quickOpen.openHint")}</span>
+          <span>{t("quickOpen.sideHint")}</span>
           <span>{t("quickOpen.closeHint")}</span>
         </div>
       )}

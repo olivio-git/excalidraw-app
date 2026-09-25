@@ -273,6 +273,7 @@ input[type="number"].no-spinners {
 
 /* Scrollable wrapper behind the page — provides the gray "canvas" background */
 .document-scroll {
+  container-type: inline-size;
   background-color: hsl(var(--muted));
   overflow-y: auto;
   overflow-x: auto;
@@ -297,6 +298,13 @@ input[type="number"].no-spinners {
   position: relative;
 }
 
+@container (max-width: 600px) {
+  .document-paper {
+    margin: 1rem auto;
+    padding: min(var(--page-margin), 24px);
+  }
+}
+
 /* Zoom wrapper — scales the page visually */
 .document-zoom-wrapper {
   transform-origin: top center;
@@ -311,11 +319,6 @@ input[type="number"].no-spinners {
 .document-paper .bn-editor {
   padding: 0;
   background-color: transparent;
-}
-
-/* Hide BlockNote's side menu in document editor */
-.document-paper .bn-side-menu {
-  display: none;
 }
 
 /* Ruler guides (optional visual aid — thin lines at margin edges) */

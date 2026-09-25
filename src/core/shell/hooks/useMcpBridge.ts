@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { prepareResourceMove } from "@/core/tabs/tab-lifecycle";
+import { updateTabsAfterRename } from "@/core/shell/panels/explorer-tab-sync";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { convertToExcalidrawElements } from "@excalidraw/excalidraw";
@@ -18,6 +20,17 @@ import { documentEditorRegistry } from "@/features/document-editor/documentEdito
 import type { SortOrder } from "@/core/shell/panels/explorer-types";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { AppState } from "@excalidraw/excalidraw/types";
+import { dispatchAutomationTool } from "@/core/automation/dispatch";
+import { workbenchActions, resolveTab } from "@/core/automation/workbench";
+import {
+  AutomationError,
+  isWorkspacePath,
+  optionalBoolean,
+  group,
+  text,
+} from "@/core/automation/validation";
+import { closeTabManaged } from "@/core/tabs/tab-lifecycle";
+import { describeTab } from "@/core/tabs/tab-resources";
 
 interface McpCommandPayload {
   uuid: string;
@@ -51,10 +64,9 @@ export const hasPathTraversal = (p: string): boolean => p.includes("..") || p.st
 
 // For document tools that use absolute paths — verifies path is inside workspace and has no traversal
 const isDocumentPathAllowed = (filePath: string): boolean => {
-  if (filePath.includes("..")) return false;
   const workspaceDir = useWorkspaceStore.getState().workspaceDir;
   if (!workspaceDir) return false;
-  return filePath.startsWith(workspaceDir);
+  return isWorkspacePath(filePath, workspaceDir);
 };
 
 function syncExplorerToFile(filePath: string): void {
@@ -70,23 +82,40 @@ async function saveMcpDiagram(
 ): Promise<void> {
   const api = DiagramController.getApi(instanceId);
   if (!api) return;
-  // Write directly via the file service using instanceId as path (they are equal in this app).
-  // useDiagramStore.saveDiagram silently no-ops if the diagram hasn't been loaded into the
-  // store yet (e.g. right after create_diagram, before the DiagramCanvas has mounted).
-  await diagramFileService.writeDiagram(instanceId, {
-    elements,
-    appState: api.getAppState(),
-    files: api.getFiles(),
-  });
+  const store = useDiagramStore.getState();
+  if (!store.getDiagram(instanceId)) await store.loadDiagram(instanceId, instanceId);
+  store.markDirty(instanceId);
+  await store.saveDiagram(instanceId, elements, api.getAppState(), api.getFiles());
+  await store.waitForSaves(instanceId);
 }
 
 export async function dispatchMcpTool(
   tool: string,
   input: Record<string, unknown>
 ): Promise<{ result: unknown; error: string | null }> {
-  const instanceId = DiagramController.getActiveInstanceId();
-
   try {
+    const automated = await dispatchAutomationTool(tool, input);
+    if (automated) return automated;
+    let instanceId = DiagramController.getActiveInstanceId();
+    if (
+      [
+        "get_elements",
+        "draw_elements",
+        "set_elements",
+        "clear_canvas",
+        "update_element",
+        "export_svg",
+      ].includes(tool) &&
+      (input.filePath !== undefined || input.tabId !== undefined)
+    ) {
+      const tab = resolveTab({
+        filePath: input.filePath === undefined ? undefined : text(input.filePath, "filePath"),
+        tabId: input.tabId === undefined ? undefined : text(input.tabId, "tabId"),
+      });
+      if (tab.routeId !== "diagram" || !tab.instanceId)
+        throw new AutomationError("WRONG_RESOURCE", "The target tab is not a diagram.");
+      instanceId = tab.instanceId;
+    }
     switch (tool) {
       case "get_elements": {
         if (!instanceId) {
@@ -100,6 +129,11 @@ export async function dispatchMcpTool(
             error: `No active diagram canvas.${hint} Open a .excalidraw file in a tab first.`,
           };
         }
+        if (!DiagramController.getApi(instanceId))
+          throw new AutomationError(
+            "NOT_READY",
+            "Diagram canvas is not ready. Retry after opening it."
+          );
         const elements = DiagramController.getElements(instanceId);
         return { result: JSON.stringify(elements), error: null };
       }
@@ -128,7 +162,9 @@ export async function dispatchMcpTool(
         if (!api) {
           return { result: null, error: "Canvas not ready. Try again in a moment." };
         }
-        const elements = (input.elements as unknown[]) ?? [];
+        if (!Array.isArray(input.elements))
+          throw new AutomationError("INVALID_INPUT", "elements must be an array.");
+        const elements = input.elements;
         if (elements.length === 0) {
           api.updateScene({ elements: [] });
           await saveMcpDiagram(instanceId, []);
@@ -187,6 +223,7 @@ export async function dispatchMcpTool(
         if (!tab) return { result: null, error: null };
         return {
           result: JSON.stringify({
+            ...describeTab(tab),
             tabId: tab.id,
             routeId: tab.routeId,
             title: tab.title,
@@ -302,19 +339,12 @@ export async function dispatchMcpTool(
         }
         const absoluteOld = await join(workspaceDir, oldPath);
         const absoluteNew = await join(workspaceDir, newPath);
+        await prepareResourceMove(absoluteOld);
         await rename(absoluteOld, absoluteNew);
         const { tabs } = useTabStore.getState();
         const matchingTab = tabs.find((t) => t.instanceId === absoluteOld);
-        let tabUpdated = false;
-        if (matchingTab) {
-          const newTitle = absoluteNew.split(/[\\/]/).pop() ?? absoluteNew;
-          useTabStore.getState().updateTab(matchingTab.id, {
-            instanceId: absoluteNew,
-            title: newTitle,
-            metadata: { ...matchingTab.metadata, filePath: absoluteNew },
-          });
-          tabUpdated = true;
-        }
+        const tabUpdated = Boolean(matchingTab);
+        updateTabsAfterRename(absoluteOld, absoluteNew);
         return {
           result: JSON.stringify({ renamed: true, oldPath, newPath, tabUpdated }),
           error: null,
@@ -355,31 +385,25 @@ export async function dispatchMcpTool(
       case "open_file_or_focus": {
         const filePath = input.filePath as string | undefined;
         if (!filePath) return { result: null, error: "filePath is required." };
-        const filename = filePath.split("/").pop() ?? filePath;
-        const handler = fileHandlerRegistry.resolveOrDefault(filename);
-        const routePath = `/${handler.routeId}`;
-        const existing = useTabStore.getState().findTabByPath(routePath, filePath);
-        if (existing) {
-          useTabStore.getState().setActiveTab(existing.id);
-          syncExplorerToFile(filePath);
-          return { result: JSON.stringify({ tabId: existing.id, wasCreated: false }), error: null };
-        }
-        const title = handler.displayName ? handler.displayName(filename) : filename;
-        const tabId = useTabStore.getState().addTab({
-          routeId: handler.routeId,
-          path: routePath,
-          title,
-          instanceId: filePath,
-          metadata: { filePath },
+        const previous = new Set(useTabStore.getState().tabs.map((tab) => tab.id));
+        const tab = await workbenchActions.openFile({
+          filePath,
+          groupId: input.groupId === undefined ? undefined : group(input.groupId),
+          beside: optionalBoolean(input.beside, "beside"),
+          anchor: input.anchor === undefined ? undefined : text(input.anchor, "anchor"),
         });
         syncExplorerToFile(filePath);
-        return { result: JSON.stringify({ tabId, wasCreated: true }), error: null };
+        return {
+          result: JSON.stringify({ ...tab, wasCreated: !previous.has(tab.id) }),
+          error: null,
+        };
       }
 
       case "list_open_diagrams": {
         const { tabs, activeTabId } = useTabStore.getState();
         const diagramTabs = tabs.filter((t) => t.routeId === "diagram");
         const result = diagramTabs.map((t) => ({
+          ...describeTab(t),
           tabId: t.id,
           title: t.title,
           filePath: t.instanceId ?? null,
@@ -411,77 +435,33 @@ export async function dispatchMcpTool(
       }
 
       case "close_tab": {
-        const filePath = input.filePath as string | undefined;
-        const tabId = input.tabId as string | undefined;
-        const force = input.force as boolean | undefined;
-        if (!filePath && !tabId) return { result: null, error: "filePath or tabId is required." };
         let tab;
-        if (filePath) {
-          const filename = filePath.split("/").pop() ?? filePath;
-          const handler = fileHandlerRegistry.resolveOrDefault(filename);
-          const routePath = `/${handler.routeId}`;
-          tab = useTabStore.getState().findTabByPath(routePath, filePath);
-        } else {
-          tab = useTabStore.getState().getTab(tabId!);
+        try {
+          tab = resolveTab({
+            filePath: input.filePath === undefined ? undefined : text(input.filePath, "filePath"),
+            tabId: input.tabId === undefined ? undefined : text(input.tabId, "tabId"),
+          });
+        } catch (error) {
+          if (error instanceof AutomationError && error.code === "TAB_NOT_FOUND")
+            return {
+              result: JSON.stringify({ closed: false, wasDirty: false, reason: "not_found" }),
+              error: null,
+            };
+          throw error;
         }
-        if (!tab)
-          return {
-            result: JSON.stringify({ closed: false, wasDirty: false, reason: "not_found" }),
-            error: null,
-          };
-        if (tab.isPinned)
-          return {
-            result: JSON.stringify({ closed: false, wasDirty: false, reason: "pinned" }),
-            error: null,
-          };
-        if (!tab.isClosable)
-          return {
-            result: JSON.stringify({ closed: false, wasDirty: false, reason: "not_closable" }),
-            error: null,
-          };
-        if (useTabStore.getState().tabs.length === 1)
-          return {
-            result: JSON.stringify({ closed: false, wasDirty: false, reason: "last_tab" }),
-            error: null,
-          };
-        const isDirty =
-          useDiagramStore.getState().getDiagram(tab.instanceId ?? "")?.isDirty ?? false;
-        if (isDirty && !force)
-          return {
-            result: JSON.stringify({ closed: false, wasDirty: true, reason: "unsaved_changes" }),
-            error: null,
-          };
-        useTabStore.getState().removeTab(tab.id);
-        return { result: JSON.stringify({ closed: true, wasDirty: isDirty }), error: null };
+        const closed = await closeTabManaged(tab.id, {
+          discard: optionalBoolean(input.force, "force"),
+        });
+        return { result: JSON.stringify(closed), error: null };
       }
 
       case "get_tab_metadata": {
-        const filePath = input.filePath as string | undefined;
-        const tabId = input.tabId as string | undefined;
-        if (!filePath && !tabId) return { result: null, error: "filePath or tabId is required." };
-        let tab;
-        if (filePath) {
-          const filename = filePath.split("/").pop() ?? filePath;
-          const handler = fileHandlerRegistry.resolveOrDefault(filename);
-          const routePath = `/${handler.routeId}`;
-          tab = useTabStore.getState().findTabByPath(routePath, filePath);
-        } else {
-          tab = useTabStore.getState().getTab(tabId!);
-        }
-        if (!tab) return { result: null, error: "tab not found" };
-        const { activeTabId } = useTabStore.getState();
-        const isDirty =
-          useDiagramStore.getState().getDiagram(tab.instanceId ?? "")?.isDirty ?? false;
+        const tab = resolveTab({
+          filePath: input.filePath === undefined ? undefined : text(input.filePath, "filePath"),
+          tabId: input.tabId === undefined ? undefined : text(input.tabId, "tabId"),
+        });
         return {
-          result: JSON.stringify({
-            tabId: tab.id,
-            title: tab.title,
-            filePath: tab.instanceId,
-            isDirty,
-            isActive: tab.id === activeTabId,
-            isPinned: tab.isPinned,
-            routeId: tab.routeId,
-          }),
+          result: JSON.stringify(describeTab(tab)),
           error: null,
         };
       }

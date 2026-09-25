@@ -1,6 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { registerAutomationTools } from "./automation-tools.js";
 
 const PORT = process.env.MCP_PORT ?? "7888";
 const BRIDGE_URL = `http://127.0.0.1:${PORT}/api/tool`;
@@ -40,22 +43,33 @@ function toText(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
-const server = new McpServer({
+export const server = new McpServer({
   name: "excalidraw",
   version: "0.1.0",
 });
+registerAutomationTools(server, callBridge);
+const diagramTarget = {
+  filePath: z
+    .string()
+    .optional()
+    .describe("Absolute path of an open diagram. Omit with tabId to use the active canvas."),
+  tabId: z
+    .string()
+    .optional()
+    .describe("Explicit diagram tab ID. If filePath is also provided, both must match."),
+};
 
 // ─── get_elements ─────────────────────────────────────────────────────────────
 server.tool(
   "get_elements",
   [
-    "Get all elements from the active Excalidraw diagram canvas. Returns a JSON array of Excalidraw elements.",
-    "ONLY works when the active tab is an Excalidraw diagram (routeId: 'excalidraw').",
-    "If the active tab is a document editor or any other route, this returns an error — use get_active_tab to check first.",
+    "Get all elements from an explicit diagram target, or the active canvas if no target is supplied. Returns a JSON array of Excalidraw elements.",
+    "The target must be an Excalidraw diagram (routeId: 'diagram').",
+    "When no explicit target is supplied, the active tab must be a diagram; use get_active_tab to check.",
   ].join(" "),
-  {},
-  async () => {
-    const res = await callBridge("get_elements", {});
+  diagramTarget,
+  async (target) => {
+    const res = await callBridge("get_elements", target);
     if (res.error)
       return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
     return { content: [{ type: "text", text: toText(res.result) }] };
@@ -66,19 +80,20 @@ server.tool(
 server.tool(
   "draw_elements",
   [
-    "Add Excalidraw elements to the active canvas without replacing existing content.",
+    "Add Excalidraw elements to the explicit diagram target, or active canvas, without replacing existing content.",
     "PREFERRED for building diagrams: call multiple times for different sections (e.g. one call per layer or subsystem).",
     "Supports labeled shapes, arrows with bindings, and pseudo-elements (delete, cameraUpdate).",
     "For labeled shapes (rectangles, ellipses, etc.), use the 'label' property instead of a separate text element — Excalidraw handles positioning automatically.",
     "Diagrams are saved to disk automatically after each call.",
   ].join(" "),
   {
+    ...diagramTarget,
     elements: z
       .array(z.record(z.string(), z.unknown()))
       .describe("Array of Excalidraw skeleton elements to draw"),
   },
-  async ({ elements }) => {
-    const res = await callBridge("draw_elements", { elements });
+  async ({ elements, ...target }) => {
+    const res = await callBridge("draw_elements", { elements, ...target });
     if (res.error)
       return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
     return { content: [{ type: "text", text: toText(res.result) }] };
@@ -89,19 +104,20 @@ server.tool(
 server.tool(
   "set_elements",
   [
-    "Replace ALL elements on the active canvas with the provided elements.",
+    "Replace ALL elements on the explicit diagram target, or active canvas, with the provided elements.",
     "Use draw_elements instead when building a diagram incrementally — it is faster and avoids generating the entire diagram JSON in one shot.",
     "Reserve set_elements for replacing or restoring a known complete canvas state.",
     "For labeled shapes (rectangles, ellipses, etc.), use the 'label' property instead of a separate text element — Excalidraw handles positioning automatically.",
     "Diagram is saved to disk automatically after the call.",
   ].join(" "),
   {
+    ...diagramTarget,
     elements: z
       .array(z.record(z.string(), z.unknown()))
       .describe("Array of Excalidraw elements that will replace the current canvas"),
   },
-  async ({ elements }) => {
-    const res = await callBridge("set_elements", { elements });
+  async ({ elements, ...target }) => {
+    const res = await callBridge("set_elements", { elements, ...target });
     if (res.error)
       return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
     return { content: [{ type: "text", text: toText(res.result) }] };
@@ -113,10 +129,11 @@ server.tool(
   "clear_canvas",
   "Remove all elements from the active canvas. Requires explicit confirmation to prevent accidental clears.",
   {
+    ...diagramTarget,
     confirm: z.boolean().describe("Must be true to proceed with clearing the canvas"),
   },
-  async ({ confirm }) => {
-    const res = await callBridge("clear_canvas", { confirm });
+  async ({ confirm, ...target }) => {
+    const res = await callBridge("clear_canvas", { confirm, ...target });
     if (res.error)
       return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
     return { content: [{ type: "text", text: toText(res.result) }] };
@@ -128,13 +145,14 @@ server.tool(
   "update_element",
   "Apply partial property updates to a specific element on the canvas identified by its id.",
   {
+    ...diagramTarget,
     elementId: z.string().describe("The id of the element to update"),
     updates: z
       .record(z.string(), z.unknown())
       .describe("Partial element properties to merge into the element"),
   },
-  async ({ elementId, updates }) => {
-    const res = await callBridge("update_element", { elementId, updates });
+  async ({ elementId, updates, ...target }) => {
+    const res = await callBridge("update_element", { elementId, updates, ...target });
     if (res.error)
       return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
     return { content: [{ type: "text", text: toText(res.result) }] };
@@ -150,9 +168,9 @@ server.tool(
     "If your goal is to embed the diagram into a markdown document, use document_insert_diagram instead —",
     "it handles the SVG export and base64 embedding automatically without consuming context.",
   ].join(" "),
-  {},
-  async () => {
-    const res = await callBridge("export_svg", {});
+  diagramTarget,
+  async (target) => {
+    const res = await callBridge("export_svg", target);
     if (res.error)
       return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
     return { content: [{ type: "text", text: toText(res.result) }] };
@@ -306,12 +324,15 @@ server.tool(
 // ─── open_file_or_focus ───────────────────────────────────────────────────────
 server.tool(
   "open_file_or_focus",
-  "Open a file in a new tab, or focus it if already open",
+  "Open a workspace file in a group, or focus/move its existing editor. Optional beside opens in the group opposite groupId (or current focus).",
   {
     filePath: z.string().describe("Absolute path to the file"),
+    groupId: z.enum(["primary", "secondary"]).optional(),
+    beside: z.boolean().optional(),
+    anchor: z.string().min(1).optional(),
   },
-  async ({ filePath }) => {
-    const res = await callBridge("open_file_or_focus", { filePath });
+  async (input) => {
+    const res = await callBridge("open_file_or_focus", input);
     if (res.error)
       return { content: [{ type: "text", text: `Error: ${res.error}` }], isError: true };
     return { content: [{ type: "text", text: toText(res.result) }] };
@@ -350,7 +371,7 @@ server.tool(
 // ─── close_tab ────────────────────────────────────────────────────────────────
 server.tool(
   "close_tab",
-  "Close an open tab. Pinned tabs cannot be closed. Use force=true to close tabs with unsaved changes.",
+  "Save and close an open document or diagram through the same lifecycle as the UI. Reports blocked/save failures. force=true explicitly discards unsaved edits; pinned/non-closable tabs and last-tab settings are respected.",
   {
     filePath: z.string().optional().describe("Absolute path of the file whose tab to close"),
     tabId: z.string().optional().describe("The tab ID to close"),
@@ -554,7 +575,7 @@ server.tool(
 server.tool(
   "document_open",
   [
-    "Open a markdown document in a new tab (or focus its existing tab).",
+    "Open a Markdown or native .note document in a tab (or focus its existing tab).",
     "NOTE: opening a tab does not guarantee the editor is immediately rendered.",
     "If you need to call document_set_block_color right after, follow with activate_tab to ensure the tab is focused and the editor is mounted.",
   ].join(" "),
@@ -573,7 +594,7 @@ server.tool(
 server.tool(
   "document_get_content",
   [
-    "Get the markdown content of an open document.",
+    "Get the Markdown content/projection of an open .md or .note document. For native block IDs/properties use document_get_blocks.",
     "IMPORTANT: filePath must be an absolute path obtained from document_list or document_create — never guess or construct the path.",
     "Embedded base64 images are replaced with '[embedded-image]' placeholders by default to avoid token overflow — pass includeDataUrls: true only when you need the raw bytes.",
     "For large documents, use offset and limit to paginate by line number.",
@@ -800,7 +821,8 @@ server.tool(
 server.tool(
   "document_insert_diagram",
   [
-    "Export an open Excalidraw diagram as SVG and embed it into a document as an inline image.",
+    "Export an open Excalidraw diagram as a STATIC SVG snapshot and embed it into a document as an inline image.",
+    "For a live, automatically refreshed reference in a .note, use document_insert_linked_diagram instead.",
     "The SVG is embedded as a base64 data URL — no external files needed, no manual encoding required.",
     "IMPORTANT: the diagram must be open in a tab before calling this tool.",
     "Workflow: 1) open_file_or_focus the .excalidraw file, 2) draw or verify the diagram, 3) call this tool.",
@@ -809,7 +831,7 @@ server.tool(
     "NEVER use export_svg + manual base64 encoding for this — always use this tool instead.",
   ].join(" "),
   {
-    filePath: z.string().describe("Absolute path to the target .md document"),
+    filePath: z.string().describe("Absolute path to the target .md or .note document"),
     diagramPath: z
       .string()
       .describe("Absolute path to the .excalidraw file — must be open in a tab"),
@@ -856,7 +878,7 @@ server.tool(
 // ─── document_list ────────────────────────────────────────────────────────────
 server.tool(
   "document_list",
-  "List all currently open documents. Returns an array of { filePath, title, isDirty } objects. Use this to obtain filePath values before calling any other document tool.",
+  "List absolute .md/.note file paths in the workspace (or cached document paths if no workspace is selected). Returns a string array. Use list_tabs for open-tab metadata and dirty flags.",
   {},
   async () => {
     const res = await callBridge("document_list", {});
@@ -874,7 +896,7 @@ server.tool(
     "THIS IS THE CORRECT TOOL for coloring headings — do NOT use <span style='color:...'> or any HTML in markdown, it will not render.",
     "Uses BlockNote's native color system — values must be one of the named colors:",
     "default | gray | brown | orange | yellow | green | blue | purple | pink | red.",
-    "IMPORTANT: colors are applied to the in-memory editor only and are NOT persisted to the .md file.",
+    "In .md files colors are visual-only. In native .note files they are persisted by autosave; prefer document_update_block with a native block ID when working with rich notes.",
     "If you get 'Editor not mounted', call activate_tab with the filePath first, then retry.",
     "Get sectionId from document_get_sections.",
   ].join(" "),
@@ -954,5 +976,19 @@ server.tool(
 );
 
 // ─── Start ────────────────────────────────────────────────────────────────────
-const transport = new StdioServerTransport();
-await server.connect(transport);
+function isMainEntry(): boolean {
+  if (!process.argv[1]) return false;
+  try {
+    const entry = realpathSync(process.argv[1]);
+    const current = realpathSync(fileURLToPath(import.meta.url));
+    return process.platform === "win32"
+      ? entry.toLowerCase() === current.toLowerCase()
+      : entry === current;
+  } catch {
+    return false;
+  }
+}
+if (isMainEntry()) {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}

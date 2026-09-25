@@ -25,6 +25,16 @@ export type {
 // These types live outside src/plugins/types.ts — re-export for plugin convenience
 export type { RouteConfig } from "@/core/routing/types";
 export type { KeybindingDeclaration } from "@/core/keybindings/types";
+export type { TabTarget, OpenFileRequest, LayoutRequest } from "@/core/automation/workbench";
+export type {
+  BlockInput,
+  BlockPlacement,
+  NoteCreateInput,
+  NoteMutation,
+  BlockReadOptions,
+} from "@/core/automation/notes";
+export type { ReferenceQuery } from "@/core/automation/references";
+export type { CloseTabResult } from "@/core/tabs/tab-lifecycle";
 
 /**
  * Helper para definir un plugin con autocompletado completo.

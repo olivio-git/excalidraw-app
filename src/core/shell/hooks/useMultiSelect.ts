@@ -1,4 +1,4 @@
-import { useState, type Dispatch, type SetStateAction, type MouseEvent } from "react";
+import { useState, useEffect, type Dispatch, type SetStateAction, type MouseEvent } from "react";
 import type { FlatNode } from "@/core/shell/panels/explorer-types";
 import { useExplorerSelectionStore } from "@/stores/explorerStore";
 
@@ -22,22 +22,12 @@ export interface UseMultiSelectReturn {
 }
 
 export function useMultiSelect(): UseMultiSelectReturn {
-  const [selectedPaths, setSelectedPathsInternal] = useState<Set<string>>(() => new Set());
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(() => new Set());
 
-  // Sync local Set to the external store on every change so MCP and other
-  // external consumers can read the selection without prop-drilling.
-  const syncToStore = (next: Set<string>) => {
-    useExplorerSelectionStore.getState().setSelectedPaths(Array.from(next));
-  };
-
-  // Wrapped setter: keeps the local Set state and syncs to external store.
-  const setSelectedPaths: Dispatch<SetStateAction<Set<string>>> = (action) => {
-    setSelectedPathsInternal((prev) => {
-      const next = typeof action === "function" ? action(prev) : action;
-      syncToStore(next);
-      return next;
-    });
-  };
+  // Publish after commit, never from a React state updater (which can run during render).
+  useEffect(() => {
+    useExplorerSelectionStore.getState().setSelectedPaths([...selectedPaths]);
+  }, [selectedPaths]);
 
   const handleNodeClick = (
     e: MouseEvent,

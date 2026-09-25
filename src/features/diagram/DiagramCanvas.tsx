@@ -1,5 +1,5 @@
 import { Excalidraw, useHandleLibrary } from "@excalidraw/excalidraw";
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useCallback, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTabContext } from "@/core/tabs/hooks/use-tab-context";
 import { useTabStore } from "@/core/tabs/store/tab-store";
@@ -12,13 +12,18 @@ import { useLanguageStore } from "@/stores/languageStore";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import { registerTabCloseHandler } from "@/core/tabs/tab-lifecycle";
+import { isLocalFileReference, openFileReference } from "@/core/shell/services/file-navigation";
+import { tabGroup } from "@/core/tabs/store/editor-layout";
 
 const AUTOSAVE_DEBOUNCE_MS = 1000;
 
 const DiagramCanvas = () => {
-  const { tabId, isActive } = useTabContext();
+  const { tabId, isActive, isVisible = isActive } = useTabContext();
   const tab = useTabStore((s) => s.getTab(tabId));
   const updateTab = useTabStore((s) => s.updateTab);
+  const splitDirection = useTabStore((s) => s.splitDirection);
+  const splitRatio = useTabStore((s) => s.splitRatio);
   const instanceId = tab?.instanceId;
   const filePath = tab?.metadata?.filePath as string | undefined;
 
@@ -31,14 +36,18 @@ const DiagramCanvas = () => {
   const language = useLanguageStore((s) => s.language);
   const excalidrawLang = language === "es" ? "es-ES" : "en";
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savingPausedRef = useRef(false);
   const filesRef = useRef<BinaryFiles>({});
-  const isActiveRef = useRef(isActive);
+  const isActiveRef = useRef(isVisible);
   // Excalidraw fires onChange once on mount with initialData — skip that init fire
   const skipInitChangeRef = useRef(true);
   const [isDragging, setIsDragging] = useState(false);
   const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI | null>(null);
 
   useHandleLibrary({ excalidrawAPI });
+  useLayoutEffect(() => {
+    excalidrawAPI?.refresh();
+  }, [excalidrawAPI, tab?.groupId, splitDirection, splitRatio]);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   // Block Excalidraw's native HTML5 file drop handler via capture on the wrapper div.
@@ -146,25 +155,82 @@ const DiagramCanvas = () => {
 
   // Unregister DiagramController on unmount
   useEffect(() => {
+    if (instanceId && excalidrawAPI) DiagramController.register(instanceId, excalidrawAPI);
     return () => {
       if (instanceId) DiagramController.unregister(instanceId);
     };
-  }, [instanceId]);
+  }, [instanceId, excalidrawAPI]);
 
-  useEffect(() => {
-    isActiveRef.current = isActive;
-  }, [isActive]);
+  useLayoutEffect(() => {
+    isActiveRef.current = isVisible;
+  }, [isVisible]);
+
+  useEffect(
+    () =>
+      registerTabCloseHandler(
+        tabId,
+        async () => {
+          if (!instanceId) return true;
+          if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+          const api = DiagramController.getApi(instanceId);
+          if (useDiagramStore.getState().getDiagram(instanceId)?.isDirty) {
+            if (!api) return false;
+            await saveDiagram(
+              instanceId,
+              api.getSceneElements(),
+              api.getAppState(),
+              api.getFiles()
+            );
+          }
+          await useDiagramStore.getState().waitForSaves(instanceId);
+          return !useDiagramStore.getState().getDiagram(instanceId)?.isDirty;
+        },
+        async () => {
+          savingPausedRef.current = true;
+          if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+          const resume = () => {
+            savingPausedRef.current = false;
+            if (!instanceId || !useDiagramStore.getState().getDiagram(instanceId)?.isDirty) return;
+            saveTimerRef.current = setTimeout(() => {
+              const api = DiagramController.getApi(instanceId);
+              if (api)
+                void saveDiagram(
+                  instanceId,
+                  api.getSceneElements(),
+                  api.getAppState(),
+                  api.getFiles()
+                ).catch((error: unknown) => notify(String(error), { type: "error" }));
+            }, AUTOSAVE_DEBOUNCE_MS);
+          };
+          try {
+            if (instanceId) await useDiagramStore.getState().waitForSaves(instanceId, true);
+            return resume;
+          } catch (error) {
+            resume();
+            throw error;
+          }
+        }
+      ),
+    [tabId, instanceId, saveDiagram]
+  );
+
+  useEffect(
+    () => () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    },
+    []
+  );
 
   // Sync Excalidraw UI state when tab visibility changes
   useEffect(() => {
     if (!instanceId) return;
     const api = DiagramController.getApi(instanceId);
     if (!api) return;
-    if (!isActive) {
+    if (!isVisible) {
       // Clear selection so Excalidraw's portal toolbar disappears when tab is hidden.
       // isActiveRef guard in handleChange suppresses the resulting onChange.
       api.updateScene({
-        appState: { selectedElementIds: {}, selectedGroupIds: {} } as Partial<AppState>,
+        appState: { selectedElementIds: {}, selectedGroupIds: {} },
       });
     } else {
       // refresh() re-syncs Excalidraw UI (zoom indicator, etc.) after becoming visible
@@ -172,7 +238,7 @@ const DiagramCanvas = () => {
       skipInitChangeRef.current = true;
       api.refresh();
     }
-  }, [isActive, instanceId]);
+  }, [isVisible, instanceId]);
 
   // Load diagram on mount — reset init-skip so each new diagram load suppresses one onChange
   useEffect(() => {
@@ -187,7 +253,7 @@ const DiagramCanvas = () => {
     if (tab.metadata?.isDirty !== diagram.isDirty) {
       updateTab(tabId, { metadata: { ...tab.metadata, isDirty: diagram.isDirty } });
     }
-  }, [diagram?.isDirty, tab, tabId, updateTab]);
+  }, [diagram, tab, tabId, updateTab]);
 
   const handleChange = useCallback(
     (_elements: readonly ExcalidrawElement[], _appState: AppState, files: BinaryFiles) => {
@@ -206,12 +272,18 @@ const DiagramCanvas = () => {
       // and avoids feedback loops that freeze Excalidraw's zoom indicator.
       // Live state is read from the API at save time.
       markDirty(instanceId);
+      if (savingPausedRef.current) return;
 
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
         const api = DiagramController.getApi(instanceId);
         if (!api) return;
-        saveDiagram(instanceId, api.getSceneElements(), api.getAppState(), filesRef.current);
+        void saveDiagram(
+          instanceId,
+          api.getSceneElements(),
+          api.getAppState(),
+          filesRef.current
+        ).catch((error: unknown) => notify(String(error), { type: "error" }));
       }, AUTOSAVE_DEBOUNCE_MS);
     },
     [instanceId, markDirty, saveDiagram]
@@ -223,6 +295,26 @@ const DiagramCanvas = () => {
         .pop()
         ?.replace(/\.excalidraw$/, "") ?? "diagram")
     : "diagram";
+
+  const navigationAnchor = tab?.metadata?.navigationAnchor as
+    | { text: string; id: string }
+    | undefined;
+  useEffect(() => {
+    if (!navigationAnchor || !excalidrawAPI || !isActive) return;
+    const frame = requestAnimationFrame(() => {
+      const element = excalidrawAPI
+        .getSceneElements()
+        .find((item) => item.id === navigationAnchor.text && !item.isDeleted);
+      if (element) {
+        excalidrawAPI.updateScene({ appState: { selectedElementIds: { [element.id]: true } } });
+        excalidrawAPI.scrollToContent([element], { animate: true });
+      }
+      const current = useTabStore.getState().getTab(tabId);
+      if (current?.metadata?.navigationAnchor?.id === navigationAnchor.id)
+        updateTab(tabId, { metadata: { ...current.metadata, navigationAnchor: undefined } });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [navigationAnchor, excalidrawAPI, isActive, tabId, updateTab]);
 
   if (!instanceId || !diagram) {
     return (
@@ -248,6 +340,16 @@ const DiagramCanvas = () => {
           files: diagram.files,
         }}
         onChange={handleChange}
+        handleKeyboardGlobally={false}
+        onLinkOpen={(element, event) => {
+          if (!element.link || !filePath || !isLocalFileReference(element.link)) return;
+          event.preventDefault();
+          const native = event.detail.nativeEvent;
+          void openFileReference(element.link, filePath, {
+            beside: native.ctrlKey || native.metaKey || native.shiftKey,
+            groupId: tab ? tabGroup(tab) : undefined,
+          }).catch((error: unknown) => notify(String(error), { type: "error" }));
+        }}
         theme={resolvedTheme}
         langCode={excalidrawLang}
         libraryReturnUrl={window.location.origin}

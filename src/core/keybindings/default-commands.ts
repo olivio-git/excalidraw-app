@@ -3,12 +3,15 @@ import { useTabStore } from "@/core/tabs/store/tab-store";
 import { RouteRegistry } from "@/core/routing/route-registry";
 import { useDiagramStore } from "@/core/diagram/store/diagram-store";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { useExplorerUiStore } from "@/stores/explorerStore";
 import { useLanguageStore } from "@/stores/languageStore";
 import { useSettingsStore, type SettingsTab } from "@/stores/settingsStore";
 import { diagramFileService } from "@/core/diagram/services/diagram-file.service";
 import { DiagramController } from "@/core/diagram/DiagramController";
 import { prompt } from "@/shared/lib/prompt";
 import i18n from "@/core/i18n/i18n";
+import { requestCloseTab } from "@/core/tabs/tab-lifecycle";
+import { tabGroup } from "@/core/tabs/store/editor-layout";
 
 // ── Core command handlers ─────────────────────────────────────────────────────
 //
@@ -94,14 +97,15 @@ function openSettingsHandler(): void {
 }
 
 function closeActiveTabHandler(): void {
-  const { activeTabId, removeTab } = useTabStore.getState();
+  const { activeTabId } = useTabStore.getState();
   if (activeTabId) {
-    removeTab(activeTabId);
+    void requestCloseTab(activeTabId);
   }
 }
 
 function nextTabHandler(): void {
-  const { tabs, activeTabId, setActiveTab } = useTabStore.getState();
+  const { tabs: allTabs, activeTabId, setActiveTab, activeGroupId } = useTabStore.getState();
+  const tabs = allTabs.filter((tab) => tabGroup(tab) === activeGroupId);
   if (tabs.length === 0 || !activeTabId) return;
 
   const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
@@ -112,7 +116,8 @@ function nextTabHandler(): void {
 }
 
 function previousTabHandler(): void {
-  const { tabs, activeTabId, setActiveTab } = useTabStore.getState();
+  const { tabs: allTabs, activeTabId, setActiveTab, activeGroupId } = useTabStore.getState();
+  const tabs = allTabs.filter((tab) => tabGroup(tab) === activeGroupId);
   if (tabs.length === 0 || !activeTabId) return;
 
   const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
@@ -125,9 +130,20 @@ function previousTabHandler(): void {
 function focusSidebarHandler(): void {
   const sidebar = document.querySelector<HTMLElement>("[data-panel='sidebar']");
   const explorerContainer = sidebar?.querySelector<HTMLElement>(
-    ".flex.flex-col.h-full.overflow-hidden[tabindex='-1']"
+    "[data-explorer-visible='true'] [role='tree']"
   );
   (explorerContainer ?? sidebar)?.focus();
+}
+
+function toggleSidebarHandler(): void {
+  window.dispatchEvent(new Event("workbench:toggle-sidebar"));
+}
+
+function openQuickOpenHandler(): void {
+  if (!useWorkspaceStore.getState().workspaceDir) return;
+  const active = document.activeElement;
+  if (active?.tagName === "CANVAS" || active?.closest(".excalidraw")) return;
+  useExplorerUiStore.getState().setQuickOpenOpen(true);
 }
 
 function focusEditorHandler(): void {
@@ -136,7 +152,9 @@ function focusEditorHandler(): void {
 
 function focusSidebarSearchHandler(): void {
   const sidebar = document.querySelector<HTMLElement>("[data-panel='sidebar']");
-  const search = sidebar?.querySelector<HTMLInputElement>("[data-panel-search]");
+  const search = Array.from(
+    sidebar?.querySelectorAll<HTMLInputElement>("[data-panel-search]") ?? []
+  ).find((input) => !input.closest("[data-explorer-visible='false']"));
   if (search) {
     search.focus();
     search.select();
@@ -200,6 +218,15 @@ export function initializeCoreCommands(): void {
   PluginManager.registerCommandHandler("workbench.action.nextTab", nextTabHandler);
 
   PluginManager.registerCommandHandler("workbench.action.previousTab", previousTabHandler);
+  PluginManager.registerCommandHandler("workbench.action.navigateBack", () =>
+    useTabStore.getState().navigateHistory(-1)
+  );
+  PluginManager.registerCommandHandler("workbench.action.navigateForward", () =>
+    useTabStore.getState().navigateHistory(1)
+  );
+
+  PluginManager.registerCommandHandler("workbench.action.toggleSidebar", toggleSidebarHandler);
+  PluginManager.registerCommandHandler("workbench.action.openQuickOpen", openQuickOpenHandler);
 
   PluginManager.registerCommandHandler("workbench.action.focusSidebar", focusSidebarHandler);
 

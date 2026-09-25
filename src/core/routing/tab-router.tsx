@@ -47,7 +47,7 @@ export function useTabRouter() {
 
     // Parse ?file= query param to identify the specific tab instance
     const fileParam = new URLSearchParams(location.search).get("file");
-    const decodedInstanceId = fileParam ? decodeURIComponent(fileParam) : undefined;
+    const decodedInstanceId = fileParam || undefined;
 
     const existingTab = findTabByPath(path, decodedInstanceId);
     if (existingTab) {

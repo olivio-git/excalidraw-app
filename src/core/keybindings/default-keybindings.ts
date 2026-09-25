@@ -12,6 +12,8 @@ import { KeybindingSource } from "./types";
 // familiarity and forward-compatibility.
 
 const BUILTIN_KEYBINDINGS = [
+  { key: "alt+arrowleft", commandId: "workbench.action.navigateBack", allowInInput: true },
+  { key: "alt+arrowright", commandId: "workbench.action.navigateForward", allowInInput: true },
   {
     key: "ctrl+s",
     commandId: "diagram.action.save",
@@ -37,6 +39,7 @@ const BUILTIN_KEYBINDINGS = [
   {
     key: "ctrl+w",
     commandId: "workbench.action.closeActiveTab",
+    allowInInput: true,
   },
   {
     key: "ctrl+b",

@@ -1,5 +1,8 @@
 {
   "toolbar": {
+    "files": "Archivos",
+    "more": "Opciones del explorador",
+    "revealActive": "Mostrar archivo activo",
     "newFile": "Nuevo archivo",
     "newFolder": "Nueva carpeta",
     "refresh": "Actualizar",
@@ -15,6 +18,8 @@
     "nameDesc": "Nombre Z→A"
   },
   "contextMenu": {
+    "openToSide": "Abrir al lado",
+    "reveal": "Mostrar en el gestor de archivos",
     "newFileHere": "Nuevo archivo aquí",
     "newFolderHere": "Nueva carpeta aquí",
     "rename": "Renombrar",
@@ -42,6 +47,7 @@
     "noFiles": "Sin archivos en el workspace",
     "navHint": "↑↓ navegar",
     "openHint": "↵ abrir",
+    "sideHint": "Shift+↵ abrir al lado",
     "closeHint": "Esc cerrar",
     "dialogTitle": "Apertura rápida de archivo",
     "dialogDescription": "Escribe para buscar archivos en el workspace"
@@ -53,6 +59,19 @@
     "errorMoving": "Error al mover \"{{name}}\": {{message}}"
   },
   "panel": {
+    "emptyTitle": "Tu espacio de trabajo comienza aquí",
+    "emptyDescription": "Abre una carpeta para organizar tus diagramas y documentos.",
+    "openFolder": "Abrir carpeta",
+    "loading": "Cargando archivos…",
+    "loadFailed": "No se pudo leer este espacio de trabajo",
+    "unreadableFolder": "No se pudo leer esta carpeta",
+    "clearFilter": "Limpiar filtro",
+    "selectedCount": "{{count}} seleccionados",
+    "fileCount_one": "{{count}} archivo",
+    "fileCount_other": "{{count}} archivos",
+    "itemCount_one": "{{count}} elemento",
+    "itemCount_other": "{{count}} elementos",
+    "operationError": "La operación falló: {{message}}",
     "noFilesInFolder": "No hay archivos en esta carpeta",
     "noFilterResults": "Sin resultados para \"{{query}}\"",
     "deleteFileTitle": "Eliminar archivo",
@@ -68,6 +87,12 @@
     "batchDeletedSuccess": "{{count}} elementos eliminados"
   },
   "clipboard": {
+    "invalidTarget": "No se puede pegar una carpeta dentro de sí misma ni de una de sus subcarpetas.",
     "errorPasting": "Error al pegar \"{{name}}\": {{message}}"
+  },
+  "input": {
+    "name": "Nombre del archivo o carpeta",
+    "invalidName": "Escribe un nombre válido sin separadores de ruta ni caracteres reservados.",
+    "exists": "\"{{name}}\" ya existe. Elige otro nombre."
   }
 }

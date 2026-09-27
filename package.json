@@ -16,7 +16,8 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "bench:tabs": "node perf/bench-tabs.mjs"
   },
   "dependencies": {
     "@blocknote/core": "^0.47.3",
@@ -95,6 +96,7 @@
     "husky": "^9.1.7",
     "jsdom": "^28.1.0",
     "lint-staged": "^16.2.7",
+    "playwright": "1.56.1",
     "prettier": "^3.8.1",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.0",

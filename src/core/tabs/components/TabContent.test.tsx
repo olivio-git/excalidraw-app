@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import TabContent from "./TabContent";
 import { useTabStore } from "../store/tab-store";
+import { requestTabMount } from "../tab-mount";
 import { initialEditorLayout } from "../store/editor-layout";
 import { RouteRegistry } from "@/core/routing/route-registry";
 import { useTabContext } from "../hooks/use-tab-context";
@@ -119,13 +120,43 @@ describe("split editor workspace", () => {
     const ids = Array.from({ length: 16 }, (_, index) => add(`note-${index}.md`));
     render(<TabContent />);
     await screen.findByRole("textbox", { name: `editor-${ids[15]}` });
-    await waitFor(() => expect(mounted).toHaveBeenCalledTimes(16));
+    // Restored/background tabs are not mounted until they are first shown.
+    await waitFor(() => expect(mounted).toHaveBeenCalledTimes(1));
     rendered.mockClear();
 
     act(() => useTabStore.getState().setActiveTab(ids[0]));
 
     expect(new Set(rendered.mock.calls.map(([id]) => id))).toEqual(new Set([ids[0], ids[15]]));
     expect(unmounted).not.toHaveBeenCalled();
+  });
+
+  it("mounts keepMounted tabs on first view and keeps them mounted afterwards", async () => {
+    const [first, second] = [add("first.md"), add("second.md")];
+    render(<TabContent />);
+    await screen.findByRole("textbox", { name: `editor-${second}` });
+    expect(mounted.mock.calls.map(([id]) => id)).toEqual([second]);
+
+    act(() => useTabStore.getState().setActiveTab(first));
+    await screen.findByRole("textbox", { name: `editor-${first}` });
+    act(() => useTabStore.getState().setActiveTab(second));
+
+    // Hidden again, but still mounted: editor state (undo, scroll) survives.
+    expect(screen.getByRole("textbox", { name: `editor-${first}`, hidden: true })).toBeTruthy();
+    expect(unmounted).not.toHaveBeenCalled();
+  });
+
+  it("mounts a hidden tab when its editor is requested (e.g. by an AI tool)", async () => {
+    const hidden = add("hidden.md");
+    const visible = add("visible.md");
+    render(<TabContent />);
+    await screen.findByRole("textbox", { name: `editor-${visible}` });
+    expect(mounted).not.toHaveBeenCalledWith(hidden);
+
+    const path = useTabStore.getState().getTab(hidden)!.instanceId!;
+    act(() => requestTabMount(path));
+
+    await waitFor(() => expect(mounted).toHaveBeenCalledWith(hidden));
+    expect(useTabStore.getState().activeTabId).toBe(visible);
   });
 
   it("does not render unrelated editors when opening and closing a background tab", async () => {

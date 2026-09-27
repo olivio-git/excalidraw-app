@@ -72,7 +72,9 @@
     "allowCloseLastTab": "Permitir cerrar la última pestaña",
     "allowCloseLastTabDescription": "Cuando está activado, cerrar la última pestaña abierta muestra la pantalla de bienvenida en lugar de mantener la pestaña abierta.",
     "on": "Activado",
-    "off": "Desactivado"
+    "off": "Desactivado",
+    "enablePreview": "Pestañas de vista previa",
+    "enablePreviewDescription": "Un clic en el explorador abre el archivo en una pestaña temporal (título en cursiva) que el siguiente archivo reemplaza. Haz doble clic, edítala o fíjala para conservarla."
   },
   "ai": {
     "title": "Configuración de IA",

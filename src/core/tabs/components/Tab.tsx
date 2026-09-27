@@ -91,6 +91,7 @@ const Tab = React.memo(
             <Button
               variant="ghost"
               onClick={() => onTabClick(tab)}
+              onDoubleClick={() => useTabStore.getState().keepTab(tab.id)}
               onMouseDown={handleMiddleClick}
               {...attributes}
               {...listeners}
@@ -149,7 +150,7 @@ const Tab = React.memo(
                 <>
                   {Icon && <Icon className="size-3 flex-shrink-0" />}
                   <span
-                    className="truncate flex-1 text-left"
+                    className={cn("truncate flex-1 text-left", tab.isPreview && "italic")}
                     title={
                       tab.instanceId && homeDir
                         ? tildify(tab.instanceId, homeDir)

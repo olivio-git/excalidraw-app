@@ -1,4 +1,4 @@
-import { Suspense, lazy, memo, useEffect, useRef, type CSSProperties } from "react";
+import { Suspense, lazy, memo, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { ErrorBoundary } from "@/shared/components/error/ErrorBoundary";
@@ -7,6 +7,7 @@ import { RouteRegistry } from "@/core/routing/route-registry";
 import { contextKeyService } from "@/core/keybindings/context-key-service";
 import { TabContext } from "../hooks/use-tab-context";
 import { useTabStore } from "../store/tab-store";
+import { useTabMountStore } from "../tab-mount";
 import { tabGroup } from "../store/editor-layout";
 import { EDITOR_GROUP, type EditorGroupId, type SplitDirection } from "../types";
 import { useResizePreview } from "@/shared/hooks/useResizePreview";
@@ -36,22 +37,31 @@ function paneBounds(group: EditorGroupId, direction: SplitDirection | null): CSS
 const TabRenderer = memo(function TabRenderer({
   tabId,
   routeId,
+  instanceId,
   isActive,
   isVisible,
 }: {
   tabId: string;
   routeId: string;
+  instanceId?: string;
   isActive: boolean;
   isVisible: boolean;
 }) {
   const route = RouteRegistry.getRoute(routeId);
   const Component = route?.component;
   const { t } = useTranslation("tabs");
+  // keepMounted tabs are created the first time they are shown (not all at
+  // startup when a session is restored) and then stay mounted to keep their
+  // editor state. A hidden tab can also be mounted on request (tab-mount.ts).
+  const [wasVisible, setWasVisible] = useState(isVisible);
+  if (isVisible && !wasVisible) setWasVisible(true);
+  const mountRequested = useTabMountStore((state) => !!instanceId && !!state.requested[instanceId]);
+  const mounted = isVisible || (!!route?.tabConfig?.keepMounted && (wasVisible || mountRequested));
   return (
     <TabContext.Provider value={{ tabId, isActive, isVisible }}>
       <ErrorBoundary fallback={ErrorFallback} name={`TabBoundary-${routeId}`}>
         <Suspense fallback={<TabSkeleton />}>
-          {isVisible || route?.tabConfig?.keepMounted ? (
+          {mounted ? (
             Component ? (
               <Component />
             ) : (
@@ -162,6 +172,7 @@ export default function TabContent() {
             <TabRenderer
               tabId={tab.id}
               routeId={tab.routeId}
+              instanceId={tab.instanceId}
               isActive={activeTabId === tab.id}
               isVisible={visible}
             />

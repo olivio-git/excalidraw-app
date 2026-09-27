@@ -34,3 +34,5 @@ coverage/
 
 
 .env
+# Performance benchmark build (perf/)
+dist-perf/

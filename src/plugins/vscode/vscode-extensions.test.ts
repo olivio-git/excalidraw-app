@@ -178,6 +178,26 @@ describe("color themes", () => {
     expect(vars["--primary"]).toBeUndefined();
   });
 
+  it("keeps accent-colored separators out of --border (Dracula)", () => {
+    const vars = mapColorsToCssVariables(
+      {
+        "editor.background": "#282A36",
+        "editor.foreground": "#F8F8F2",
+        "panel.border": "#BD93F9",
+        "editorGroup.border": "#BD93F9",
+        "input.border": "#191A21",
+        "tab.inactiveForeground": "#6272A4",
+      },
+      "dark"
+    );
+    expect(vars["--border"]).toBe(toHslTriplet(parseHexColor("#191A21")!));
+    expect(vars["--input"]).toBe(vars["--border"]);
+    // No descriptionForeground → foreground at 70%, like VS Code, not the dim tab color.
+    expect(vars["--muted-foreground"]).toBe(toHslTriplet({ r: 186, g: 186, b: 186, a: 1 }));
+    // No sideBar border → subtle line derived from the foreground.
+    expect(vars["--sidebar-border"]).toBe(toHslTriplet({ r: 71, g: 73, b: 82, a: 1 }));
+  });
+
   it("merges include chains relative to the including file", async () => {
     const files: Record<string, ColorThemeDocument> = {
       "themes/dark.json": { include: "./base/common.json", colors: { a: "#111111" } },

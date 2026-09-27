@@ -11,6 +11,7 @@ import {
   resolveIconFilePath,
 } from "./icon-theme";
 import {
+  contrastRatio,
   kindFromUiTheme,
   loadColorThemeColors,
   mapColorsToCssVariables,
@@ -212,5 +213,101 @@ describe("color themes", () => {
     expect(kindFromUiTheme("hc-light")).toBe("light");
     expect(kindFromUiTheme("vs-dark")).toBe("dark");
     expect(kindFromUiTheme("hc-black")).toBe("dark");
+  });
+});
+
+describe("color theme contrast guarantees", () => {
+  /** Parse an `H S% L%` triplet back to RGB to measure what the app will render. */
+  const fromTriplet = (triplet: string) => {
+    const [h, s, l] = triplet.replace(/%/g, "").split(" ").map(Number);
+    const a = (s / 100) * Math.min(l / 100, 1 - l / 100);
+    const f = (n: number) => {
+      const k = (n + h / 30) % 12;
+      return Math.round(255 * (l / 100 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))));
+    };
+    return { r: f(0), g: f(8), b: f(4), a: 1 };
+  };
+  const contrast = (vars: Record<string, string>, fg: string, bg: string) =>
+    contrastRatio(fromTriplet(vars[fg]), fromTriplet(vars[bg]));
+
+  // Real Dracula colors (dracula-theme.theme-dracula 2.24.3).
+  const dracula = {
+    "editor.background": "#282A36",
+    "editor.foreground": "#F8F8F2",
+    foreground: "#F8F8F2",
+    "activityBarBadge.background": "#FF79C6",
+    "progressBar.background": "#FF79C6",
+    "button.background": "#44475A",
+    "button.foreground": "#F8F8F2",
+    "button.secondaryBackground": "#282A36",
+    focusBorder: "#6272A4",
+    "list.highlightForeground": "#8BE9FD",
+    "list.hoverBackground": "#44475A75",
+    "list.activeSelectionBackground": "#44475A",
+    "list.activeSelectionForeground": "#F8F8F2",
+    "sideBar.background": "#21222C",
+    "editorWidget.background": "#21222C",
+    "input.background": "#282A36",
+    "input.border": "#191A21",
+    errorForeground: "#FF5555",
+    "panel.border": "#BD93F9",
+    "editorGroup.border": "#BD93F9",
+  };
+
+  it("picks a readable brand color instead of a gray button (Dracula)", () => {
+    const vars = mapColorsToCssVariables(dracula, "dark");
+    // Pink accent, not the #44475A button gray.
+    expect(vars["--primary"]).toBe(toHslTriplet(parseHexColor("#FF79C6")!));
+    // Active tab: text-primary on bg-accent.
+    expect(contrast(vars, "--primary", "--accent")).toBeGreaterThanOrEqual(3);
+    expect(contrast(vars, "--primary", "--background")).toBeGreaterThanOrEqual(3);
+  });
+
+  it("keeps every text/surface pair readable (Dracula)", () => {
+    const vars = mapColorsToCssVariables(dracula, "dark");
+    for (const [fg, bg] of [
+      ["--foreground", "--background"],
+      ["--primary-foreground", "--primary"],
+      ["--secondary-foreground", "--secondary"],
+      ["--accent-foreground", "--accent"],
+      ["--card-foreground", "--card"],
+      ["--destructive-foreground", "--destructive"],
+      ["--sidebar-foreground", "--sidebar-background"],
+      ["--sidebar-accent-foreground", "--sidebar-accent"],
+    ]) {
+      expect(contrast(vars, fg, bg), `${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(contrast(vars, "--muted-foreground", "--background")).toBeGreaterThanOrEqual(3);
+  });
+
+  it("makes surfaces equal to the background stand out (Dracula secondary)", () => {
+    const vars = mapColorsToCssVariables(dracula, "dark");
+    // button.secondaryBackground is the editor background itself.
+    expect(vars["--secondary"]).not.toBe(vars["--background"]);
+    expect(contrast(vars, "--secondary", "--background")).toBeGreaterThanOrEqual(1.1);
+  });
+
+  it("works for light themes and keeps the button text when the button color wins", () => {
+    const vars = mapColorsToCssVariables(
+      {
+        "editor.background": "#ffffff",
+        "editor.foreground": "#1f2328",
+        "button.background": "#1f883d",
+        "button.foreground": "#ffffff",
+        "list.hoverBackground": "#eaeef2",
+      },
+      "light"
+    );
+    expect(vars["--primary"]).toBe(toHslTriplet(parseHexColor("#1f883d")!));
+    expect(vars["--primary-foreground"]).toBe("0 0% 100%");
+    expect(contrast(vars, "--primary-foreground", "--primary")).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(vars, "--accent-foreground", "--accent")).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("measures WCAG contrast", () => {
+    const white = { r: 255, g: 255, b: 255, a: 1 };
+    const black = { r: 0, g: 0, b: 0, a: 1 };
+    expect(contrastRatio(white, black)).toBeCloseTo(21, 5);
+    expect(contrastRatio(white, white)).toBe(1);
   });
 });

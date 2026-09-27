@@ -1,18 +1,15 @@
 import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
-import { PlugZap, RotateCcw, Trash2, Upload } from "lucide-react";
+import { FileImage, Palette, PlugZap, RotateCcw, Trash2, Upload } from "lucide-react";
 
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { PluginManager } from "@/plugins/plugin-manager";
 import { usePluginsState } from "@/plugins/hooks/usePluginsState";
-import {
-  installVsixExtension,
-  setActiveIconTheme,
-  uninstallVsixExtension,
-  useIconThemeState,
-} from "@/plugins/vscode/icon-theme-service";
+import { setActiveIconTheme, useIconThemeState } from "@/plugins/vscode/icon-theme-service";
+import { setActiveColorTheme, useColorThemeState } from "@/plugins/vscode/color-theme-service";
+import { installVsixExtension, uninstallVsixExtension } from "@/plugins/vscode/extension-manager";
 import { notify } from "@/shared/lib/notify";
 
 export default function PluginAdminPage() {
@@ -20,6 +17,7 @@ export default function PluginAdminPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
   const iconThemeState = useIconThemeState();
+  const colorThemeState = useColorThemeState();
   const plugins = usePluginsState();
 
   const handleInstallVsix = async () => {
@@ -30,7 +28,7 @@ export default function PluginAdminPage() {
       const extension = await installVsixExtension(await readFile(selected));
       notify(`${extension.displayName} instalado y activado`, { type: "success" });
     } catch (error) {
-      console.error("Failed to install VSIX icon theme", error);
+      console.error("Failed to install VSIX extension", error);
       notify("No se pudo instalar la extensión", { type: "error", description: String(error) });
     } finally {
       setIsInstalling(false);
@@ -45,6 +43,17 @@ export default function PluginAdminPage() {
       });
     } catch (error) {
       notify("No se pudo cambiar el tema de iconos", { type: "error", description: String(error) });
+    }
+  };
+
+  const handleActivateColorTheme = async (key: string | null, label?: string) => {
+    try {
+      await setActiveColorTheme(key);
+      notify(key ? `Tema de color activo: ${label}` : "Tema de color desactivado", {
+        type: key ? "success" : "info",
+      });
+    } catch (error) {
+      notify("No se pudo cambiar el tema de color", { type: "error", description: String(error) });
     }
   };
 
@@ -129,16 +138,26 @@ export default function PluginAdminPage() {
 
       {iconThemeState.extensions.length > 0 && (
         <section className="rounded-xl border border-border bg-card/70 p-4 space-y-3">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">Extensiones VS Code instaladas</h2>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!iconThemeState.activeKey}
-              onClick={() => void handleActivateIconTheme(null)}
-            >
-              Desactivar tema de iconos
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!colorThemeState.activeKey}
+                onClick={() => void handleActivateColorTheme(null)}
+              >
+                Desactivar tema de color
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!iconThemeState.activeKey}
+                onClick={() => void handleActivateIconTheme(null)}
+              >
+                Desactivar tema de iconos
+              </Button>
+            </div>
           </div>
           <div className="space-y-2">
             {iconThemeState.extensions.map((extension) => (
@@ -155,6 +174,26 @@ export default function PluginAdminPage() {
                   </p>
                   <p className="text-[11px] text-muted-foreground truncate">{extension.id}</p>
                 </div>
+                {colorThemeState.themes
+                  .filter((theme) => theme.extension.id === extension.id)
+                  .map((theme) => {
+                    const isActive = colorThemeState.activeKey === theme.key;
+                    return (
+                      <Button
+                        key={theme.key}
+                        size="sm"
+                        variant={isActive ? "default" : "secondary"}
+                        disabled={isActive}
+                        title="Tema de color"
+                        className="gap-1.5"
+                        onClick={() => void handleActivateColorTheme(theme.key, theme.label)}
+                      >
+                        <Palette className="size-3.5" />
+                        {theme.label}
+                        {isActive ? " · Activo" : ""}
+                      </Button>
+                    );
+                  })}
                 {iconThemeState.themes
                   .filter((theme) => theme.extension.id === extension.id)
                   .map((theme) => {
@@ -165,8 +204,11 @@ export default function PluginAdminPage() {
                         size="sm"
                         variant={isActive ? "default" : "secondary"}
                         disabled={isActive}
+                        title="Tema de iconos"
+                        className="gap-1.5"
                         onClick={() => void handleActivateIconTheme(theme.key, theme.label)}
                       >
+                        <FileImage className="size-3.5" />
                         {theme.label}
                         {isActive ? " · Activo" : ""}
                       </Button>

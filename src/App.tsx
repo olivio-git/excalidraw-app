@@ -6,6 +6,7 @@ import Shell from "@/core/shell/Shell";
 import { registerFeatureRoutes } from "@/features/_registry";
 import { TabRouter } from "@/core/routing/tab-router";
 import { PluginManager } from "@/plugins/plugin-manager";
+import { ensureColorThemesInitialized } from "@/plugins/vscode/color-theme-service";
 import SplashScreen from "@/shared/common/SplashScreen";
 import { ErrorBoundary } from "@/shared/components/error/ErrorBoundary";
 import { ErrorFallback } from "@/shared/components/error/ErrorFallback";
@@ -31,6 +32,8 @@ export default function App() {
     const init = async () => {
       await PluginManager.loadExternalPlugins();
       await PluginManager.activateAll();
+      // Restore the VS Code color theme before the first paint of the shell.
+      await ensureColorThemesInitialized();
       if (import.meta.env.DEV) {
         (window as any).__pluginManager = PluginManager;
       }

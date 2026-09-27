@@ -1,14 +1,11 @@
 import { useSyncExternalStore } from "react";
-import { createTauriStorage } from "@/core/storage/tauri-storage";
 import { useThemeStore } from "@/stores/themeStore";
+import { readExtensionFile, readExtensionJson, type InstalledExtension } from "./extension-storage";
 import {
-  installVsix as installVsixToDisk,
-  listInstalledExtensions,
-  readExtensionFile,
-  readExtensionJson,
-  uninstallExtension as uninstallFromDisk,
-  type InstalledExtension,
-} from "./extension-storage";
+  extensionSettings as settings,
+  loadInstalledExtensions,
+  onInstalledExtensionsChanged,
+} from "./extension-registry";
 import {
   normalizeIconTheme,
   resolveFileIconId,
@@ -54,7 +51,6 @@ interface ActiveTheme {
 const ACTIVE_THEME_KEY = "activeIconTheme";
 const LEGACY_LOCAL_STORAGE_KEYS = ["qori.vsix-icon-themes", "qori.vsix-icon-theme-active"];
 
-const settings = createTauriStorage("extensions-storage.json");
 const listeners = new Set<() => void>();
 
 let state: IconThemeState = {
@@ -88,14 +84,14 @@ function scheduleEmit(): void {
   }, 0);
 }
 
-function themeKey(extension: InstalledExtension, themeId: string): string {
+export function iconThemeKey(extension: InstalledExtension, themeId: string): string {
   return `${extension.id}/${themeId}`;
 }
 
 function toOptions(extensions: InstalledExtension[]): IconThemeOption[] {
   return extensions.flatMap((extension) =>
     extension.iconThemes.map((theme) => ({
-      key: themeKey(extension, theme.id),
+      key: iconThemeKey(extension, theme.id),
       label: theme.label ?? theme.id,
       extension,
     }))
@@ -124,7 +120,7 @@ async function loadTheme(key: string | null): Promise<void> {
   const option = toOptions(state.extensions).find((theme) => theme.key === key);
   if (!option) return;
   const contribution = option.extension.iconThemes.find(
-    (theme) => themeKey(option.extension, theme.id) === key
+    (theme) => iconThemeKey(option.extension, theme.id) === key
   );
   const themePath = contribution && normalizeRelativePath(contribution.path);
   if (!themePath) return;
@@ -140,9 +136,18 @@ async function loadTheme(key: string | null): Promise<void> {
   }
 }
 
-async function refreshExtensions(): Promise<void> {
-  const extensions = await listInstalledExtensions();
+function setExtensions(extensions: InstalledExtension[]): void {
   state = { ...state, extensions, themes: toOptions(extensions) };
+}
+
+async function handleExtensionsChanged(extensions: InstalledExtension[]): Promise<void> {
+  setExtensions(extensions);
+  // The active theme's extension was uninstalled.
+  if (state.activeKey && !state.themes.some((theme) => theme.key === state.activeKey)) {
+    await setActiveIconTheme(null);
+  } else {
+    emit();
+  }
 }
 
 async function initialize(): Promise<void> {
@@ -160,8 +165,10 @@ async function initialize(): Promise<void> {
     }
   });
 
+  onInstalledExtensionsChanged(handleExtensionsChanged);
+
   try {
-    await refreshExtensions();
+    setExtensions(await loadInstalledExtensions());
     const activeKey = await settings.getItem(ACTIVE_THEME_KEY);
     await loadTheme(activeKey);
     state = { ...state, activeKey: active?.key ?? null };
@@ -231,24 +238,6 @@ export async function setActiveIconTheme(key: string | null): Promise<void> {
   else await settings.removeItem(ACTIVE_THEME_KEY);
   state = { ...state, activeKey };
   emit();
-}
-
-/** Install a `.vsix` and activate its first icon theme. */
-export async function installVsixExtension(bytes: Uint8Array): Promise<InstalledExtension> {
-  await ensureIconThemesInitialized();
-  const extension = await installVsixToDisk(bytes);
-  await refreshExtensions();
-  await setActiveIconTheme(themeKey(extension, extension.iconThemes[0].id));
-  return extension;
-}
-
-export async function uninstallVsixExtension(id: string): Promise<void> {
-  await ensureIconThemesInitialized();
-  const wasActive = active?.extension.id === id;
-  await uninstallFromDisk(id);
-  await refreshExtensions();
-  if (wasActive) await setActiveIconTheme(null);
-  else emit();
 }
 
 function subscribe(listener: () => void): () => void {

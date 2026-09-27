@@ -34,11 +34,12 @@ import {
   ensureIconThemesInitialized,
   getFileIconUrl,
   getFolderIconUrl,
-  installVsixExtension,
   setActiveIconTheme,
-  uninstallVsixExtension,
   useIconThemeState,
 } from "./icon-theme-service";
+import { setActiveColorTheme, useColorThemeState } from "./color-theme-service";
+import { installVsixExtension, uninstallVsixExtension } from "./extension-manager";
+import { useThemeStore } from "@/stores/themeStore";
 import { renderHook, waitFor } from "@testing-library/react";
 
 function buildVsix(version: string) {
@@ -49,7 +50,10 @@ function buildVsix(version: string) {
         publisher: "acme",
         displayName: "Demo Icons",
         version,
-        contributes: { iconThemes: [{ id: "demo", label: "Demo", path: "./dist/theme.json" }] },
+        contributes: {
+          iconThemes: [{ id: "demo", label: "Demo", path: "./dist/theme.json" }],
+          themes: [{ label: "Demo Light", uiTheme: "vs", path: "./themes/light.json" }],
+        },
       })
     ),
     // JSONC on purpose: comments and trailing commas must be accepted.
@@ -62,12 +66,22 @@ function buildVsix(version: string) {
       "fileExtensions": { "ts": "ts" },
       "folder": "folder",
     }`),
+    // Color theme with an `include` chain: the including file wins.
+    "extension/themes/base.json": strToU8(
+      JSON.stringify({ colors: { "editor.background": "#000000", "button.background": "#ff0000" } })
+    ),
+    "extension/themes/light.json": strToU8(
+      JSON.stringify({
+        include: "./base.json",
+        colors: { "editor.background": "#ffffff", focusBorder: "#0000ff80" },
+      })
+    ),
     "extension/icons/ts.svg": strToU8("<svg id='ts'/>"),
     "extension/icons/folder.svg": strToU8("<svg id='folder'/>"),
   });
 }
 
-describe("icon theme service", () => {
+describe("VS Code extension manager", () => {
   beforeAll(() => {
     let counter = 0;
     URL.createObjectURL = vi.fn(() => `blob:icon-${++counter}`);
@@ -96,6 +110,24 @@ describe("icon theme service", () => {
     expect(getFileIconUrl("README.md")).toBeNull();
   });
 
+  it("applies the color theme as CSS variables and switches to its light/dark mode", async () => {
+    const { result } = renderHook(() => useColorThemeState());
+    await waitFor(() => expect(result.current.activeKey).toBe("acme.demo-icons/Demo Light"));
+
+    const root = document.documentElement.style;
+    expect(root.getPropertyValue("--background")).toBe("0 0% 100%");
+    expect(root.getPropertyValue("--primary")).toBe("0 100% 50%");
+    // #0000ff at 50% alpha composited over the white editor background.
+    expect(root.getPropertyValue("--ring")).toBe("240 100% 74.9%");
+    expect(useThemeStore.getState().resolvedTheme).toBe("light");
+
+    await setActiveColorTheme(null);
+    expect(root.getPropertyValue("--background")).toBe("");
+    expect(root.getPropertyValue("--primary")).toBe("");
+    await setActiveColorTheme("acme.demo-icons/Demo Light");
+    expect(root.getPropertyValue("--background")).toBe("0 0% 100%");
+  });
+
   it("can be disabled without falling back to another installed theme", async () => {
     await setActiveIconTheme(null);
     expect(getFileIconUrl("main.ts")).toBeNull();
@@ -114,5 +146,7 @@ describe("icon theme service", () => {
     expect([...disk.keys()].filter((key) => key.includes("demo-icons"))).toEqual([]);
     expect(JSON.parse(disk.get("extensions/extensions.json") as string)).toEqual([]);
     expect(getFileIconUrl("main.ts")).toBeNull();
+    // Uninstalling the extension also removes its color theme.
+    expect(document.documentElement.style.getPropertyValue("--background")).toBe("");
   });
 });

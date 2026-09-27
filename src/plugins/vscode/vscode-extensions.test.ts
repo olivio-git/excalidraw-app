@@ -10,6 +10,14 @@ import {
   resolveFolderIconId,
   resolveIconFilePath,
 } from "./icon-theme";
+import {
+  kindFromUiTheme,
+  loadColorThemeColors,
+  mapColorsToCssVariables,
+  parseHexColor,
+  toHslTriplet,
+  type ColorThemeDocument,
+} from "./color-theme";
 
 describe("parseJsonc", () => {
   it("accepts comments, trailing commas and a BOM", () => {
@@ -138,5 +146,51 @@ describe("icon theme resolution", () => {
     expect(resolveIconFilePath(theme, "theme.json", "ts")).toBeNull();
     expect(resolveIconFilePath(theme, "dist/theme.json", "glyph")).toBeNull();
     expect(resolveIconFilePath(theme, "dist/theme.json", "missing")).toBeNull();
+  });
+});
+
+describe("color themes", () => {
+  it("parses the hex formats VS Code accepts", () => {
+    expect(parseHexColor("#fff")).toEqual({ r: 255, g: 255, b: 255, a: 1 });
+    expect(parseHexColor("#00000080")?.a).toBeCloseTo(0.5, 2);
+    expect(parseHexColor("red")).toBeNull();
+  });
+
+  it("converts colors to the app's HSL triplets", () => {
+    expect(toHslTriplet({ r: 255, g: 0, b: 0, a: 1 })).toBe("0 100% 50%");
+    expect(toHslTriplet({ r: 30, g: 30, b: 30, a: 1 })).toBe("0 0% 11.8%");
+  });
+
+  it("maps workbench colors with fallbacks and blends translucent ones", () => {
+    const vars = mapColorsToCssVariables(
+      {
+        "editor.background": "#000000",
+        foreground: "#ffffff",
+        "list.hoverBackground": "#ffffff80",
+      },
+      "dark"
+    );
+    expect(vars["--background"]).toBe("0 0% 0%");
+    // No editor.foreground → falls back to the generic foreground.
+    expect(vars["--foreground"]).toBe("0 0% 100%");
+    expect(vars["--accent"]).toBe("0 0% 50.2%");
+    // Unmapped variables are left to the app defaults.
+    expect(vars["--primary"]).toBeUndefined();
+  });
+
+  it("merges include chains relative to the including file", async () => {
+    const files: Record<string, ColorThemeDocument> = {
+      "themes/dark.json": { include: "./base/common.json", colors: { a: "#111111" } },
+      "themes/base/common.json": { colors: { a: "#000000", b: "#222222" } },
+    };
+    const colors = await loadColorThemeColors(async (path) => files[path], "themes/dark.json");
+    expect(colors).toEqual({ a: "#111111", b: "#222222" });
+  });
+
+  it("maps uiTheme to light or dark", () => {
+    expect(kindFromUiTheme("vs")).toBe("light");
+    expect(kindFromUiTheme("hc-light")).toBe("light");
+    expect(kindFromUiTheme("vs-dark")).toBe("dark");
+    expect(kindFromUiTheme("hc-black")).toBe("dark");
   });
 });

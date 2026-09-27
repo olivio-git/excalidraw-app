@@ -114,12 +114,23 @@ export const CSS_VARIABLE_SOURCES: Record<string, string[]> = {
   "--secondary": ["button.secondaryBackground", "input.background"],
   "--secondary-foreground": ["button.secondaryForeground", "foreground"],
   "--muted": ["input.background", "editorWidget.background"],
-  "--muted-foreground": ["descriptionForeground", "tab.inactiveForeground"],
+  "--muted-foreground": ["descriptionForeground"],
   "--accent": ["list.hoverBackground", "list.inactiveSelectionBackground"],
   "--accent-foreground": ["list.hoverForeground", "foreground"],
   "--destructive": ["errorForeground", "editorError.foreground"],
-  "--border": ["panel.border", "editorGroup.border", "sideBar.border", "contrastBorder"],
-  "--input": ["input.border", "panel.border", "editorGroup.border"],
+  // `--border` outlines every card, badge and input in the app, so it takes
+  // component borders — not `panel.border`/`editorGroup.border`, which themes
+  // often paint in an accent color because VS Code draws them as a single line.
+  "--border": [
+    "contrastBorder",
+    "widget.border",
+    "editorWidget.border",
+    "dropdown.border",
+    "input.border",
+    "tab.border",
+    "sideBarSectionHeader.border",
+  ],
+  "--input": ["contrastBorder", "input.border", "dropdown.border"],
   "--ring": ["focusBorder"],
   "--sidebar-background": ["sideBar.background"],
   "--sidebar-foreground": ["sideBar.foreground", "foreground"],
@@ -127,8 +138,21 @@ export const CSS_VARIABLE_SOURCES: Record<string, string[]> = {
   "--sidebar-primary-foreground": ["activityBarBadge.foreground"],
   "--sidebar-accent": ["list.activeSelectionBackground", "list.hoverBackground"],
   "--sidebar-accent-foreground": ["list.activeSelectionForeground", "sideBar.foreground"],
-  "--sidebar-border": ["sideBar.border", "panel.border", "contrastBorder"],
+  "--sidebar-border": ["contrastBorder", "sideBar.border", "sideBarSectionHeader.border"],
   "--sidebar-ring": ["focusBorder"],
+};
+
+/**
+ * Variables derived from the foreground when the theme defines none of their
+ * keys, the way VS Code derives its own defaults (e.g. `descriptionForeground`
+ * is the foreground at 70% opacity). Keeps the theme's hue instead of the
+ * app default, which would clash with it.
+ */
+const DERIVED_FROM_FOREGROUND: Record<string, number> = {
+  "--muted-foreground": 0.7,
+  "--border": 0.15,
+  "--input": 0.15,
+  "--sidebar-border": 0.15,
 };
 
 /**
@@ -151,6 +175,13 @@ export function mapColorsToCssVariables(
       if (!parsed) continue;
       result[variable] = toHslTriplet(parsed.a < 1 ? blend(parsed, base) : parsed);
       break;
+    }
+  }
+
+  const foreground = parseHexColor(colors["editor.foreground"] ?? colors.foreground ?? "");
+  if (foreground) {
+    for (const [variable, alpha] of Object.entries(DERIVED_FROM_FOREGROUND)) {
+      result[variable] ??= toHslTriplet(blend({ ...foreground, a: alpha }, base));
     }
   }
   return result;

@@ -28,11 +28,11 @@ function formatChord(entry: KeybindingEntry): string {
 function sourceBadgeClasses(source: KeybindingSource): string {
   switch (source) {
     case KeybindingSource.User:
-      return "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700";
+      return "bg-primary/15 text-primary border-primary/40";
     case KeybindingSource.Plugin:
-      return "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-700";
+      return "bg-accent text-accent-foreground border-border";
     default:
-      return "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700";
+      return "bg-muted text-muted-foreground border-border";
   }
 }
 
@@ -116,11 +116,11 @@ function ReassignCapture({ entry, t, onConfirm, onCancel }: ReassignCaptureProps
         readOnly
         value={capturedKey ? capturedKey : t("keybindings.capture.pressKey")}
         onKeyDown={handleKeyDown}
-        className="h-7 w-48 rounded border border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 px-2 text-xs font-mono text-zinc-700 dark:text-zinc-300 outline-none focus:border-blue-400 dark:focus:border-blue-500"
+        className="h-7 w-48 rounded border border-input bg-background px-2 text-xs font-mono text-foreground outline-none focus:border-ring"
       />
       {capturedKey && (
         <button
-          className="h-7 rounded border border-blue-500 dark:border-blue-400 bg-blue-500 dark:bg-blue-600 px-2 text-xs font-medium text-white hover:bg-blue-600 dark:hover:bg-blue-500 transition-colors"
+          className="h-7 rounded border border-primary bg-primary px-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           onClick={() => {
             const chord = keyNormalizer.normalizeChord(capturedKey);
             const newEntry: KeybindingEntry = { ...entry, chord, source: KeybindingSource.User };
@@ -131,7 +131,7 @@ function ReassignCapture({ entry, t, onConfirm, onCancel }: ReassignCaptureProps
         </button>
       )}
       <button
-        className="h-7 rounded border border-zinc-200 dark:border-zinc-700 bg-transparent px-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+        className="h-7 rounded border border-border bg-transparent px-2 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
         onClick={onCancel}
       >
         {t("keybindings.capture.cancel")}
@@ -197,20 +197,17 @@ export default function KeybindingsPanel() {
           <div>
             <div className="flex items-center gap-2">
               <span
-                className={cn(
-                  "font-medium",
-                  conflict ? "text-red-700 dark:text-red-400" : "text-foreground"
-                )}
+                className={cn("font-medium", conflict ? "text-destructive" : "text-foreground")}
               >
                 {label}
               </span>
               {conflict && (
-                <span className="inline-flex items-center rounded border border-red-300 dark:border-red-700 bg-red-100 dark:bg-red-900/50 px-1.5 py-0 text-[10px] font-medium text-red-700 dark:text-red-300">
+                <span className="inline-flex items-center rounded border border-destructive/50 bg-destructive/15 px-1.5 py-0 text-[10px] font-medium text-destructive">
                   {t("keybindings.badge.conflict")}
                 </span>
               )}
               {overridden && !conflict && (
-                <span className="inline-flex items-center rounded border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                <span className="inline-flex items-center rounded border border-primary/40 bg-primary/10 px-1.5 py-0 text-[10px] font-medium text-primary">
                   {t("keybindings.badge.modified")}
                 </span>
               )}
@@ -312,9 +309,7 @@ export default function KeybindingsPanel() {
           }
         }}
         getRowClassName={(entry) =>
-          isConflict(entry)
-            ? "bg-red-50 dark:bg-red-950/30 hover:bg-red-100! dark:hover:bg-red-950/50!"
-            : undefined
+          isConflict(entry) ? "bg-destructive/10 hover:bg-destructive/15!" : undefined
         }
         getRowId={(entry) => entry.commandId}
       />

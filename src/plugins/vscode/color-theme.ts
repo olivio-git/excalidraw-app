@@ -98,9 +98,32 @@ export function toHslTriplet({ r, g, b }: Rgba): string {
   return `${round(h)} ${round(s * 100)}% ${round(l * 100)}%`;
 }
 
+/** WCAG relative luminance. */
+function luminance({ r, g, b }: Rgba): number {
+  const channel = (value: number) => {
+    const c = value / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+/** WCAG contrast ratio between two opaque colors (1–21). */
+export function contrastRatio(a: Rgba, b: Rgba): number {
+  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (light + 0.05) / (dark + 0.05);
+}
+
+/** Minimum contrast for body text (WCAG AA). */
+const MIN_TEXT_CONTRAST = 4.5;
+/** Minimum contrast for icons, large text and UI accents (WCAG AA). */
+const MIN_UI_CONTRAST = 3;
+/** Below this, a surface is indistinguishable from what it sits on. */
+const MIN_SURFACE_CONTRAST = 1.1;
+
 /**
  * App CSS variable → VS Code color keys, most specific first.
- * The first key the theme defines wins; unmapped variables keep the app default.
+ * The first key the theme defines wins; the brand color, text colors and
+ * surfaces are then checked for contrast (see `mapColorsToCssVariables`).
  */
 export const CSS_VARIABLE_SOURCES: Record<string, string[]> = {
   "--background": ["editor.background"],
@@ -109,8 +132,6 @@ export const CSS_VARIABLE_SOURCES: Record<string, string[]> = {
   "--card-foreground": ["editorWidget.foreground", "foreground", "editor.foreground"],
   "--popover": ["menu.background", "dropdown.background", "editorWidget.background"],
   "--popover-foreground": ["menu.foreground", "dropdown.foreground", "foreground"],
-  "--primary": ["button.background", "focusBorder"],
-  "--primary-foreground": ["button.foreground"],
   "--secondary": ["button.secondaryBackground", "input.background"],
   "--secondary-foreground": ["button.secondaryForeground", "foreground"],
   "--muted": ["input.background", "editorWidget.background"],
@@ -134,13 +155,26 @@ export const CSS_VARIABLE_SOURCES: Record<string, string[]> = {
   "--ring": ["focusBorder"],
   "--sidebar-background": ["sideBar.background"],
   "--sidebar-foreground": ["sideBar.foreground", "foreground"],
-  "--sidebar-primary": ["activityBarBadge.background", "focusBorder"],
-  "--sidebar-primary-foreground": ["activityBarBadge.foreground"],
   "--sidebar-accent": ["list.activeSelectionBackground", "list.hoverBackground"],
   "--sidebar-accent-foreground": ["list.activeSelectionForeground", "sideBar.foreground"],
   "--sidebar-border": ["contrastBorder", "sideBar.border", "sideBarSectionHeader.border"],
   "--sidebar-ring": ["focusBorder"],
 };
+
+/**
+ * Candidates for the brand color (`--primary`, `--sidebar-primary`). The app
+ * uses it both as button background and as text/icon color (`text-primary`,
+ * e.g. the active tab), so the first candidate readable on the background wins.
+ * `button.background` is not first: many themes (Dracula) make it a gray.
+ */
+export const BRAND_SOURCES = [
+  "textLink.foreground",
+  "activityBarBadge.background",
+  "progressBar.background",
+  "button.background",
+  "focusBorder",
+  "list.highlightForeground",
+];
 
 /**
  * Variables derived from the foreground when the theme defines none of their
@@ -156,33 +190,136 @@ const DERIVED_FROM_FOREGROUND: Record<string, number> = {
 };
 
 /**
+ * Surfaces that must stand out from what they sit on (secondary buttons,
+ * chips, hover/selection). Missing or indistinguishable ones are derived as
+ * the foreground at `alpha` over their base.
+ */
+const SURFACES: Array<{ variable: string; on: string; alpha: number }> = [
+  { variable: "--secondary", on: "--background", alpha: 0.1 },
+  { variable: "--muted", on: "--background", alpha: 0.08 },
+  { variable: "--accent", on: "--background", alpha: 0.12 },
+  { variable: "--sidebar-accent", on: "--sidebar-background", alpha: 0.12 },
+];
+
+/** Text variables and the background they are drawn on. */
+const TEXT_PAIRS: Array<[background: string, text: string]> = [
+  ["--card", "--card-foreground"],
+  ["--popover", "--popover-foreground"],
+  ["--primary", "--primary-foreground"],
+  ["--secondary", "--secondary-foreground"],
+  ["--muted", "--muted-foreground"],
+  ["--accent", "--accent-foreground"],
+  ["--destructive", "--destructive-foreground"],
+  ["--sidebar-background", "--sidebar-foreground"],
+  ["--sidebar-primary", "--sidebar-primary-foreground"],
+  ["--sidebar-accent", "--sidebar-accent-foreground"],
+];
+
+/** First candidate reaching `min` contrast on `background`, else the highest-contrast one. */
+function pickReadable(
+  candidates: Array<Rgba | undefined>,
+  background: Rgba,
+  min: number
+): Rgba | undefined {
+  const defined = candidates.filter((c): c is Rgba => c !== undefined);
+  return (
+    defined.find((c) => contrastRatio(c, background) >= min) ??
+    defined.sort((a, b) => contrastRatio(b, background) - contrastRatio(a, background))[0]
+  );
+}
+
+/**
  * Map VS Code workbench colors onto the app CSS variables.
+ *
  * Translucent colors are composited over the editor background, since the
- * variables are consumed as opaque `hsl(var(--x))`.
+ * variables are consumed as opaque `hsl(var(--x))`. Because VS Code keys don't
+ * map 1:1 to how the app uses each variable, the result is checked for
+ * contrast: the brand color must read on the background, text must read on its
+ * surface, and surfaces must stand out from their base.
  */
 export function mapColorsToCssVariables(
   colors: Record<string, string>,
   kind: ColorThemeKind
 ): Record<string, string> {
-  const base =
-    parseHexColor(colors["editor.background"] ?? "") ??
-    (kind === "dark" ? { r: 30, g: 30, b: 30, a: 1 } : { r: 255, g: 255, b: 255, a: 1 });
+  const fallbackBackground =
+    kind === "dark" ? { r: 30, g: 30, b: 30, a: 1 } : { r: 255, g: 255, b: 255, a: 1 };
+  const base = parseHexColor(colors["editor.background"] ?? "") ?? fallbackBackground;
+  const read = (key: string): Rgba | undefined => {
+    const parsed = colors[key] ? parseHexColor(colors[key]) : null;
+    if (!parsed) return undefined;
+    return parsed.a < 1 ? blend(parsed, base) : parsed;
+  };
 
-  const result: Record<string, string> = {};
+  const resolved: Record<string, Rgba> = {};
   for (const [variable, keys] of Object.entries(CSS_VARIABLE_SOURCES)) {
     for (const key of keys) {
-      const parsed = colors[key] ? parseHexColor(colors[key]) : null;
-      if (!parsed) continue;
-      result[variable] = toHslTriplet(parsed.a < 1 ? blend(parsed, base) : parsed);
-      break;
+      const color = read(key);
+      if (color) {
+        resolved[variable] = color;
+        break;
+      }
     }
   }
 
-  const foreground = parseHexColor(colors["editor.foreground"] ?? colors.foreground ?? "");
-  if (foreground) {
-    for (const [variable, alpha] of Object.entries(DERIVED_FROM_FOREGROUND)) {
-      result[variable] ??= toHslTriplet(blend({ ...foreground, a: alpha }, base));
+  const background = resolved["--background"] ?? base;
+  const foreground =
+    resolved["--foreground"] ??
+    (kind === "dark" ? { r: 255, g: 255, b: 255, a: 1 } : { r: 0, g: 0, b: 0, a: 1 });
+  const onBase = (variable: string) => resolved[variable] ?? background;
+  const tint = (alpha: number, on: Rgba) => blend({ ...foreground, a: alpha }, on);
+
+  for (const [variable, alpha] of Object.entries(DERIVED_FROM_FOREGROUND)) {
+    resolved[variable] ??= tint(alpha, background);
+  }
+  if (contrastRatio(resolved["--muted-foreground"], background) < MIN_UI_CONTRAST) {
+    resolved["--muted-foreground"] = tint(
+      DERIVED_FROM_FOREGROUND["--muted-foreground"],
+      background
+    );
+  }
+
+  for (const { variable, on, alpha } of SURFACES) {
+    const surface = resolved[variable];
+    if (!surface || contrastRatio(surface, onBase(on)) < MIN_SURFACE_CONTRAST) {
+      resolved[variable] = tint(alpha, onBase(on));
     }
   }
-  return result;
+
+  const brandCandidates = BRAND_SOURCES.map((key) => ({ key, color: read(key) })).filter(
+    (candidate) => candidate.color
+  );
+  const pickBrand = (on: Rgba) => {
+    const color = pickReadable(
+      brandCandidates.map((c) => c.color),
+      on,
+      MIN_UI_CONTRAST
+    );
+    return color && brandCandidates.find((c) => c.color === color);
+  };
+  const brand = pickBrand(background);
+  if (brand?.color) {
+    resolved["--primary"] = brand.color;
+    // The button's own text color is the best match when the button color won.
+    const buttonForeground =
+      brand.key === "button.background" ? read("button.foreground") : undefined;
+    if (buttonForeground) resolved["--primary-foreground"] = buttonForeground;
+    resolved["--ring"] ??= brand.color;
+  }
+  const sidebarBrand = pickBrand(onBase("--sidebar-background"));
+  if (sidebarBrand?.color) {
+    resolved["--sidebar-primary"] = sidebarBrand.color;
+    resolved["--sidebar-ring"] ??= resolved["--ring"] ?? sidebarBrand.color;
+  }
+
+  for (const [surfaceVariable, textVariable] of TEXT_PAIRS) {
+    const surface = resolved[surfaceVariable];
+    if (!surface) continue;
+    const min = textVariable === "--muted-foreground" ? MIN_UI_CONTRAST : MIN_TEXT_CONTRAST;
+    const text = pickReadable([resolved[textVariable], foreground, background], surface, min);
+    if (text) resolved[textVariable] = text;
+  }
+
+  return Object.fromEntries(
+    Object.entries(resolved).map(([variable, color]) => [variable, toHslTriplet(color)])
+  );
 }

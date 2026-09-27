@@ -1,6 +1,8 @@
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { isSameOrDescendant } from "./explorer-file-operations";
+import { useTabStore } from "@/core/tabs/store/tab-store";
+import { selectActiveFilePath } from "./active-file";
 
 // ---------------------------------------------------------------------------
 // ExplorerBreadcrumb — Task 3.4
@@ -10,7 +12,6 @@ import { isSameOrDescendant } from "./explorer-file-operations";
 // ---------------------------------------------------------------------------
 
 interface ExplorerBreadcrumbProps {
-  activeFilePath: string | undefined;
   workspaceDir: string;
   /** Called with all ancestor paths that should be added to expandedPaths */
   onExpandPaths: (paths: string[]) => void;
@@ -24,11 +25,9 @@ function getSegments(filePath: string, workspaceDir: string): string[] {
   return relative.split(/[\\/]/).filter(Boolean);
 }
 
-export const ExplorerBreadcrumb = ({
-  activeFilePath,
-  workspaceDir,
-  onExpandPaths,
-}: ExplorerBreadcrumbProps) => {
+export const ExplorerBreadcrumb = ({ workspaceDir, onExpandPaths }: ExplorerBreadcrumbProps) => {
+  // Subscribes on its own so the explorer doesn't re-render on tab switches.
+  const activeFilePath = useTabStore(selectActiveFilePath);
   if (!activeFilePath || !isSameOrDescendant(activeFilePath, workspaceDir)) return null;
 
   const segments = getSegments(activeFilePath, workspaceDir);

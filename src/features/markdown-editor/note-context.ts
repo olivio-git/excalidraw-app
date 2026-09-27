@@ -11,6 +11,8 @@ export interface NoteContext {
   /** Open a link (note, diagram, URL, `#heading`) the way the workbench does. */
   open: (href: string, options?: { beside?: boolean }) => void;
   readFile: (path: string) => Promise<Uint8Array>;
+  /** Last modification time (ms) of a file, to know when a preview is stale. */
+  modifiedAt: (path: string) => Promise<number | null>;
   renderDiagram: (path: string, dark: boolean) => Promise<Blob>;
 }
 

@@ -21,8 +21,6 @@ export function embedHref(match: RegExpExecArray): string {
   return match[2] ?? match[3];
 }
 
-const objectUrls = new Map<string, Promise<string>>();
-
 function imageMime(path: string): string {
   const ext = path.split(".").pop()?.toLowerCase();
   if (ext === "svg") return "image/svg+xml";
@@ -30,41 +28,60 @@ function imageMime(path: string): string {
   return `image/${ext}`;
 }
 
-/** Dispatch to re-render previews (e.g. after switching light/dark mode). */
+/**
+ * Dispatch when previews may be stale (tab re-activated, light/dark switch).
+ * Widgets re-check their file's modification time and only re-render the
+ * preview if it changed, so this is cheap to call often.
+ */
 export const refreshEmbeds = StateEffect.define<null>();
 
-/** Cached object URL for a rendered diagram or local image. */
-function previewUrl(
+/** Bumped by `refreshEmbeds`, so widgets re-validate their cached preview. */
+const embedVersion = StateField.define<number>({
+  create: () => 0,
+  update: (value, transaction) =>
+    transaction.effects.some((effect) => effect.is(refreshEmbeds)) ? value + 1 : value,
+});
+
+/** Latest preview per file/kind/mode, re-rendered only when the file's mtime changes. */
+const previews = new Map<string, { mtime: number | null; url: Promise<string> }>();
+
+async function previewUrl(
   view: EditorView,
   href: string,
   kind: "diagram" | "image",
   dark: boolean
 ): Promise<string> {
   const context = view.state.facet(noteContext);
-  const key = `${context.getFilePath()}|${href}|${kind}|${dark}`;
-  let url = objectUrls.get(key);
-  if (!url) {
-    url = context.resolve(href).then(async (path) => {
-      const blob =
-        kind === "diagram"
-          ? await context.renderDiagram(path, dark)
-          : new Blob([(await context.readFile(path)) as BlobPart], { type: imageMime(path) });
-      return URL.createObjectURL(blob);
-    });
-    url.catch(() => objectUrls.delete(key));
-    objectUrls.set(key, url);
-  }
+  const path = await context.resolve(href);
+  const mtime = await context.modifiedAt(path).catch(() => null);
+  const key = `${path}|${kind}|${dark}`;
+  const cached = previews.get(key);
+  if (cached && cached.mtime !== null && cached.mtime === mtime) return cached.url;
+
+  const url = (async () => {
+    const blob =
+      kind === "diagram"
+        ? await context.renderDiagram(path, dark)
+        : new Blob([(await context.readFile(path)) as BlobPart], { type: imageMime(path) });
+    return URL.createObjectURL(blob);
+  })();
+  previews.set(key, { mtime, url });
+  url.catch(() => previews.delete(key));
+  cached?.url.then(
+    (old) => URL.revokeObjectURL(old),
+    () => {}
+  );
   return url;
 }
 
-/** Drop cached previews (e.g. after a diagram is saved) so they re-render. */
+/** Drop all cached previews. */
 export function clearPreviewCache(): void {
-  for (const url of objectUrls.values())
+  for (const { url } of previews.values())
     url.then(
       (value) => URL.revokeObjectURL(value),
       () => {}
     );
-  objectUrls.clear();
+  previews.clear();
 }
 
 class EmbedWidget extends WidgetType {
@@ -73,12 +90,14 @@ class EmbedWidget extends WidgetType {
   readonly kind: "diagram" | "image";
   readonly dark: boolean;
   readonly lineFrom: number;
+  readonly version: number;
   constructor(
     href: string,
     alt: string,
     kind: "diagram" | "image",
     dark: boolean,
-    lineFrom: number
+    lineFrom: number,
+    version: number
   ) {
     super();
     this.href = href;
@@ -86,6 +105,7 @@ class EmbedWidget extends WidgetType {
     this.kind = kind;
     this.dark = dark;
     this.lineFrom = lineFrom;
+    this.version = version;
   }
 
   eq(other: EmbedWidget) {
@@ -93,7 +113,8 @@ class EmbedWidget extends WidgetType {
       other.href === this.href &&
       other.alt === this.alt &&
       other.dark === this.dark &&
-      other.lineFrom === this.lineFrom
+      other.lineFrom === this.lineFrom &&
+      other.version === this.version
     );
   }
 
@@ -220,6 +241,7 @@ export function findMathBlocks(
 function buildEmbeds(state: EditorState): DecorationSet {
   const decorations: Range<Decoration>[] = [];
   const dark = state.facet(noteContext)?.isDark() ?? false;
+  const version = state.field(embedVersion, false) ?? 0;
   const { doc } = state;
   let inCode = false;
 
@@ -240,7 +262,7 @@ function buildEmbeds(state: EditorState): DecorationSet {
     if (!kind || /^[a-z][a-z\d+.-]*:\/\//i.test(href)) continue;
     decorations.push(
       Decoration.replace({
-        widget: new EmbedWidget(href, match[1], kind, dark, line.from),
+        widget: new EmbedWidget(href, match[1], kind, dark, line.from, version),
         block: true,
       }).range(line.from, line.to)
     );
@@ -272,6 +294,7 @@ export const embeds = StateField.define<DecorationSet>({
     return value;
   },
   provide: (field) => [
+    embedVersion,
     EditorView.decorations.from(field),
     EditorView.atomicRanges.of((view) => view.state.field(field)),
   ],

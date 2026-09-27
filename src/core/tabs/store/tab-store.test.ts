@@ -468,20 +468,21 @@ describe("TabStore", () => {
       expect(useTabStore.getState().activeTabId).toBe(firstTabId);
     });
 
-    it("updates openedAt for LRU tracking when activating a different tab", () => {
+    it("tracks activation time for LRU without replacing the tabs array", () => {
       vi.useFakeTimers();
       vi.setSystemTime(1000);
 
       useTabStore.getState().addTab({ routeId: "r1", path: "/a", title: "A" });
       const tabId = useTabStore.getState().tabs[0].id;
-      const originalOpenedAt = useTabStore.getState().tabs[0].openedAt;
       useTabStore.getState().addTab({ routeId: "r2", path: "/b", title: "B" });
+      const tabsBefore = useTabStore.getState().tabs;
 
       vi.setSystemTime(5000);
       useTabStore.getState().setActiveTab(tabId);
 
-      const updatedOpenedAt = useTabStore.getState().tabs[0].openedAt;
-      expect(updatedOpenedAt).toBeGreaterThan(originalOpenedAt);
+      expect(useTabStore.getState().lastActivatedAt[tabId]).toBe(5000);
+      // Same array: `tabs` subscribers (explorer, toolbars) don't re-render on a switch.
+      expect(useTabStore.getState().tabs).toBe(tabsBefore);
 
       vi.useRealTimers();
     });

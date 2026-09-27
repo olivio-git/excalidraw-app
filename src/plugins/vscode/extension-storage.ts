@@ -10,7 +10,7 @@ import {
 } from "@tauri-apps/plugin-fs";
 import { parseJsonc } from "./jsonc";
 import { dirname } from "./paths";
-import { readVsix, type IconThemeContribution } from "./vsix";
+import { readVsix, type ColorThemeContribution, type IconThemeContribution } from "./vsix";
 
 /**
  * On-disk layout, mirroring VS Code's `~/.vscode/extensions`:
@@ -33,13 +33,20 @@ export interface InstalledExtension {
   /** Folder name under `extensions/`. */
   dir: string;
   iconThemes: IconThemeContribution[];
+  colorThemes: ColorThemeContribution[];
 }
 
 async function readIndex(): Promise<InstalledExtension[]> {
   try {
     if (!(await exists(INDEX_FILE, opts()))) return [];
     const parsed = JSON.parse(await readTextFile(INDEX_FILE, opts()));
-    return Array.isArray(parsed) ? (parsed as InstalledExtension[]) : [];
+    if (!Array.isArray(parsed)) return [];
+    // Entries written before color theme support have no `colorThemes`.
+    return (parsed as InstalledExtension[]).map((ext) => ({
+      ...ext,
+      iconThemes: ext.iconThemes ?? [],
+      colorThemes: ext.colorThemes ?? [],
+    }));
   } catch (error) {
     console.error("[extensions] Failed to read extensions index", error);
     return [];
@@ -69,9 +76,10 @@ export function listInstalledExtensions(): Promise<InstalledExtension[]> {
 export async function installVsix(bytes: Uint8Array): Promise<InstalledExtension> {
   const pkg = readVsix(bytes);
   const iconThemes = pkg.manifest.contributes?.iconThemes ?? [];
-  if (iconThemes.length === 0) {
+  const colorThemes = pkg.manifest.contributes?.themes ?? [];
+  if (iconThemes.length === 0 && colorThemes.length === 0) {
     throw new Error(
-      "La extensión no aporta ninguna contribución compatible (por ahora solo iconThemes)"
+      "La extensión no aporta ninguna contribución compatible (por ahora: themes e iconThemes)"
     );
   }
 
@@ -105,6 +113,7 @@ export async function installVsix(bytes: Uint8Array): Promise<InstalledExtension
     description: pkg.manifest.description,
     dir,
     iconThemes,
+    colorThemes,
   };
 
   const previous = await readIndex();

@@ -8,6 +8,14 @@ export interface IconThemeContribution {
   path: string;
 }
 
+export interface ColorThemeContribution {
+  id?: string;
+  label?: string;
+  /** `vs` (light), `vs-dark`, `hc-black` or `hc-light`. */
+  uiTheme?: string;
+  path: string;
+}
+
 /** Subset of a VS Code extension `package.json` we currently understand. */
 export interface VsCodeExtensionManifest {
   name: string;
@@ -17,6 +25,7 @@ export interface VsCodeExtensionManifest {
   description?: string;
   contributes?: {
     iconThemes?: IconThemeContribution[];
+    themes?: ColorThemeContribution[];
   };
 }
 

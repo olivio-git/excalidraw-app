@@ -50,7 +50,8 @@ export interface FileTreeNodeProps {
   focusedPath: string | null;
   clipboardState: ClipboardState;
   onToggle: (path: string) => void;
-  onOpen: (path: string, name: string, beside?: boolean) => void;
+  /** `keep`: open as a normal tab instead of a preview tab. */
+  onOpen: (path: string, name: string, beside?: boolean, keep?: boolean) => void;
   onDelete: (path: string, isDir: boolean) => void;
   onStartRename: (path: string) => void;
   onCommitRename: (oldPath: string, newName: string) => Promise<void>;
@@ -198,6 +199,10 @@ export const FileTreeNode = memo(function FileTreeNode(props: FileTreeNodeProps)
                 else if (hasHandler) onOpen(entry.path, entry.name);
               }
             }}
+            onDoubleClick={() => {
+              if (!renaming && !entry.isDir && hasHandler)
+                onOpen(entry.path, entry.name, false, true);
+            }}
             className={cn(
               "group/row relative flex min-h-7 w-full cursor-default items-center gap-1.5 border-l-2 border-transparent pr-2 text-[13px] select-none hover:bg-accent/70",
               selected && "bg-primary/10 text-foreground",
@@ -297,7 +302,10 @@ export const FileTreeNode = memo(function FileTreeNode(props: FileTreeNodeProps)
               </ContextMenuItem>
             </>
           ) : (
-            <ContextMenuItem disabled={!hasHandler} onClick={() => onOpen(entry.path, entry.name)}>
+            <ContextMenuItem
+              disabled={!hasHandler}
+              onClick={() => onOpen(entry.path, entry.name, false, true)}
+            >
               <CornerDownRight />
               {t("contextMenu.open")}
               <ContextMenuShortcut>Enter</ContextMenuShortcut>

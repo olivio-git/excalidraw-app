@@ -11,6 +11,8 @@ interface OpenFileOptions {
   beside?: boolean;
   groupId?: EditorGroupId;
   anchor?: string;
+  /** Open in the group's preview tab (replaced by the next previewed file). */
+  preview?: boolean;
 }
 
 /** Root-relative syntax survives standard Markdown/Tiptap link sanitizers. */
@@ -42,6 +44,7 @@ export function openFileInWorkbench(
     instanceId: filePath,
     metadata: { filePath },
     groupId: options.beside ? otherGroup(source) : options.groupId,
+    preview: options.preview,
   });
   if (options.anchor) {
     const tab = useTabStore.getState().getTab(tabId);

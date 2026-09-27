@@ -46,6 +46,7 @@ import { isSameOrDescendant, topLevelPaths } from "./explorer-file-operations";
 import { useDragAndDrop } from "@/core/shell/hooks/useDragAndDrop";
 import { useMultiSelect } from "@/core/shell/hooks/useMultiSelect";
 import { useExplorerSelectionStore } from "@/stores/explorerStore";
+import { useTabsSettingsStore } from "@/stores/tabsSettingsStore";
 import { selectActiveFilePath, withPaths } from "./active-file";
 import { useStableHandlers } from "@/shared/hooks/useStableHandlers";
 import { useKeyboardNav } from "@/core/shell/hooks/useKeyboardNav";
@@ -326,9 +327,14 @@ const ExplorerWorkspacePanel = () => {
   // Open file
   // -------------------------------------------------------------------------
 
-  const handleOpenFile = useCallback((filePath: string, _name: string, beside = false) => {
-    openFileInWorkbench(filePath, { beside });
-  }, []);
+  const handleOpenFile = useCallback(
+    (filePath: string, _name: string, beside = false, keep = false) => {
+      // A single click previews (VS Code-style); double-click or "open" keeps the tab.
+      const preview = !keep && !beside && useTabsSettingsStore.getState().enablePreview;
+      openFileInWorkbench(filePath, { beside, preview });
+    },
+    []
+  );
 
   // -------------------------------------------------------------------------
   // Create new file / folder

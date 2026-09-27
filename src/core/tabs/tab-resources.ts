@@ -62,6 +62,8 @@ export async function saveTabResource(tab: TabInstance): Promise<boolean> {
   if (tab.routeId === "diagram") {
     const { DiagramController } = await import("@/core/diagram/DiagramController");
     const api = DiagramController.getApi(path);
+    // A tab that was never shown has no canvas yet, and nothing unsaved either.
+    if (!api && !tabIsDirty(tab)) return true;
     if (!api) throw new Error("Diagram canvas is not ready. Open the file and retry.");
     const store = useDiagramStore.getState();
     if (!store.getDiagram(path)) await store.loadDiagram(path, path);

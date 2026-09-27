@@ -37,7 +37,11 @@ interface TabState extends EditorLayoutState {
     instanceId?: string;
     metadata?: Record<string, any>;
     groupId?: EditorGroupId;
+    /** Open as a preview tab, replacing the group's current preview tab. */
+    preview?: boolean;
   }) => string;
+  /** Turn a preview tab into a normal one. */
+  keepTab: (tabId: string) => void;
   removeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
   updateTab: (tabId: string, updates: Partial<TabInstance>) => void;
@@ -81,7 +85,7 @@ export const useTabStore = create<TabState>()(
         activeTabId: null,
         lastActivatedAt: {},
 
-        addTab: ({ routeId, path, title, icon, instanceId, metadata, groupId }) => {
+        addTab: ({ routeId, path, title, icon, instanceId, metadata, groupId, preview }) => {
           const state = get();
 
           // Check singleton constraint
@@ -113,13 +117,32 @@ export const useTabStore = create<TabState>()(
             (tab) => tab.path === path && tab.instanceId === instanceId
           );
           if (existingTab) {
+            // Opening a previewed file "for real" (e.g. double-click) keeps it.
+            if (!preview && existingTab.isPreview) get().keepTab(existingTab.id);
             if (groupId) get().moveTabToGroup(existingTab.id, groupId);
             else get().setActiveTab(existingTab.id);
             return existingTab.id;
           }
 
-          // Enforce MAX_OPEN_TABS via LRU eviction
           let currentTabs = [...state.tabs];
+          const targetGroup = groupId ?? state.activeGroupId;
+          // A new preview takes the place of the group's clean preview tab.
+          let insertBeforeId: string | undefined;
+          if (preview) {
+            const index = currentTabs.findIndex(
+              (tab) =>
+                tab.isPreview &&
+                !tab.isPinned &&
+                !tab.metadata?.isDirty &&
+                tabGroup(tab) === targetGroup
+            );
+            if (index >= 0) {
+              insertBeforeId = currentTabs[index + 1]?.id;
+              currentTabs.splice(index, 1);
+            }
+          }
+
+          // Enforce MAX_OPEN_TABS via LRU eviction
           if (currentTabs.length >= TABS_CONFIG.MAX_OPEN_TABS) {
             const unpinnedTabs = currentTabs
               .filter(
@@ -156,11 +179,18 @@ export const useTabStore = create<TabState>()(
             metadata: metadata || {},
             instanceId,
             openedAt: Date.now(),
-            groupId: groupId ?? state.activeGroupId,
+            groupId: targetGroup,
+            isPreview: preview || undefined,
           };
 
+          const insertAt = insertBeforeId
+            ? currentTabs.findIndex((tab) => tab.id === insertBeforeId)
+            : -1;
           commit({
-            tabs: [...currentTabs, newTab],
+            tabs:
+              insertAt >= 0
+                ? [...currentTabs.slice(0, insertAt), newTab, ...currentTabs.slice(insertAt)]
+                : [...currentTabs, newTab],
             activeTabId: newTab.id,
             splitDirection:
               groupId === EDITOR_GROUP.SECONDARY
@@ -208,7 +238,21 @@ export const useTabStore = create<TabState>()(
 
         updateTab: (tabId: string, updates: Partial<TabInstance>) => {
           set((state) => ({
-            tabs: state.tabs.map((tab) => (tab.id === tabId ? { ...tab, ...updates } : tab)),
+            tabs: state.tabs.map((tab) => {
+              if (tab.id !== tabId) return tab;
+              const next = { ...tab, ...updates };
+              // Editing a preview tab keeps it.
+              if (next.isPreview && next.metadata?.isDirty) next.isPreview = undefined;
+              return next;
+            }),
+          }));
+        },
+        keepTab: (tabId: string) => {
+          if (!get().getTab(tabId)?.isPreview) return;
+          set((state) => ({
+            tabs: state.tabs.map((tab) =>
+              tab.id === tabId ? { ...tab, isPreview: undefined } : tab
+            ),
           }));
         },
 
@@ -254,7 +298,7 @@ export const useTabStore = create<TabState>()(
             const tabIndex = tabs.findIndex((t) => t.id === tabId);
             if (tabIndex === -1) return state;
 
-            const tab = { ...tabs[tabIndex], isPinned: true };
+            const tab = { ...tabs[tabIndex], isPinned: true, isPreview: undefined };
             tabs.splice(tabIndex, 1);
 
             // Insert after last pinned tab
@@ -287,7 +331,7 @@ export const useTabStore = create<TabState>()(
           set((state) => {
             const newTabs = [...state.tabs];
             const [movedTab] = newTabs.splice(fromIndex, 1);
-            newTabs.splice(toIndex, 0, movedTab);
+            newTabs.splice(toIndex, 0, { ...movedTab, isPreview: undefined });
             return { tabs: newTabs };
           });
         },
@@ -321,7 +365,9 @@ export const useTabStore = create<TabState>()(
             return;
           }
           commit({
-            tabs: get().tabs.map((tab) => (tab.id === tabId ? { ...tab, groupId } : tab)),
+            tabs: get().tabs.map((tab) =>
+              tab.id === tabId ? { ...tab, groupId, isPreview: undefined } : tab
+            ),
             splitDirection: get().splitDirection ?? "horizontal",
             activeTabId: tabId,
           });
@@ -379,6 +425,7 @@ export const useTabStore = create<TabState>()(
           instanceId: tab.instanceId,
           openedAt: tab.openedAt,
           groupId: tab.groupId,
+          isPreview: tab.isPreview,
           // Omit icon - React components can't be serialized
         })),
         activeTabId: state.activeTabId,

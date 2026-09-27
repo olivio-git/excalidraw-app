@@ -45,6 +45,8 @@ export default function SettingsPage() {
   const setLanguage = useLanguageStore((s) => s.setLanguage);
 
   const allowCloseLastTab = useTabsSettingsStore((s) => s.allowCloseLastTab);
+  const enablePreview = useTabsSettingsStore((s) => s.enablePreview);
+  const setEnablePreview = useTabsSettingsStore((s) => s.setEnablePreview);
   const setAllowCloseLastTab = useTabsSettingsStore((s) => s.setAllowCloseLastTab);
 
   const fontFamily = useAppearanceStore((s) => s.fontFamily);
@@ -191,6 +193,22 @@ export default function SettingsPage() {
                   onClick={() => setAllowCloseLastTab(!allowCloseLastTab)}
                 >
                   {allowCloseLastTab ? t("tabsBehavior.on") : t("tabsBehavior.off")}
+                </Button>
+              </div>
+              <div className="flex items-start justify-between gap-4 rounded-md border border-border px-4 py-3">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">{t("tabsBehavior.enablePreview")}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("tabsBehavior.enablePreviewDescription")}
+                  </p>
+                </div>
+                <Button
+                  variant={enablePreview ? "default" : "outline"}
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => setEnablePreview(!enablePreview)}
+                >
+                  {enablePreview ? t("tabsBehavior.on") : t("tabsBehavior.off")}
                 </Button>
               </div>
             </section>

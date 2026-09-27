@@ -4,15 +4,19 @@ import { tauriTabsSettingsStorage } from "@/core/storage/tauri-storage";
 
 interface TabsSettings {
   allowCloseLastTab: boolean;
+  /** Single-click in the explorer opens files in a reusable preview tab. */
+  enablePreview: boolean;
 }
 
 interface TabsSettingsState extends TabsSettings {
   setAllowCloseLastTab: (value: boolean) => void;
+  setEnablePreview: (value: boolean) => void;
   resetToDefaults: () => void;
 }
 
 const DEFAULTS: TabsSettings = {
   allowCloseLastTab: false,
+  enablePreview: true,
 };
 
 export const useTabsSettingsStore = create<TabsSettingsState>()(
@@ -21,6 +25,7 @@ export const useTabsSettingsStore = create<TabsSettingsState>()(
       ...DEFAULTS,
 
       setAllowCloseLastTab: (value) => set({ allowCloseLastTab: value }),
+      setEnablePreview: (value) => set({ enablePreview: value }),
 
       resetToDefaults: () => set(DEFAULTS),
     }),
@@ -29,6 +34,7 @@ export const useTabsSettingsStore = create<TabsSettingsState>()(
       storage: createJSONStorage(() => tauriTabsSettingsStorage),
       partialize: (state) => ({
         allowCloseLastTab: state.allowCloseLastTab,
+        enablePreview: state.enablePreview,
       }),
     }
   )

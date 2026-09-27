@@ -13,6 +13,12 @@ export interface TabInstance {
   instanceId?: string;
   openedAt: number;
   groupId?: EditorGroupId;
+  /**
+   * Preview tab (VS Code-style): opened with a single click in the explorer and
+   * replaced by the next previewed file. Becomes a normal tab when edited,
+   * pinned, moved, reordered or double-clicked. Shown with an italic title.
+   */
+  isPreview?: boolean;
 }
 
 export const EDITOR_GROUP = { PRIMARY: "primary", SECONDARY: "secondary" } as const;

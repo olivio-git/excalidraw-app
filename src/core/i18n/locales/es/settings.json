@@ -143,5 +143,13 @@
   "aiChat": {
     "on": "Activado",
     "off": "Desactivado"
+  },
+  "markdownEditor": {
+    "title": "Editor de Markdown",
+    "description": "Editor con el que se abren los archivos .md. Las notas enriquecidas (.note) siempre usan el editor de bloques. Se aplica a los archivos que abras a partir de ahora.",
+    "classic": "Clásico (bloques)",
+    "classicHint": "Editor por bloques. La conversión a Markdown puede perder formato.",
+    "markdown": "Markdown (beta)",
+    "markdownHint": "Markdown puro con vista previa en vivo, comandos /, enlaces [[, diagramas y fórmulas. Guarda exactamente lo que escribes."
   }
 }

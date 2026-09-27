@@ -143,5 +143,13 @@
   "aiChat": {
     "on": "On",
     "off": "Off"
+  },
+  "markdownEditor": {
+    "title": "Markdown editor",
+    "description": "Editor used to open .md files. Rich notes (.note) always use the rich editor. Applies to files opened from now on.",
+    "classic": "Classic (blocks)",
+    "classicHint": "Block editor. Converting to Markdown can lose formatting.",
+    "markdown": "Markdown (beta)",
+    "markdownHint": "Plain Markdown with live preview, / commands, [[ links, diagrams and formulas. Saves exactly what you write."
   }
 }

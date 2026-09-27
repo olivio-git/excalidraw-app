@@ -7,12 +7,12 @@ import { createInMemoryStorage } from "../../../test/in-memory-storage";
 // ── Mock keybinding-registry singleton ────────────────────────────────────────
 
 const mockRegisterOverride = vi.fn();
-const mockUnregister = vi.fn();
+const mockRemoveUserOverride = vi.fn();
 
 vi.mock("../keybinding-registry", () => ({
   keybindingRegistry: {
     registerOverride: mockRegisterOverride,
-    unregister: mockUnregister,
+    removeUserOverride: mockRemoveUserOverride,
     resolve: vi.fn().mockReturnValue(null),
     getAll: vi.fn().mockReturnValue([]),
     getConflicts: vi.fn().mockReturnValue([]),
@@ -93,7 +93,7 @@ describe("useKeybindingStore", () => {
     vi.mock("../keybinding-registry", () => ({
       keybindingRegistry: {
         registerOverride: mockRegisterOverride,
-        unregister: mockUnregister,
+        removeUserOverride: mockRemoveUserOverride,
         resolve: vi.fn().mockReturnValue(null),
         getAll: vi.fn().mockReturnValue([]),
         getConflicts: vi.fn().mockReturnValue([]),
@@ -153,7 +153,7 @@ describe("useKeybindingStore", () => {
     });
   });
 
-  // ── removeOverride: removes from store + calls unregister ─────────────────
+  // Removing overrides must preserve built-in and plugin bindings.
 
   describe("removeOverride", () => {
     it("removes the matching entry from the overrides array", async () => {
@@ -167,7 +167,7 @@ describe("useKeybindingStore", () => {
       expect(store.getState().overrides).toHaveLength(0);
     });
 
-    it("calls keybindingRegistry.unregister with firstKey and commandId", async () => {
+    it("calls keybindingRegistry.removeUserOverride with firstKey and commandId", async () => {
       const store = await getStore();
 
       await act(async () => {
@@ -175,7 +175,7 @@ describe("useKeybindingStore", () => {
         store.getState().removeOverride("ctrl+s", "editor.save");
       });
 
-      expect(mockUnregister).toHaveBeenCalledWith("ctrl+s", "editor.save");
+      expect(mockRemoveUserOverride).toHaveBeenCalledWith("ctrl+s", "editor.save");
     });
 
     it("does not remove entries for other commandIds", async () => {
@@ -208,7 +208,7 @@ describe("useKeybindingStore", () => {
       expect(store.getState().overrides).toHaveLength(0);
     });
 
-    it("calls unregister for each override in the store", async () => {
+    it("calls removeUserOverride for each override in the store", async () => {
       const store = await getStore();
 
       await act(async () => {
@@ -216,13 +216,13 @@ describe("useKeybindingStore", () => {
         store.getState().addOverride(makeEntry("cmd.b", "ctrl+b"));
       });
 
-      mockUnregister.mockClear();
+      mockRemoveUserOverride.mockClear();
 
       await act(async () => {
         store.getState().resetAll();
       });
 
-      expect(mockUnregister).toHaveBeenCalledTimes(2);
+      expect(mockRemoveUserOverride).toHaveBeenCalledTimes(2);
     });
   });
 

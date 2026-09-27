@@ -1,0 +1,36 @@
+{
+  "palette": {
+    "newDiagram": {
+      "title": "New Diagram",
+      "nameLabel": "Name",
+      "namePlaceholder": "my-diagram",
+      "createLabel": "Create"
+    }
+  },
+  "changeLanguage": {
+    "title": "Change Language / Cambiar Idioma"
+  },
+  "routes": {
+    "home": "Home",
+    "home-overview": "Welcome",
+    "settings": "Settings",
+    "plugin-admin": "Plugin Administration",
+    "library-detail": "Library Detail",
+    "document-editor": "Document Editor"
+  },
+  "document": {
+    "newNote": "New Rich Note",
+    "new": "New Document",
+    "open": "Open Document",
+    "save": "Save Document",
+    "saveAll": "Save All Documents",
+    "close": "Close Document",
+    "rename": "Rename Document",
+    "unsavedChanges": {
+      "title": "Unsaved Changes",
+      "body": "This document has unsaved changes. Do you want to save before closing?",
+      "confirm": "Save",
+      "cancel": "Discard"
+    }
+  }
+}

@@ -21,6 +21,7 @@ interface PluginEntry {
   registeredRouteIds: string[];
   registeredFooterActionIds: string[];
   registeredKeybindingKeys: Array<{ firstKey: NormalizedKey; commandId: string }>;
+  registeredTabChangeUnsubscribers: Array<() => void>;
 }
 
 type PluginManagerEventType = "plugin-activated" | "plugin-deactivated" | "plugins-changed";
@@ -83,6 +84,7 @@ export class PluginManagerClass {
       registeredRouteIds: [],
       registeredFooterActionIds: [],
       registeredKeybindingKeys: [],
+      registeredTabChangeUnsubscribers: [],
     });
   }
 
@@ -92,6 +94,10 @@ export class PluginManagerClass {
       return;
     }
     this.commandHandlers.set(commandId, handler);
+  }
+
+  unregisterCommandHandler(commandId: string): void {
+    this.commandHandlers.delete(commandId);
   }
 
   async activate(pluginId: string): Promise<void> {
@@ -162,6 +168,10 @@ export class PluginManagerClass {
       pluginId,
       (firstKey: NormalizedKey, commandId: string) => {
         entry.registeredKeybindingKeys.push({ firstKey, commandId });
+      },
+      (commandId: string) => this.executeCommand(commandId),
+      (unsub: () => void) => {
+        entry.registeredTabChangeUnsubscribers.push(unsub);
       }
     );
 
@@ -236,6 +246,12 @@ export class PluginManagerClass {
       }
       entry.registeredKeybindingKeys = [];
 
+      // Clean up tab change subscriptions
+      for (const unsub of entry.registeredTabChangeUnsubscribers) {
+        unsub();
+      }
+      entry.registeredTabChangeUnsubscribers = [];
+
       // Remove all event listeners registered by this plugin
       for (const [topic, listeners] of this.pluginEventListeners) {
         const remaining = listeners.filter((listener) => listener.pluginId !== pluginId);
@@ -301,7 +317,7 @@ export class PluginManagerClass {
   }
 
   async loadExternalPlugins(): Promise<void> {
-    if (!(window as any).__TAURI_INTERNALS__) return;
+    if (!(window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__) return;
 
     const { invoke } = await import("@tauri-apps/api/core");
 
@@ -318,9 +334,12 @@ export class PluginManagerClass {
       try {
         manifest = JSON.parse(info.manifest_json);
       } catch {
-        logger.error("PluginManager", "manifest.json inválido, ignorando plugin.");
+        logger.error("PluginManager", "Invalid manifest.json, skipping plugin.");
         continue;
       }
+
+      // Skip already-registered plugins (e.g. StrictMode double-effect, refresh)
+      if (this.plugins.has(manifest.id)) continue;
 
       try {
         const blob = new Blob([info.script_content], { type: "text/javascript" });

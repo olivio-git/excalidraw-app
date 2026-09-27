@@ -20,6 +20,12 @@ export interface RouteConfig {
     closable?: boolean;
     singleton?: boolean;
     maxInstances?: number;
+    /**
+     * When true, the tab stays mounted and uses `visibility: hidden` instead of unmounting.
+     * Required for canvas-based components (Excalidraw, PDF viewers, etc.) that lose
+     * their rendering context when removed from the DOM.
+     */
+    keepMounted?: boolean;
   };
 
   metadata?: {
@@ -28,6 +34,12 @@ export interface RouteConfig {
     order?: number;
     hidden?: boolean;
   };
+
+  /**
+   * If set, NavigationPanel uses this command instead of navigate() to open the route.
+   * Required for routes that have a registered command handler (tab-system awareness).
+   */
+  commandId?: string;
 
   subRoutes?: RouteConfig[];
   isHeader?: boolean;

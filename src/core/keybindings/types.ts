@@ -25,11 +25,13 @@ export type WhenExpression = string;
 
 // ── Sources ───────────────────────────────────────────────────────────────────
 
-export enum KeybindingSource {
-  Builtin = "builtin",
-  Plugin = "plugin",
-  User = "user",
-}
+export const KeybindingSource = {
+  Builtin: "builtin",
+  Plugin: "plugin",
+  User: "user",
+} as const;
+
+export type KeybindingSource = (typeof KeybindingSource)[keyof typeof KeybindingSource];
 
 // ── Core data shapes ──────────────────────────────────────────────────────────
 
@@ -51,6 +53,13 @@ export interface KeybindingEntry {
 
   /** Where the binding was registered from. */
   source: KeybindingSource;
+
+  /**
+   * When true, the keybinding fires even when focus is inside an input,
+   * textarea, or contenteditable element.
+   * Use for workspace-level shortcuts that should always work (e.g. tab navigation).
+   */
+  allowInInput?: boolean;
 }
 
 /**
@@ -71,6 +80,8 @@ export interface KeybindingDeclaration {
   /** Raw key string before normalization. E.g. "Ctrl+Shift+K" or "ctrl+k ctrl+b" */
   key: string;
   when?: WhenExpression;
+  /** Opt in for commands such as save while a text editor has focus. */
+  allowInInput?: boolean;
 }
 
 /**

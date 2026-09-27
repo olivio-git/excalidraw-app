@@ -99,13 +99,26 @@ export class KeybindingRegistryClass {
   }
 
   /**
-   * Return all registered entries across both layers (overrides first).
+   * Return one entry per commandId — user overrides take precedence over defaults.
+   * Defaults are included as-is when no override exists for that command.
    */
   getAll(): KeybindingEntry[] {
-    const all: KeybindingEntry[] = [];
-    for (const entries of this.overrides.values()) all.push(...entries);
-    for (const entries of this.defaults.values()) all.push(...entries);
-    return all;
+    const seen = new Map<string, KeybindingEntry>();
+    for (const entries of this.defaults.values()) {
+      for (const entry of entries) seen.set(entry.commandId, entry);
+    }
+    for (const entries of this.overrides.values()) {
+      for (const entry of entries) seen.set(entry.commandId, entry);
+    }
+    return [...seen.values()];
+  }
+
+  /**
+   * Remove a user override only — leaves the default binding intact.
+   * Use this when the user resets a custom binding back to default.
+   */
+  removeUserOverride(firstKey: NormalizedKey, commandId: string): void {
+    this._removeFrom(this.overrides, firstKey, commandId);
   }
 
   /**

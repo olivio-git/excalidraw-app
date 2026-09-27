@@ -43,13 +43,30 @@ export class KeybindingServiceClass {
   /** Parallel key sequence mirror — lets us build KeyChord without exposing buffer internals. */
   private sequence: NormalizedKey[] = [];
 
-  /** Reference to the bound event listener for cleanup in dispose(). */
+  /** Reference to the bound keydown event listener for cleanup in dispose(). */
   private boundHandler: ((event: KeyboardEvent) => void) | null = null;
+
+  /**
+   * Reference to the keyup fallback listener for cleanup in dispose().
+   *
+   * On Linux/GTK, WebKitGTK intercepts certain keydown events (e.g. Ctrl+Shift+Tab
+   * for backwards focus traversal) before they reach JavaScript. The keyup event
+   * still fires, so we use it as a fallback dispatch path.
+   * The lastDispatchedChord guard prevents double-dispatch on other platforms.
+   */
+  private keyupFallbackHandler: ((event: KeyboardEvent) => void) | null = null;
+
+  /**
+   * The NormalizedKey of the last chord dispatched via keydown.
+   * Set by _tryExecute; cleared by the keyup fallback handler.
+   * Guards against double-dispatch when keydown already handled the chord.
+   */
+  private lastDispatchedChord: NormalizedKey | null = null;
 
   // ── Lifecycle ───────────────────────────────────────────────────────────────
 
   /**
-   * Attach a global 'keydown' listener at the document level (capture phase).
+   * Attach global 'keydown' and 'keyup' listeners at the document level (capture phase).
    * Call once at application boot.
    */
   initialize(): void {
@@ -57,10 +74,40 @@ export class KeybindingServiceClass {
       this.handleKeyEvent(event);
     };
     document.addEventListener("keydown", this.boundHandler, true);
+
+    // keyup fallback: handles chords whose keydown was consumed by GTK before
+    // reaching JavaScript (e.g. Ctrl+Shift+Tab on Linux/WebKitGTK).
+    // Only single-key chords are attempted here — two-key chords can't be
+    // reliably reconstructed from keyup alone.
+    this.keyupFallbackHandler = (event: KeyboardEvent) => {
+      if (event.isComposing) return;
+
+      const normalizedKey = keyNormalizer.normalize(event);
+
+      // Always consume the guard on any non-modifier keyup to prevent stale state
+      // (e.g. user releases Ctrl before Tab — the Tab keyup won't have ctrlKey set).
+      const prevDispatched = this.lastDispatchedChord;
+      this.lastDispatchedChord = null;
+
+      if (!normalizedKey) return;
+
+      // keydown already handled this chord — skip to avoid double-dispatch
+      if (prevDispatched === normalizedKey) return;
+
+      // keydown was not dispatched for this chord (likely GTK-intercepted) — try now
+      const chord: KeyChord = [normalizedKey];
+      const entry = keybindingRegistry.resolve(chord);
+      if (!entry) return;
+      if (isInputTarget(event) && !entry.allowInInput) return;
+
+      event.preventDefault();
+      void PluginManager.executeCommand(entry.commandId);
+    };
+    document.addEventListener("keyup", this.keyupFallbackHandler, true);
   }
 
   /**
-   * Remove the global listener and reset state.
+   * Remove the global listeners and reset state.
    * Call on application unmount / teardown.
    */
   dispose(): void {
@@ -68,6 +115,11 @@ export class KeybindingServiceClass {
       document.removeEventListener("keydown", this.boundHandler, true);
       this.boundHandler = null;
     }
+    if (this.keyupFallbackHandler) {
+      document.removeEventListener("keyup", this.keyupFallbackHandler, true);
+      this.keyupFallbackHandler = null;
+    }
+    this.lastDispatchedChord = null;
     this._reset();
   }
 
@@ -166,8 +218,7 @@ export class KeybindingServiceClass {
     }
 
     // Target input guard — skip unless binding opts in via allowInInput
-    const entryWithFlag = entry as typeof entry & { allowInInput?: boolean };
-    if (isInputTarget(event) && !entryWithFlag.allowInInput) {
+    if (isInputTarget(event) && !entry.allowInInput) {
       this._reset();
       return false;
     }
@@ -175,6 +226,11 @@ export class KeybindingServiceClass {
     // Consume the event and execute
     event.preventDefault();
     this._reset();
+
+    // Track single-key dispatches so the keyup fallback can skip double-dispatch
+    if (chord.length === 1) {
+      this.lastDispatchedChord = chord[0];
+    }
 
     void PluginManager.executeCommand(entry.commandId);
     return true;

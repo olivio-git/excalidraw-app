@@ -1,9 +1,21 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { viteStaticCopy } from "vite-plugin-static-copy";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    viteStaticCopy({
+      targets: [
+        {
+          src: "node_modules/@excalidraw/excalidraw/dist/prod/fonts",
+          dest: "excalidraw-assets",
+        },
+      ],
+    }),
+  ],
   resolve: {
     alias: {
       "@": "/src",
@@ -32,11 +44,6 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: ["src/test/setup.ts"],
-    resolve: {
-      alias: {
-        "@": "/src",
-      },
-    },
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

@@ -1,11 +1,39 @@
 import { lazy } from "react";
-import { LayoutDashboard, LucideView, Settings, PlugZap } from "lucide-react";
+import { LayoutDashboard, LucideView, Settings, PlugZap, BookOpen } from "lucide-react";
 import type { RouteConfig } from "./types";
+import { ExcalidrawFileIcon } from "@/shared/icons/ExcalidrawFileIcon";
 
 // Lazy-loaded feature components
-const HomePage = lazy(() => import("@/features/home/HomePage"));
 const SettingsPage = lazy(() => import("@/features/settings/SettingsPage"));
 const PluginAdminPage = lazy(() => import("@/features/plugins/PluginAdminPage"));
+const DiagramCanvas = lazy(() => import("@/features/diagram/DiagramCanvas"));
+const LibraryDetailPage = lazy(() => import("@/features/library-browser/LibraryDetailPage"));
+
+export const libraryDetailRoute: RouteConfig = {
+  id: "library-detail",
+  path: "/library-detail",
+  name: "Library Detail",
+  type: "protected",
+  icon: BookOpen as unknown as React.ComponentType<{ className?: string }>,
+  component: LibraryDetailPage,
+  security: { requiresAuth: false },
+  tabConfig: { singleton: false, closable: true, keepMounted: false },
+  showSidebar: true,
+  showInCommandPalette: false,
+};
+
+export const diagramRoute: RouteConfig = {
+  id: "diagram",
+  path: "/diagram",
+  name: "Diagram",
+  type: "protected",
+  icon: ExcalidrawFileIcon,
+  component: DiagramCanvas,
+  security: { requiresAuth: false },
+  tabConfig: { singleton: false, closable: true, keepMounted: true },
+  showSidebar: false,
+  showInCommandPalette: false,
+};
 
 export const protectedRoutes: RouteConfig[] = [
   {
@@ -15,7 +43,6 @@ export const protectedRoutes: RouteConfig[] = [
     description: "Main dashboard",
     type: "protected",
     icon: LayoutDashboard as unknown as React.ComponentType<{ className?: string }>,
-    // component: HomePage,
     isHeader: true,
     security: {
       requiresAuth: true,
@@ -45,7 +72,6 @@ export const protectedRoutes: RouteConfig[] = [
         showSidebar: true,
         showInCommandPalette: true,
         icon: LucideView as unknown as React.ComponentType<{ className?: string }>,
-        component: HomePage,
       },
     ],
   },
@@ -53,6 +79,7 @@ export const protectedRoutes: RouteConfig[] = [
     id: "settings",
     path: "/settings",
     name: "Settings",
+    commandId: "workbench.action.openSettings",
     description: "Application settings and preferences",
     type: "protected",
     icon: Settings as unknown as React.ComponentType<{ className?: string }>,
@@ -77,6 +104,7 @@ export const protectedRoutes: RouteConfig[] = [
     id: "plugin-admin",
     path: "/settings/plugins",
     name: "Plugin Administration",
+    commandId: "workbench.action.openPluginAdmin",
     description: "Manage installed plugins and their capabilities",
     type: "protected",
     icon: PlugZap as unknown as React.ComponentType<{ className?: string }>,

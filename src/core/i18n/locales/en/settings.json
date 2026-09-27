@@ -1,0 +1,147 @@
+{
+  "page": {
+    "title": "Settings",
+    "description": "Customize the appearance and behavior of the application."
+  },
+  "tabs": {
+    "appearance": "Appearance",
+    "keybindings": "Keybindings",
+    "workspace": "Workspace",
+    "tabs": "Tabs",
+    "ai": "AI"
+  },
+  "appearance": {
+    "language": "Language",
+    "theme": {
+      "title": "Theme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "typography": {
+      "title": "Typography",
+      "fontFamily": "Font Family",
+      "fontSize": "Font Size"
+    },
+    "borderRadius": {
+      "title": "Border Radius"
+    },
+    "accessibility": {
+      "title": "Accessibility",
+      "highContrast": "High Contrast: {{state}}",
+      "reduceAnimations": "Reduce Animations: {{state}}",
+      "on": "On",
+      "off": "Off"
+    },
+    "reset": "Reset to Defaults"
+  },
+  "keybindings": {
+    "title": "Keybindings",
+    "description": "View and customize keyboard shortcuts. Click a row to reassign.",
+    "searchPlaceholder": "Search keybindings...",
+    "resetAll": "Reset all ({{count}})",
+    "noResults": "No keybindings found",
+    "table": {
+      "command": "Command",
+      "keybinding": "Keybinding",
+      "source": "Source"
+    },
+    "capture": {
+      "pressKey": "Press a key combo...",
+      "save": "Save",
+      "cancel": "Cancel",
+      "resetToDefault": "Reset to default"
+    },
+    "badge": {
+      "conflict": "conflict",
+      "modified": "modified",
+      "user": "user",
+      "plugin": "plugin",
+      "builtin": "builtin"
+    }
+  },
+  "workspace": {
+    "title": "Workspace Folder",
+    "description": "Select a local folder to use as your workspace. Diagrams will be read from and saved to this directory.",
+    "noWorkspace": "No workspace selected",
+    "changeFolder": "Change folder",
+    "removeWorkspace": "Remove workspace"
+  },
+  "tabsBehavior": {
+    "title": "Tab Behavior",
+    "allowCloseLastTab": "Allow closing the last tab",
+    "allowCloseLastTabDescription": "When enabled, closing the last open tab shows the welcome screen instead of keeping the tab open.",
+    "on": "On",
+    "off": "Off"
+  },
+  "ai": {
+    "title": "AI Configuration",
+    "description": "Configure AI providers and API keys for diagram assistance.",
+    "provider": {
+      "title": "AI Provider",
+      "description": "Choose which AI provider to use for diagram assistance."
+    },
+    "apiKey": {
+      "title": "API Key",
+      "label": "{{provider}} API Key",
+      "current": "Current:",
+      "showKey": "Show API key",
+      "hideKey": "Hide API key"
+    },
+    "model": {
+      "title": "Model",
+      "selectLabel": "Select Model",
+      "refresh": "Refresh models",
+      "customPlaceholder": "Enter a custom model",
+      "customHelp": "Select one from the list or type any model manually.",
+      "loaded": "Models updated",
+      "noModels": "No available models found",
+      "loadFailed": "Could not load models"
+    },
+    "codex": {
+      "title": "ChatGPT / Codex",
+      "description": "Connect your ChatGPT Plus/Pro account through the local gateway. Tokens are kept outside the webview.",
+      "connectBrowser": "Connect with browser",
+      "connectDevice": "Connect with code",
+      "logout": "Log out",
+      "openLoginUrl": "Open login URL",
+      "copyLoginUrl": "Copy URL",
+      "browserOpenFailed": "Could not open the browser automatically",
+      "connected": "Connected to ChatGPT",
+      "completeInBrowser": "Complete login in the browser. If it shows a callback URL, paste it here.",
+      "waitingForCode": "Waiting for the authorization code or callback URL from the browser.",
+      "manualCodeTitle": "Finish ChatGPT login",
+      "manualCodeDescription": "Paste the authorization code or full callback URL shown by the browser.",
+      "manualCodeLabel": "Code or callback URL",
+      "submitCode": "Submit code",
+      "cancelLogin": "Cancel login",
+      "deviceCode": "Code",
+      "notConnected": "Not connected",
+      "gatewayUnavailable": "Local gateway unavailable",
+      "loginFailed": "Login failed"
+    },
+    "customInstructions": {
+      "title": "Custom Instructions",
+      "description": "These instructions are appended to every AI request. Use them to set persistent preferences like language, style, or constraints.",
+      "placeholder": "Example: Always respond in Spanish. Use blue as the primary color for shapes."
+    },
+    "actions": {
+      "save": "Save",
+      "testConnection": "Test Connection",
+      "saved": "Saved",
+      "connected": "Connected",
+      "noApiKey": "No API key configured"
+    },
+    "toolConfirmation": {
+      "title": "Require confirmation for write tools",
+      "description": "Show a permission dialog before the AI modifies documents or diagrams.",
+      "enableLabel": "Enable tool confirmation",
+      "enabledHint": "The AI will ask before modifying documents or diagrams.",
+      "disabledWarning": "The AI can modify documents and diagrams without asking."
+    }
+  },
+  "aiChat": {
+    "on": "On",
+    "off": "Off"
+  }
+}

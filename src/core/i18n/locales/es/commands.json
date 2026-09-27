@@ -1,0 +1,36 @@
+{
+  "palette": {
+    "newDiagram": {
+      "title": "Nuevo diagrama",
+      "nameLabel": "Nombre",
+      "namePlaceholder": "mi-diagrama",
+      "createLabel": "Crear"
+    }
+  },
+  "changeLanguage": {
+    "title": "Change Language / Cambiar Idioma"
+  },
+  "routes": {
+    "home": "Inicio",
+    "home-overview": "Bienvenida",
+    "settings": "Configuración",
+    "plugin-admin": "Administración de plugins",
+    "library-detail": "Detalle de biblioteca",
+    "document-editor": "Editor de documentos"
+  },
+  "document": {
+    "newNote": "Nueva nota enriquecida",
+    "new": "Nuevo documento",
+    "open": "Abrir documento",
+    "save": "Guardar documento",
+    "saveAll": "Guardar todos los documentos",
+    "close": "Cerrar documento",
+    "rename": "Renombrar documento",
+    "unsavedChanges": {
+      "title": "Cambios sin guardar",
+      "body": "Este documento tiene cambios sin guardar. ¿Querés guardar antes de cerrar?",
+      "confirm": "Guardar",
+      "cancel": "Descartar"
+    }
+  }
+}

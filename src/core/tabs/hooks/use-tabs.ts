@@ -1,15 +1,13 @@
 import { useCallback } from "react";
-import { useNavigate } from "react-router";
+import { requestCloseTab } from "../tab-lifecycle";
 import { useTabStore } from "../store/tab-store";
 import { RouteRegistry } from "@/core/routing/route-registry";
 import type { RouteConfig } from "@/core/routing/types";
 
 export function useTabs() {
-  const navigate = useNavigate();
   const tabs = useTabStore((s) => s.tabs);
   const activeTabId = useTabStore((s) => s.activeTabId);
   const addTab = useTabStore((s) => s.addTab);
-  const removeTab = useTabStore((s) => s.removeTab);
   const setActiveTab = useTabStore((s) => s.setActiveTab);
 
   const openTab = useCallback(
@@ -23,10 +21,9 @@ export function useTabs() {
         instanceId,
         metadata,
       });
-      navigate(route.path);
       return tabId;
     },
-    [addTab, navigate]
+    [addTab]
   );
 
   const openTabByPath = useCallback(
@@ -41,40 +38,21 @@ export function useTabs() {
         path,
         title: title || path.split("/").pop() || "Tab",
       });
-      navigate(path);
       return tabId;
     },
-    [addTab, navigate, openTab]
+    [addTab, openTab]
   );
 
-  const closeTab = useCallback(
-    (tabId: string) => {
-      const state = useTabStore.getState();
-      const wasActive = state.activeTabId === tabId;
-      removeTab(tabId);
-
-      if (wasActive) {
-        const newState = useTabStore.getState();
-        if (newState.activeTabId) {
-          const activeTab = newState.tabs.find((t) => t.id === newState.activeTabId);
-          if (activeTab) {
-            navigate(activeTab.path);
-          }
-        }
-      }
-    },
-    [removeTab, navigate]
-  );
+  const closeTab = requestCloseTab;
 
   const switchToTab = useCallback(
     (tabId: string) => {
       const tab = useTabStore.getState().tabs.find((t) => t.id === tabId);
       if (tab) {
         setActiveTab(tabId);
-        navigate(tab.path);
       }
     },
-    [setActiveTab, navigate]
+    [setActiveTab]
   );
 
   const activeTab = tabs.find((t) => t.id === activeTabId);

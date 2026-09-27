@@ -2,10 +2,21 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Keep workbench resize interactions on the compositor path. */
+body[data-resizing] * {
+  transition: none !important;
+  animation: none !important;
+  cursor: col-resize !important;
+}
+
 @layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+
   :root {
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
+    --border: 220 14% 88%;
+    --input: 220 14% 88%;
     --ring: 222.2 84% 4.9%;
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
@@ -15,21 +26,21 @@
     --secondary-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
+    --muted: 220 16% 96%;
+    --muted-foreground: 215 14% 45%;
+    --accent: 220 16% 94%;
     --accent-foreground: 222.2 47.4% 11.2%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
+    --sidebar-background: 220 14% 97%;
+    --sidebar-foreground: 220 12% 27%;
+    --sidebar-primary: 221 83% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 16% 93%;
+    --sidebar-accent-foreground: 220 20% 16%;
+    --sidebar-border: 220 14% 89%;
     --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* System Font Stacks */
@@ -52,7 +63,10 @@
 
     /* Layout & spacing defaults */
     --element-spacing: 16px;
-    --border-radius-base: 0.5rem;
+    /* Compact editor chrome: controls feel integrated instead of card-like. */
+    --border-radius-base: 0.375rem;
+    --motion-fast: 120ms;
+    --motion-normal: 160ms;
   }
 
   * {
@@ -104,32 +118,32 @@
   }
 
   .dark {
-    --border: 220 16% 22%;
-    --input: 220 16% 22%;
+    --border: 220 14% 24%;
+    --input: 220 14% 24%;
     --ring: 0 0% 100%;
     --background: 220 13% 16%;
     --foreground: 0 0% 100%;
     --primary: 239 84% 67%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 13% 20%;
+    --secondary: 220 14% 19%;
     --secondary-foreground: 0 0% 100%;
     --destructive: 0 72% 60%;
     --destructive-foreground: 0 0% 100%;
     --muted: 220 13% 20%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 220 13% 22%;
+    --accent: 220 14% 23%;
     --accent-foreground: 0 0% 100%;
     --popover: 220 13% 16%;
     --popover-foreground: 0 0% 100%;
     --card: 220 13% 18%;
     --card-foreground: 0 0% 100%;
-    --sidebar-background: 220 13% 14%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-background: 220 14% 15%;
+    --sidebar-foreground: 220 14% 90%;
+    --sidebar-primary: 217 91% 68%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 13% 20%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 220 16% 22%;
+    --sidebar-accent: 220 14% 21%;
+    --sidebar-accent-foreground: 220 20% 96%;
+    --sidebar-border: 220 14% 23%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
@@ -192,12 +206,92 @@
 
 @layer utilities {
   .animate-fade-in {
-    animation: fade-in 0.2s ease-out;
+    animation: fade-in var(--motion-normal) ease-out;
   }
 
   .animate-fade-out {
-    animation: fade-out 0.2s ease-out;
+    animation: fade-out var(--motion-normal) ease-out;
   }
+}
+
+/* VS Code-like workbench chrome: quiet separators and compact active states. */
+.qori-workbench {
+  font-size: 13px;
+  letter-spacing: -0.005em;
+}
+
+.qori-workbench button,
+.qori-workbench input,
+.qori-workbench select,
+.qori-workbench textarea {
+  font-size: 13px;
+}
+
+.qori-workbench [data-sidebar="menu-button"] {
+  min-height: 28px;
+  height: 28px;
+  padding-block: 3px;
+  padding-inline: 10px;
+  gap: 8px;
+}
+
+.qori-workbench [data-sidebar="group-label"] {
+  height: 26px;
+  padding-inline: 10px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.qori-workbench [data-sidebar="header"],
+.qori-workbench [data-sidebar="footer"] {
+  padding: 8px;
+}
+
+.qori-workbench [data-sidebar="content"] {
+  padding-block: 4px;
+}
+
+.qori-workbench [data-sidebar="menu"] {
+  gap: 1px;
+}
+
+.qori-workbench [role="tab"] {
+  min-height: 28px;
+  height: 28px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.qori-workbench [data-panel="main"] {
+  background: hsl(var(--background));
+}
+[data-sidebar="sidebar"] {
+  border-right: 1px solid hsl(var(--sidebar-border) / 0.65);
+}
+
+[data-sidebar="menu-button"] {
+  border-radius: 4px;
+  transition:
+    background-color var(--motion-fast) ease,
+    color var(--motion-fast) ease;
+}
+
+[data-sidebar="menu-button"][data-active="true"] {
+  box-shadow: inset 2px 0 0 hsl(var(--sidebar-primary));
+}
+
+[data-sidebar-resize]::before {
+  content: "";
+  display: block;
+  width: 7px;
+  height: 100%;
+  margin-left: -3px;
+}
+
+/* Hide Excalidraw zoom indicator (bottom-left) */
+.excalidraw .zoom-actions {
+  display: none !important;
 }
 
 /* Number input spinners removal */
@@ -209,4 +303,203 @@ input[type="number"].no-spinners::-webkit-outer-spin-button {
 
 input[type="number"].no-spinners {
   -moz-appearance: textfield;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   BlockNote theme integration
+   Override BlockNote's hardcoded --bn-colors-* to use our design system vars.
+   Using :root prefix to win the specificity battle against BlockNote's own
+   .bn-container (0,1,0) and .bn-container[data-color-scheme=dark] (0,2,0).
+   Our --background/--foreground/etc. already switch on the .dark class,
+   so no duplicate dark-mode block is needed.
+───────────────────────────────────────────────────────────────────────────── */
+:root .bn-container,
+:root .bn-container[data-color-scheme="dark"] {
+  --bn-colors-editor-background: hsl(var(--background));
+  --bn-colors-editor-text: hsl(var(--foreground));
+  --bn-colors-menu-background: hsl(var(--card));
+  --bn-colors-menu-text: hsl(var(--card-foreground));
+  --bn-colors-tooltip-background: hsl(var(--popover));
+  --bn-colors-tooltip-text: hsl(var(--popover-foreground));
+  --bn-colors-hovered-background: hsl(var(--accent));
+  --bn-colors-hovered-text: hsl(var(--accent-foreground));
+  --bn-colors-selected-background: hsl(var(--primary) / 0.15);
+  --bn-colors-selected-text: hsl(var(--foreground));
+  --bn-colors-disabled-background: hsl(var(--muted));
+  --bn-colors-disabled-text: hsl(var(--muted-foreground));
+  --bn-colors-shadow: hsl(var(--border) / 0.5);
+  --bn-colors-border: hsl(var(--border));
+  --bn-colors-side-menu: hsl(var(--muted-foreground));
+  --bn-font-family: var(--font-family-active);
+  --bn-border-radius: var(--border-radius-base);
+  /* Scope absolutely-positioned side menu children (prevents them from
+     positioning relative to SidebarProvider which spans the full window) */
+  position: relative;
+}
+
+/* Editor area transparent — background comes from the wrapper div */
+:root .bn-editor {
+  background-color: transparent;
+}
+
+/* Guarantee BlockNote Radix popovers/dropdowns render above the sidebar.
+   The `z-50` class is on the content inside, but the Radix wrapper div
+   itself has no z-index — it needs to be set to participate in the
+   root stacking context above everything else. */
+[data-radix-popper-content-wrapper] {
+  z-index: 50;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Document editor — page simulation
+   Simulates a real document page (like Google Docs) with configurable size,
+   margins, shadows, and zoom. Print CSS keeps only the clean content.
+───────────────────────────────────────────────────────────────────────────── */
+
+/* Scrollable wrapper behind the page — provides the gray "canvas" background */
+.document-scroll {
+  container-type: inline-size;
+  background-color: hsl(var(--muted));
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+/* The "page" — white sheet with shadow, sized dynamically via CSS vars */
+.document-paper {
+  --page-width: 794px; /* A4 default at 96 DPI */
+  --page-height: auto;
+  --page-margin: 96px; /* 1 inch default */
+  background-color: hsl(var(--background));
+  width: var(--page-width);
+  min-height: var(--page-height);
+  max-width: 100%;
+  margin: 2rem auto;
+  padding: var(--page-margin);
+  box-shadow:
+    0 1px 1px hsl(var(--border) / 0.15),
+    0 4px 8px hsl(var(--border) / 0.1),
+    0 8px 24px hsl(var(--border) / 0.08);
+  border-radius: 2px;
+  position: relative;
+}
+
+@container (max-width: 600px) {
+  .document-paper {
+    margin: 1rem auto;
+    padding: min(var(--page-margin), 24px);
+  }
+}
+
+/* Zoom wrapper — scales the page visually */
+.document-zoom-wrapper {
+  transform-origin: top center;
+  transition: transform var(--motion-fast) ease-out;
+  will-change: transform;
+}
+
+/* BlockNote editor inside the page — fill the available content width */
+.document-paper .bn-container {
+  width: 100%;
+}
+
+.document-paper .bn-editor {
+  padding: 0;
+  background-color: transparent;
+}
+
+/* Ruler guides (optional visual aid — thin lines at margin edges) */
+.document-paper::before,
+.document-paper::after {
+  content: "";
+  position: absolute;
+  background-color: hsl(var(--border) / 0.3);
+  transition: opacity 0.15s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Top margin ruler */
+.document-paper.show-rulers::before {
+  opacity: 1;
+  top: var(--page-margin);
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+
+/* Left margin ruler */
+.document-paper.show-rulers::after {
+  opacity: 1;
+  left: var(--page-margin);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+/* Page break indicator — subtle dashed line between pages (future multi-page) */
+.page-break {
+  border-top: 2px dashed hsl(var(--border));
+  margin: 2rem auto;
+  width: var(--page-width, 794px);
+  position: relative;
+}
+
+.page-break::after {
+  content: "Page Break";
+  position: absolute;
+  top: -0.65rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: hsl(var(--muted));
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+}
+
+/* ── Print / PDF export — clean output, no chrome ─────────────────────────── */
+@page {
+  size: A4;
+  margin: 1in;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 1in;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .document-paper,
+  .document-paper * {
+    visibility: visible;
+  }
+
+  .document-paper {
+    position: absolute;
+    inset: 0;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0;
+    background-color: transparent;
+  }
+
+  /* Hide UI chrome */
+  .document-scroll,
+  .document-zoom-wrapper,
+  .document-toolbar,
+  .document-rulers {
+    display: none !important;
+  }
+
+  /* Ensure page breaks behave correctly */
+  .bn-container * {
+    page-break-inside: avoid;
+  }
 }

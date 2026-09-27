@@ -63,8 +63,16 @@ export class KeyNormalizerClass {
   normalize(event: KeyboardEvent): NormalizedKey | null {
     if (event.isComposing) return null;
 
-    const raw = event.key;
-    if (!raw || raw === "Unidentified") return null;
+    let raw = event.key;
+
+    // WebKitGTK reports event.key as "Unidentified" for some key combinations
+    // (e.g. Ctrl+Shift+Tab on Linux). Fall back to event.code which always
+    // carries the physical key identity regardless of modifier state.
+    if (!raw || raw === "Unidentified") {
+      raw = this._codeToKeyName(event.code);
+    }
+
+    if (!raw) return null;
 
     // Lone modifier keys are not standalone bindings
     if (["Shift", "Control", "Alt", "Meta"].includes(raw)) return null;
@@ -137,6 +145,23 @@ export class KeyNormalizerClass {
 
   private _isMod(value: string): value is Modifier {
     return (MODIFIER_ORDER as readonly string[]).includes(value);
+  }
+
+  /**
+   * Convert a KeyboardEvent.code value to a canonical key name.
+   * Used as fallback when event.key is "Unidentified" (WebKitGTK bug with
+   * certain modifier+key combinations on Linux).
+   *
+   * Examples: "Tab" → "tab", "KeyA" → "a", "Digit1" → "1", "PageUp" → "pageup"
+   */
+  private _codeToKeyName(code: string): string {
+    if (!code) return "";
+    // "KeyA"–"KeyZ" → "a"–"z"
+    if (/^Key[A-Z]$/.test(code)) return code[3].toLowerCase();
+    // "Digit0"–"Digit9" → "0"–"9"
+    if (/^Digit\d$/.test(code)) return code[5];
+    // Everything else: lowercase as-is ("Tab"→"tab", "PageUp"→"pageup", etc.)
+    return code.toLowerCase();
   }
 
   private _build(mods: Set<Modifier>, key: string): NormalizedKey {

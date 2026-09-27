@@ -12,6 +12,22 @@ import { KeybindingSource } from "./types";
 // familiarity and forward-compatibility.
 
 const BUILTIN_KEYBINDINGS = [
+  { key: "alt+arrowleft", commandId: "workbench.action.navigateBack", allowInInput: true },
+  { key: "alt+arrowright", commandId: "workbench.action.navigateForward", allowInInput: true },
+  {
+    key: "ctrl+s",
+    commandId: "diagram.action.save",
+  },
+  {
+    key: "ctrl+n",
+    commandId: "diagram.action.newDiagram",
+    when: "!explorerFocus",
+  },
+  {
+    key: "ctrl+n",
+    commandId: "explorer.action.newFile",
+    when: "explorerFocus",
+  },
   {
     key: "ctrl+shift+p",
     commandId: "workbench.action.showCommands",
@@ -23,14 +39,51 @@ const BUILTIN_KEYBINDINGS = [
   {
     key: "ctrl+w",
     commandId: "workbench.action.closeActiveTab",
+    allowInInput: true,
+  },
+  {
+    key: "ctrl+b",
+    commandId: "workbench.action.toggleSidebar",
+  },
+  {
+    key: "ctrl+h",
+    commandId: "workbench.action.focusSidebar",
+  },
+  {
+    key: "ctrl+l",
+    commandId: "workbench.action.focusEditor",
+  },
+  {
+    key: "ctrl+f",
+    commandId: "workbench.action.focusSidebarSearch",
+  },
+  {
+    key: "ctrl+p",
+    commandId: "workbench.action.openQuickOpen",
   },
   {
     key: "ctrl+tab",
     commandId: "workbench.action.nextTab",
+    allowInInput: true,
   },
   {
+    key: "ctrl+pagedown",
+    commandId: "workbench.action.nextTab",
+    allowInInput: true,
+  },
+  {
+    // Note: ctrl+shift+tab is consumed by GTK/WebKitGTK on Linux before
+    // reaching JavaScript. Use ctrl+pageup as the cross-platform alternative.
+    key: "ctrl+pageup",
+    commandId: "workbench.action.previousTab",
+    allowInInput: true,
+  },
+  {
+    // Works on Windows/macOS. On Linux/GTK this is intercepted at OS level
+    // and never reaches JavaScript — use ctrl+pageup as fallback.
     key: "ctrl+shift+tab",
     commandId: "workbench.action.previousTab",
+    allowInInput: true,
   },
 ] as const;
 
@@ -49,6 +102,8 @@ export function registerDefaultKeybindings(): void {
       commandId: binding.commandId,
       chord: keyNormalizer.normalizeChord(binding.key),
       source: KeybindingSource.Builtin,
+      ...("allowInInput" in binding && { allowInInput: binding.allowInInput }),
+      ...("when" in binding && { when: binding.when }),
     });
   }
 }

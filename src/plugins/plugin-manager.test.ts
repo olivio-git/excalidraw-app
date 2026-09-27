@@ -4,6 +4,8 @@ import type { Plugin, PluginManifest, PluginAPI } from "./types";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
+vi.mock("@excalidraw/excalidraw", () => ({ exportToSvg: vi.fn() }));
+
 vi.mock("@/core/routing/route-registry", () => ({
   RouteRegistry: {
     register: vi.fn(),
@@ -50,6 +52,25 @@ describe("PluginManager", () => {
   beforeEach(() => {
     manager = new PluginManagerClass();
     vi.clearAllMocks();
+  });
+
+  it("preserves a plugin keybinding's allowInInput declaration", async () => {
+    const { keybindingRegistry } = await import("@/core/keybindings/keybinding-registry");
+    const plugin = makePlugin("editor-save-input");
+    plugin.activate = (api) =>
+      api.registerKeybinding({
+        commandId: "test.editor.save",
+        key: "ctrl+s",
+        when: "documentEditorActive",
+        allowInInput: true,
+      });
+    manager.register(plugin);
+    await manager.activate(plugin.manifest.id);
+    expect(
+      keybindingRegistry.getAll().find((binding) => binding.commandId === "test.editor.save")
+        ?.allowInInput
+    ).toBe(true);
+    await manager.deactivate(plugin.manifest.id);
   });
 
   // ── register ───────────────────────────────────────────────────────────────

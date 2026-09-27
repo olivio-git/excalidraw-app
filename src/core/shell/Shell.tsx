@@ -5,26 +5,30 @@ import {
   SidebarTrigger,
 } from "@/shared/components/ui/sidebar";
 import { Separator } from "@/shared/components/ui/separator";
-import TabBar from "@/core/tabs/components/TabBar";
+import { Toaster } from "sonner";
+import { WorkbenchToolbar } from "@/core/tabs/components/WorkbenchToolbar";
 import TabContent from "@/core/tabs/components/TabContent";
 import TitleBar from "./TitleBar";
-import AppSidebar from "./Sidebar";
-import type { RouteConfig } from "@/core/routing/types";
+import DiagramSidebar from "./DiagramSidebar";
 import { useKeybindingBridge } from "@/core/keybindings/hooks/useKeybindingBridge";
+import { useMcpBridge } from "@/core/shell/hooks/useMcpBridge";
 import CommandPalette from "@/features/command-palette/CommandPalette";
+import { useThemeStore } from "@/stores/themeStore";
+import { ConfirmDialog } from "@/shared/lib/confirm";
+import { PromptDialog } from "@/shared/lib/prompt";
+import { ToolPermissionDialog } from "@/features/ai-chat/components/ToolPermissionDialog";
 
-export interface ShellProps {
-  routes: RouteConfig[];
-}
-
-export default function Shell({ routes }: ShellProps) {
+export default function Shell() {
   useKeybindingBridge();
-
-  // Removed useEffect causing cascading renders
-  // The Shell should just return the provider immediately
+  useMcpBridge();
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
   return (
-    <SidebarProvider className="h-full w-full flex flex-col overflow-hidden relative min-h-0">
+    <SidebarProvider className="qori-workbench h-full w-full flex flex-col overflow-hidden relative min-h-0">
+      <Toaster position="bottom-right" theme={resolvedTheme} richColors />
+      <ConfirmDialog />
+      <PromptDialog />
+      <ToolPermissionDialog />
       {/* Command palette — always mounted, manages its own open/close state */}
       <CommandPalette />
       {/* TitleBar at the very top, full width, with TabBar inside */}
@@ -32,15 +36,19 @@ export default function Shell({ routes }: ShellProps) {
         <SidebarTrigger className="ml-2 size-7 flex-shrink-0" />
         <Separator orientation="vertical" className="mx-1.5 !h-4" />
         <div className="flex-1 min-w-0">
-          <TabBar alwaysVisible />
+          <WorkbenchToolbar />
         </div>
       </TitleBar>
 
       {/* Sidebar + Content below the TitleBar */}
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
-        <AppSidebar routes={routes} />
+        <DiagramSidebar />
         <SidebarResizeHandle />
-        <SidebarInset className="flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden">
+        <SidebarInset
+          data-panel="main"
+          tabIndex={-1}
+          className="flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden outline-none focus-within:ring-1 focus-within:ring-inset focus-within:ring-muted-foreground/40"
+        >
           <div className="bg-secondary flex-1 min-h-0 overflow-hidden">
             <TabContent />
           </div>

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <!-- Orejas -->
+  <circle cx="36" cy="34" r="18" fill="currentColor"/>
+  <circle cx="92" cy="34" r="18" fill="currentColor"/>
+  <!-- Cabeza -->
+  <circle cx="64" cy="72" r="46" fill="currentColor"/>
+  <!-- Ojos - huecos -->
+  <circle cx="48" cy="66" r="9" fill="white"/>
+  <circle cx="80" cy="66" r="9" fill="white"/>
+  <!-- Nariz -->
+  <ellipse cx="64" cy="84" rx="5" ry="4" fill="white"/>
+
+  <style>
+    :root { color: #000; }
+    @media (prefers-color-scheme: dark) {
+      :root { color: #fff; }
+    }
+    svg { color: inherit; }
+  </style>
+</svg>

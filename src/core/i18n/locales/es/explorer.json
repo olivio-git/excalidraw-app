@@ -1,0 +1,98 @@
+{
+  "toolbar": {
+    "files": "Archivos",
+    "more": "Opciones del explorador",
+    "revealActive": "Mostrar archivo activo",
+    "newFile": "Nuevo archivo",
+    "newFolder": "Nueva carpeta",
+    "refresh": "Actualizar",
+    "collapseAll": "Contraer todo",
+    "filterPlaceholder": "Filtrar archivos...",
+    "showDotfiles": "Mostrar dotfiles",
+    "hideDotfiles": "Ocultar dotfiles",
+    "sortPrefix": "Ordenar: "
+  },
+  "sort": {
+    "typeFirst": "Tipo primero",
+    "nameAsc": "Nombre A→Z",
+    "nameDesc": "Nombre Z→A"
+  },
+  "contextMenu": {
+    "openToSide": "Abrir al lado",
+    "reveal": "Mostrar en el gestor de archivos",
+    "newFileHere": "Nuevo archivo aquí",
+    "newFolderHere": "Nueva carpeta aquí",
+    "rename": "Renombrar",
+    "cut": "Cortar",
+    "copy": "Copiar",
+    "paste": "Pegar aquí",
+    "copyPath": "Copiar ruta",
+    "copyRelativePath": "Copiar ruta relativa",
+    "deleteFolder": "Eliminar carpeta",
+    "delete": "Eliminar",
+    "deleteMultiple": "Eliminar {{count}} elementos",
+    "open": "Abrir"
+  },
+  "nodeButton": {
+    "newFile": "Nuevo archivo",
+    "newFolder": "Nueva carpeta",
+    "noViewer": "No hay visor registrado para este tipo de archivo"
+  },
+  "tooltip": {
+    "folder": "Carpeta"
+  },
+  "quickOpen": {
+    "placeholder": "Buscar archivo...",
+    "noResults": "Sin resultados para \"{{query}}\"",
+    "noFiles": "Sin archivos en el workspace",
+    "navHint": "↑↓ navegar",
+    "openHint": "↵ abrir",
+    "sideHint": "Shift+↵ abrir al lado",
+    "closeHint": "Esc cerrar",
+    "dialogTitle": "Apertura rápida de archivo",
+    "dialogDescription": "Escribe para buscar archivos en el workspace"
+  },
+  "dragDrop": {
+    "conflictTitle": "Conflicto de nombre",
+    "conflictDescription": "\"{{name}}\" ya existe en el destino. ¿Deseas reemplazarlo?",
+    "conflictConfirm": "Reemplazar",
+    "errorMoving": "Error al mover \"{{name}}\": {{message}}"
+  },
+  "panel": {
+    "emptyTitle": "Tu espacio de trabajo comienza aquí",
+    "emptyDescription": "Abre una carpeta para organizar tus diagramas y documentos.",
+    "openFolder": "Abrir carpeta",
+    "loading": "Cargando archivos…",
+    "loadFailed": "No se pudo leer este espacio de trabajo",
+    "unreadableFolder": "No se pudo leer esta carpeta",
+    "clearFilter": "Limpiar filtro",
+    "selectedCount": "{{count}} seleccionados",
+    "fileCount_one": "{{count}} archivo",
+    "fileCount_other": "{{count}} archivos",
+    "itemCount_one": "{{count}} elemento",
+    "itemCount_other": "{{count}} elementos",
+    "operationError": "La operación falló: {{message}}",
+    "noFilesInFolder": "No hay archivos en esta carpeta",
+    "noFilterResults": "Sin resultados para \"{{query}}\"",
+    "deleteFileTitle": "Eliminar archivo",
+    "deleteFolderTitle": "Eliminar carpeta",
+    "deleteDescription": "¿Eliminar \"{{name}}\"? Esta acción no se puede deshacer.",
+    "deleteLabel": "Eliminar",
+    "deletedSuccess": "\"{{name}}\" eliminado",
+    "errorDeleting": "Error al eliminar \"{{name}}\": {{message}}",
+    "batchDeleteTitle": "Eliminar {{count}} elementos",
+    "batchDeleteDescription": "¿Eliminar los siguientes elementos? Esta acción no se puede deshacer.\n\n{{preview}}",
+    "batchDeleteLabel": "Eliminar todo",
+    "batchDeleteMore": "\ny {{count}} más...",
+    "batchDeletedSuccess": "{{count}} elementos eliminados"
+  },
+  "clipboard": {
+    "invalidTarget": "No se puede pegar una carpeta dentro de sí misma ni de una de sus subcarpetas.",
+    "errorPasting": "Error al pegar \"{{name}}\": {{message}}"
+  },
+  "input": {
+    "name": "Nombre del archivo o carpeta",
+    "invalidName": "Escribe un nombre válido sin separadores de ruta ni caracteres reservados.",
+    "exists": "\"{{name}}\" ya existe. Elige otro nombre."
+  }
+}

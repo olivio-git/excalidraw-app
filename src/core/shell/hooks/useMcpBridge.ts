@@ -1,0 +1,1088 @@
+import { useEffect } from "react";
+import { prepareResourceMove } from "@/core/tabs/tab-lifecycle";
+import { updateTabsAfterRename } from "@/core/shell/panels/explorer-tab-sync";
+import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
+import { convertToExcalidrawElements } from "@excalidraw/excalidraw";
+import { DiagramController } from "@/core/diagram/DiagramController";
+import { executeAITool } from "@/features/ai-chat/utils/tool-executor";
+import { useTabStore } from "@/core/tabs/store/tab-store";
+import { useDiagramStore } from "@/core/diagram/store/diagram-store";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { fileHandlerRegistry } from "@/core/shell/panels/file-handler-registry";
+import { diagramFileService } from "@/core/diagram/services/diagram-file.service";
+import { readDir, readTextFile, remove, rename, mkdir, stat } from "@tauri-apps/plugin-fs";
+import { join } from "@tauri-apps/api/path";
+import { getFileStat, copyPath } from "@/core/shell/services/file.service";
+import { useExplorerStore, useExplorerSelectionStore } from "@/stores/explorerStore";
+import { getDocumentController } from "@/features/document-editor/documentController.singleton";
+import { documentEditorRegistry } from "@/features/document-editor/documentEditorRegistry";
+import type { SortOrder } from "@/core/shell/panels/explorer-types";
+import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
+import type { AppState } from "@excalidraw/excalidraw/types";
+import { dispatchAutomationTool } from "@/core/automation/dispatch";
+import { workbenchActions, resolveTab } from "@/core/automation/workbench";
+import {
+  AutomationError,
+  isWorkspacePath,
+  optionalBoolean,
+  group,
+  text,
+} from "@/core/automation/validation";
+import { closeTabManaged } from "@/core/tabs/tab-lifecycle";
+import { describeTab } from "@/core/tabs/tab-resources";
+
+interface McpCommandPayload {
+  uuid: string;
+  tool: string;
+  input: Record<string, unknown>;
+}
+
+interface FlatFileEntry {
+  path: string;
+  name: string;
+  isDir: boolean;
+}
+
+const flattenDir = async (dir: string, prefix: string): Promise<FlatFileEntry[]> => {
+  const entries = await readDir(dir);
+  const result: FlatFileEntry[] = [];
+  for (const entry of entries) {
+    if (!entry.name) continue;
+    const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+    result.push({ path: relativePath, name: entry.name, isDir: entry.isDirectory });
+    if (entry.isDirectory) {
+      const absoluteChild = await join(dir, entry.name);
+      const children = await flattenDir(absoluteChild, relativePath);
+      result.push(...children);
+    }
+  }
+  return result;
+};
+
+export const hasPathTraversal = (p: string): boolean => p.includes("..") || p.startsWith("/");
+
+// For document tools that use absolute paths — verifies path is inside workspace and has no traversal
+const isDocumentPathAllowed = (filePath: string): boolean => {
+  const workspaceDir = useWorkspaceStore.getState().workspaceDir;
+  if (!workspaceDir) return false;
+  return isWorkspacePath(filePath, workspaceDir);
+};
+
+function syncExplorerToFile(filePath: string): void {
+  useExplorerSelectionStore.getState().setSelectedPaths([filePath]);
+  window.dispatchEvent(
+    new CustomEvent("explorer:set-selection", { detail: { paths: [filePath] } })
+  );
+}
+
+async function saveMcpDiagram(
+  instanceId: string,
+  elements: readonly ExcalidrawElement[]
+): Promise<void> {
+  const api = DiagramController.getApi(instanceId);
+  if (!api) return;
+  const store = useDiagramStore.getState();
+  if (!store.getDiagram(instanceId)) await store.loadDiagram(instanceId, instanceId);
+  store.markDirty(instanceId);
+  await store.saveDiagram(instanceId, elements, api.getAppState(), api.getFiles());
+  await store.waitForSaves(instanceId);
+}
+
+export async function dispatchMcpTool(
+  tool: string,
+  input: Record<string, unknown>
+): Promise<{ result: unknown; error: string | null }> {
+  try {
+    const automated = await dispatchAutomationTool(tool, input);
+    if (automated) return automated;
+    let instanceId = DiagramController.getActiveInstanceId();
+    if (
+      [
+        "get_elements",
+        "draw_elements",
+        "set_elements",
+        "clear_canvas",
+        "update_element",
+        "export_svg",
+      ].includes(tool) &&
+      (input.filePath !== undefined || input.tabId !== undefined)
+    ) {
+      const tab = resolveTab({
+        filePath: input.filePath === undefined ? undefined : text(input.filePath, "filePath"),
+        tabId: input.tabId === undefined ? undefined : text(input.tabId, "tabId"),
+      });
+      if (tab.routeId !== "diagram" || !tab.instanceId)
+        throw new AutomationError("WRONG_RESOURCE", "The target tab is not a diagram.");
+      instanceId = tab.instanceId;
+    }
+    switch (tool) {
+      case "get_elements": {
+        if (!instanceId) {
+          const { tabs, activeTabId } = useTabStore.getState();
+          const activeTab = tabs.find((t) => t.id === activeTabId);
+          const hint = activeTab
+            ? ` Active tab is "${activeTab.routeId}" (${activeTab.title}) — not an Excalidraw canvas.`
+            : " No tab is active.";
+          return {
+            result: null,
+            error: `No active diagram canvas.${hint} Open a .excalidraw file in a tab first.`,
+          };
+        }
+        if (!DiagramController.getApi(instanceId))
+          throw new AutomationError(
+            "NOT_READY",
+            "Diagram canvas is not ready. Retry after opening it."
+          );
+        const elements = DiagramController.getElements(instanceId);
+        return { result: JSON.stringify(elements), error: null };
+      }
+
+      case "draw_elements":
+      case "clear_canvas":
+      case "update_element": {
+        if (!instanceId) {
+          return { result: null, error: "No active diagram canvas. Open a diagram tab first." };
+        }
+        const res = await executeAITool(tool, input, { kind: "diagram", instanceId });
+        if (!res.isError) {
+          const api = DiagramController.getApi(instanceId);
+          if (api) {
+            await saveMcpDiagram(instanceId, api.getSceneElements());
+          }
+        }
+        return { result: res.result, error: res.isError ? res.result : null };
+      }
+
+      case "set_elements": {
+        if (!instanceId) {
+          return { result: null, error: "No active diagram canvas. Open a diagram tab first." };
+        }
+        const api = DiagramController.getApi(instanceId);
+        if (!api) {
+          return { result: null, error: "Canvas not ready. Try again in a moment." };
+        }
+        if (!Array.isArray(input.elements))
+          throw new AutomationError("INVALID_INPUT", "elements must be an array.");
+        const elements = input.elements;
+        if (elements.length === 0) {
+          api.updateScene({ elements: [] });
+          await saveMcpDiagram(instanceId, []);
+          return { result: "Set 0 element(s). Canvas cleared.", error: null };
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const normalized = convertToExcalidrawElements(elements as any) as ExcalidrawElement[];
+        if (normalized.length === 0) {
+          return {
+            result: null,
+            error: `convertToExcalidrawElements returned 0 elements from ${elements.length} input. The elements may be malformed or use an unsupported format. Check that each element has at minimum: type, x, y, width, height.`,
+          };
+        }
+        api.updateScene({ elements: normalized });
+        await saveMcpDiagram(instanceId, normalized);
+        return {
+          result: `Set ${normalized.length} element(s) (${elements.length} input → ${normalized.length} converted). Saved to disk.`,
+          error: null,
+        };
+      }
+
+      case "export_svg": {
+        const svg = await DiagramController.exportToSVG(instanceId);
+        if (!svg) return { result: null, error: "No active diagram or export failed." };
+        const svgString = new XMLSerializer().serializeToString(svg);
+        return { result: svgString, error: null };
+      }
+
+      case "open_file": {
+        const filePath = input.filePath as string | undefined;
+        if (!filePath) return { result: null, error: "filePath is required." };
+        const name = filePath.split(/[\\/]/).pop() ?? filePath;
+        const handler = fileHandlerRegistry.resolveOrDefault(name);
+        const routePath = `/${handler.routeId}`;
+        const existing = useTabStore.getState().findTabByPath(routePath, filePath);
+        if (existing) {
+          useTabStore.getState().setActiveTab(existing.id);
+          syncExplorerToFile(filePath);
+          return { result: `Focused ${name}.`, error: null };
+        }
+        const title = handler.displayName ? handler.displayName(name) : name;
+        useTabStore.getState().addTab({
+          routeId: handler.routeId,
+          path: routePath,
+          title,
+          instanceId: filePath,
+          metadata: { filePath },
+        });
+        syncExplorerToFile(filePath);
+        return { result: `Opened ${name}.`, error: null };
+      }
+
+      case "get_active_tab": {
+        const { tabs, activeTabId } = useTabStore.getState();
+        const tab = tabs.find((t) => t.id === activeTabId) ?? null;
+        if (!tab) return { result: null, error: null };
+        return {
+          result: JSON.stringify({
+            ...describeTab(tab),
+            tabId: tab.id,
+            routeId: tab.routeId,
+            title: tab.title,
+            path: tab.path,
+            instanceId: tab.instanceId,
+          }),
+          error: null,
+        };
+      }
+
+      case "get_workspace_dir": {
+        const dir = useWorkspaceStore.getState().workspaceDir;
+        return { result: dir ?? null, error: null };
+      }
+
+      case "list_workspace": {
+        const workspaceDir = useWorkspaceStore.getState().workspaceDir;
+        if (!workspaceDir) return { result: null, error: "No workspace directory set." };
+        const flatList = await flattenDir(workspaceDir, "");
+        return { result: JSON.stringify(flatList), error: null };
+      }
+
+      case "create_diagram": {
+        const workspaceDir = useWorkspaceStore.getState().workspaceDir;
+        if (!workspaceDir) return { result: null, error: "No workspace directory set." };
+        const rawName = (input as Record<string, unknown>).name as string | undefined;
+        if (!rawName) return { result: null, error: "name is required." };
+        const name = rawName.endsWith(".excalidraw") ? rawName : `${rawName}.excalidraw`;
+        if (hasPathTraversal(name)) {
+          return { result: null, error: "Invalid path: path traversal not allowed." };
+        }
+        const filePath = await join(workspaceDir, name);
+        try {
+          await readTextFile(filePath);
+          return { result: null, error: "File already exists." };
+        } catch {
+          // File does not exist — proceed
+        }
+        // Auto-create parent directories so names like "subdir/my-diagram" work
+        const segments = name.split("/");
+        if (segments.length > 1) {
+          const parentRelative = segments.slice(0, -1).join("/");
+          const parentAbsolute = await join(workspaceDir, parentRelative);
+          await mkdir(parentAbsolute, { recursive: true });
+        }
+        await diagramFileService.createNewDiagram(workspaceDir, name);
+        const handler = fileHandlerRegistry.resolveOrDefault(name);
+        const title = handler.displayName ? handler.displayName(name) : name;
+        useTabStore.getState().addTab({
+          routeId: handler.routeId,
+          path: `/${handler.routeId}`,
+          title,
+          instanceId: filePath,
+          metadata: { filePath },
+        });
+        syncExplorerToFile(filePath);
+        return { result: JSON.stringify({ filePath, instanceId: filePath }), error: null };
+      }
+
+      case "save_diagram": {
+        const saveInstanceId = (input as Record<string, unknown>).instanceId as string | undefined;
+        if (!saveInstanceId) return { result: null, error: "instanceId is required." };
+        const api = DiagramController.getApi(saveInstanceId);
+        if (!api) return { result: null, error: "No open diagram for instanceId." };
+        const elements = api.getSceneElements();
+        const appState = api.getAppState();
+        const files = api.getFiles();
+        await diagramFileService.writeDiagram(saveInstanceId, { elements, appState, files });
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { collaborators: _collaborators, ...serializableAppState } =
+          appState as Partial<AppState> & { collaborators?: unknown };
+        const serialized = JSON.stringify(
+          {
+            type: "excalidraw",
+            version: 2,
+            source: "excalidraw-app",
+            elements,
+            appState: serializableAppState,
+            files,
+          },
+          null,
+          2
+        );
+        const bytes = new TextEncoder().encode(serialized).length;
+        return {
+          result: JSON.stringify({ saved: true, instanceId: saveInstanceId, bytes }),
+          error: null,
+        };
+      }
+
+      case "create_folder": {
+        const workspaceDir = useWorkspaceStore.getState().workspaceDir;
+        if (!workspaceDir) return { result: null, error: "No workspace directory set." };
+        const folderPath = (input as Record<string, unknown>).path as string | undefined;
+        if (!folderPath) return { result: null, error: "path is required." };
+        if (hasPathTraversal(folderPath)) {
+          return { result: null, error: "Invalid path: path traversal not allowed." };
+        }
+        const absolutePath = await join(workspaceDir, folderPath);
+        await mkdir(absolutePath, { recursive: true });
+        return { result: JSON.stringify({ created: true, path: folderPath }), error: null };
+      }
+
+      case "rename_file": {
+        const workspaceDir = useWorkspaceStore.getState().workspaceDir;
+        if (!workspaceDir) return { result: null, error: "No workspace directory set." };
+        const oldPath = (input as Record<string, unknown>).oldPath as string | undefined;
+        const newPath = (input as Record<string, unknown>).newPath as string | undefined;
+        if (!oldPath) return { result: null, error: "oldPath is required." };
+        if (!newPath) return { result: null, error: "newPath is required." };
+        if (hasPathTraversal(oldPath) || hasPathTraversal(newPath)) {
+          return { result: null, error: "Invalid path: path traversal not allowed." };
+        }
+        const absoluteOld = await join(workspaceDir, oldPath);
+        const absoluteNew = await join(workspaceDir, newPath);
+        await prepareResourceMove(absoluteOld);
+        await rename(absoluteOld, absoluteNew);
+        const { tabs } = useTabStore.getState();
+        const matchingTab = tabs.find((t) => t.instanceId === absoluteOld);
+        const tabUpdated = Boolean(matchingTab);
+        updateTabsAfterRename(absoluteOld, absoluteNew);
+        return {
+          result: JSON.stringify({ renamed: true, oldPath, newPath, tabUpdated }),
+          error: null,
+        };
+      }
+
+      case "delete_file": {
+        const confirm = (input as Record<string, unknown>).confirm as boolean | undefined;
+        if (confirm !== true) {
+          return { result: null, error: "confirm must be true to delete." };
+        }
+        const workspaceDir = useWorkspaceStore.getState().workspaceDir;
+        if (!workspaceDir) return { result: null, error: "No workspace directory set." };
+        const filePath = (input as Record<string, unknown>).path as string | undefined;
+        if (!filePath) return { result: null, error: "path is required." };
+        if (hasPathTraversal(filePath)) {
+          return { result: null, error: "Invalid path: path traversal not allowed." };
+        }
+        const absolutePath = await join(workspaceDir, filePath);
+        const { tabs } = useTabStore.getState();
+        const matchingTabs = tabs.filter(
+          (t) => t.instanceId === absolutePath || t.instanceId?.startsWith(absolutePath + "/")
+        );
+        for (const tab of matchingTabs) {
+          useTabStore.getState().removeTab(tab.id);
+        }
+        await remove(absolutePath, { recursive: true });
+        return {
+          result: JSON.stringify({
+            deleted: true,
+            path: filePath,
+            tabsClosed: matchingTabs.length,
+          }),
+          error: null,
+        };
+      }
+
+      case "open_file_or_focus": {
+        const filePath = input.filePath as string | undefined;
+        if (!filePath) return { result: null, error: "filePath is required." };
+        const previous = new Set(useTabStore.getState().tabs.map((tab) => tab.id));
+        const tab = await workbenchActions.openFile({
+          filePath,
+          groupId: input.groupId === undefined ? undefined : group(input.groupId),
+          beside: optionalBoolean(input.beside, "beside"),
+          anchor: input.anchor === undefined ? undefined : text(input.anchor, "anchor"),
+        });
+        syncExplorerToFile(filePath);
+        return {
+          result: JSON.stringify({ ...tab, wasCreated: !previous.has(tab.id) }),
+          error: null,
+        };
+      }
+
+      case "list_open_diagrams": {
+        const { tabs, activeTabId } = useTabStore.getState();
+        const diagramTabs = tabs.filter((t) => t.routeId === "diagram");
+        const result = diagramTabs.map((t) => ({
+          ...describeTab(t),
+          tabId: t.id,
+          title: t.title,
+          filePath: t.instanceId ?? null,
+          isDirty: useDiagramStore.getState().getDiagram(t.instanceId ?? "")?.isDirty ?? false,
+          isActive: t.id === activeTabId,
+          isPinned: t.isPinned,
+        }));
+        return { result: JSON.stringify(result), error: null };
+      }
+
+      case "activate_tab": {
+        const filePath = input.filePath as string | undefined;
+        const tabId = input.tabId as string | undefined;
+        if (!filePath && !tabId) return { result: null, error: "filePath or tabId is required." };
+        let tab;
+        if (filePath) {
+          const filename = filePath.split("/").pop() ?? filePath;
+          const handler = fileHandlerRegistry.resolveOrDefault(filename);
+          const routePath = `/${handler.routeId}`;
+          tab = useTabStore.getState().findTabByPath(routePath, filePath);
+        } else {
+          tab = useTabStore.getState().getTab(tabId!);
+        }
+        if (!tab) return { result: JSON.stringify({ success: false }), error: null };
+        useTabStore.getState().setActiveTab(tab.id);
+        const tabFilePath = tab.metadata?.filePath as string | undefined;
+        if (tabFilePath) syncExplorerToFile(tabFilePath);
+        return { result: JSON.stringify({ success: true, tabId: tab.id }), error: null };
+      }
+
+      case "close_tab": {
+        let tab;
+        try {
+          tab = resolveTab({
+            filePath: input.filePath === undefined ? undefined : text(input.filePath, "filePath"),
+            tabId: input.tabId === undefined ? undefined : text(input.tabId, "tabId"),
+          });
+        } catch (error) {
+          if (error instanceof AutomationError && error.code === "TAB_NOT_FOUND")
+            return {
+              result: JSON.stringify({ closed: false, wasDirty: false, reason: "not_found" }),
+              error: null,
+            };
+          throw error;
+        }
+        const closed = await closeTabManaged(tab.id, {
+          discard: optionalBoolean(input.force, "force"),
+        });
+        return { result: JSON.stringify(closed), error: null };
+      }
+
+      case "get_tab_metadata": {
+        const tab = resolveTab({
+          filePath: input.filePath === undefined ? undefined : text(input.filePath, "filePath"),
+          tabId: input.tabId === undefined ? undefined : text(input.tabId, "tabId"),
+        });
+        return {
+          result: JSON.stringify(describeTab(tab)),
+          error: null,
+        };
+      }
+
+      case "save_all_diagrams": {
+        const instanceIds = input.instanceIds as string[] | undefined;
+        const { tabs } = useTabStore.getState();
+        const diagramTabs = tabs.filter((t) => t.routeId === "diagram" && t.instanceId);
+        const targets = instanceIds
+          ? diagramTabs.filter((t) => instanceIds.includes(t.instanceId!))
+          : diagramTabs.filter(
+              (t) => useDiagramStore.getState().getDiagram(t.instanceId!)?.isDirty === true
+            );
+        let saved = 0;
+        let failed = 0;
+        const errors: Record<string, string> = {};
+        // Count unknown instanceIds as failed upfront
+        if (instanceIds) {
+          const openIds = new Set(diagramTabs.map((t) => t.instanceId!));
+          for (const iid of instanceIds) {
+            if (!openIds.has(iid)) {
+              failed++;
+              errors[iid] = "No open diagram for instanceId.";
+            }
+          }
+        }
+        for (const t of targets) {
+          const iid = t.instanceId!;
+          const api = DiagramController.getApi(iid);
+          if (!api) {
+            failed++;
+            errors[iid] = "Canvas not ready.";
+            continue;
+          }
+          try {
+            await useDiagramStore
+              .getState()
+              .saveDiagram(iid, api.getSceneElements(), api.getAppState(), api.getFiles());
+            saved++;
+          } catch (err) {
+            failed++;
+            errors[iid] = String(err);
+          }
+        }
+        const payload: { saved: number; failed: number; errors?: Record<string, string> } = {
+          saved,
+          failed,
+        };
+        if (Object.keys(errors).length > 0) payload.errors = errors;
+        return { result: JSON.stringify(payload), error: null };
+      }
+
+      case "stat_file": {
+        const filePath = input.filePath as string | undefined;
+        if (!filePath) return { result: null, error: "filePath is required." };
+        const fileStat = await getFileStat(filePath);
+        return { result: JSON.stringify(fileStat), error: null };
+      }
+
+      case "copy_file": {
+        const srcPath = input.srcPath as string | undefined;
+        const destPath = input.destPath as string | undefined;
+        const overwrite = input.overwrite as boolean | undefined;
+        if (!srcPath) return { result: null, error: "srcPath is required." };
+        if (!destPath) return { result: null, error: "destPath is required." };
+        try {
+          await copyPath(srcPath, destPath, overwrite ?? false);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg === "EXISTS") {
+            return {
+              result: null,
+              error: "Destination already exists. Set overwrite: true to replace it.",
+            };
+          }
+          throw err;
+        }
+        return { result: JSON.stringify({ copied: true, path: destPath }), error: null };
+      }
+
+      case "list_directory": {
+        const dirPath = input.dirPath as string | undefined;
+        const recursive = (input.recursive as boolean | undefined) ?? false;
+        const showDotfiles = (input.showDotfiles as boolean | undefined) ?? false;
+
+        const targetDir = dirPath ?? useWorkspaceStore.getState().workspaceDir ?? null;
+        if (!targetDir)
+          return { result: null, error: "No directory provided and no workspace set." };
+
+        interface DirEntry {
+          path: string;
+          name: string;
+          isDir: boolean;
+          size?: number;
+          mtime?: number | null;
+        }
+
+        const listDir = async (dir: string): Promise<DirEntry[]> => {
+          const entries = await readDir(dir);
+          const result: DirEntry[] = [];
+          for (const entry of entries) {
+            if (!entry.name) continue;
+            if (!showDotfiles && entry.name.startsWith(".")) continue;
+            const entryPath = await join(dir, entry.name);
+            let size: number | undefined;
+            let mtime: number | null | undefined;
+            try {
+              const info = await stat(entryPath);
+              size = info.size ?? 0;
+              mtime =
+                info.mtime instanceof Date
+                  ? info.mtime.getTime()
+                  : typeof info.mtime === "number"
+                    ? info.mtime
+                    : null;
+            } catch {
+              // stat failed — omit size/mtime
+            }
+            result.push({
+              path: entryPath,
+              name: entry.name,
+              isDir: entry.isDirectory,
+              size,
+              mtime,
+            });
+            if (recursive && entry.isDirectory) {
+              const children = await listDir(entryPath);
+              result.push(...children);
+            }
+          }
+          return result;
+        };
+
+        const entries = await listDir(targetDir);
+        return { result: JSON.stringify(entries), error: null };
+      }
+
+      case "get_explorer_state": {
+        const { sortOrder, showDotfiles } = useExplorerStore.getState();
+        const { selectedPaths } = useExplorerSelectionStore.getState();
+        return {
+          result: JSON.stringify({ sortOrder, showDotfiles, selectedPaths }),
+          error: null,
+        };
+      }
+
+      case "set_explorer_state": {
+        const sortOrder = input.sortOrder as SortOrder | undefined;
+        const showDotfiles = input.showDotfiles as boolean | undefined;
+        if (sortOrder !== undefined) {
+          useExplorerStore.getState().setSortOrder(sortOrder);
+        }
+        if (showDotfiles !== undefined) {
+          useExplorerStore.getState().setShowDotfiles(showDotfiles);
+        }
+        return { result: JSON.stringify({ updated: true }), error: null };
+      }
+
+      case "toggle_folder": {
+        const folderPath = input.folderPath as string | undefined;
+        const expand = input.expand as boolean | undefined;
+        if (!folderPath) return { result: null, error: "folderPath is required." };
+        // Emit a DOM event — ExplorerPanel listens and calls handleToggle
+        const event = new CustomEvent("explorer:toggle-folder", {
+          detail: { folderPath, expand },
+        });
+        window.dispatchEvent(event);
+        // We can't synchronously read the resulting state since it lives in
+        // ExplorerPanel's local useState. Return the requested state as-is.
+        const expanded = expand !== undefined ? expand : "toggled";
+        return { result: JSON.stringify({ expanded }), error: null };
+      }
+
+      case "get_selected_files": {
+        const { selectedPaths } = useExplorerSelectionStore.getState();
+        return {
+          result: JSON.stringify({ selectedPaths, count: selectedPaths.length }),
+          error: null,
+        };
+      }
+
+      case "set_selected_files": {
+        const paths = input.paths as string[] | undefined;
+        if (!Array.isArray(paths)) return { result: null, error: "paths must be an array." };
+        useExplorerSelectionStore.getState().setSelectedPaths(paths);
+        // Also emit a DOM event so ExplorerPanel can sync local Set state
+        window.dispatchEvent(new CustomEvent("explorer:set-selection", { detail: { paths } }));
+        return { result: JSON.stringify({ selected: paths.length }), error: null };
+      }
+
+      case "document_create": {
+        try {
+          const title = input.title as string | undefined;
+          if (!title) return { result: null, error: "title is required." };
+          if (hasPathTraversal(title)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          const result = await getDocumentController().createDocument(title);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_open": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          const result = await getDocumentController().openDocument(filePath);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_get_content": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          const raw = getDocumentController().getContent(filePath);
+          if (raw === null) return { result: null, error: "Document not open or not found." };
+
+          // Strip embedded data: URLs by default to avoid token overflow.
+          // Pass includeDataUrls: true only when the raw bytes are actually needed.
+          const includeDataUrls = input.includeDataUrls === true;
+          const content = includeDataUrls
+            ? raw
+            : raw.replace(/!\[([^\]]*)\]\(data:[^)]{20,}\)/g, "![$1]([embedded-image])");
+
+          const offsetLines = typeof input.offset === "number" ? input.offset : 0;
+          const limitLines = typeof input.limit === "number" ? input.limit : undefined;
+
+          if (offsetLines > 0 || limitLines !== undefined) {
+            const lines = content.split("\n");
+            const total = lines.length;
+            const sliced =
+              limitLines !== undefined
+                ? lines.slice(offsetLines, offsetLines + limitLines)
+                : lines.slice(offsetLines);
+            const hasMore = offsetLines + sliced.length < total;
+            return {
+              result: JSON.stringify({
+                content: sliced.join("\n"),
+                offset: offsetLines,
+                total,
+                hasMore,
+              }),
+              error: null,
+            };
+          }
+
+          return { result: JSON.stringify(content), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_get_sections": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          const sections = getDocumentController().getSections(filePath);
+          const headingsOnly = input.headingsOnly === true;
+          const includeDataUrls = input.includeDataUrls === true;
+
+          if (headingsOnly) {
+            return {
+              result: JSON.stringify(
+                sections.map(({ id, heading, level }) => ({ id, heading, level }))
+              ),
+              error: null,
+            };
+          }
+
+          const result = includeDataUrls
+            ? sections
+            : sections.map((s) => ({
+                ...s,
+                content: s.content.replace(
+                  /!\[([^\]]*)\]\(data:[^)]{20,}\)/g,
+                  "![$1]([embedded-image])"
+                ),
+              }));
+          return { result: JSON.stringify(result), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_set_content": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          const content = input.content as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          if (content === undefined) return { result: null, error: "content is required." };
+          const result = await getDocumentController().setContent(filePath, content);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_append": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          const content = input.content as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          if (content === undefined) return { result: null, error: "content is required." };
+          const result = await getDocumentController().appendContent(filePath, content);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_insert_after_section": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          const sectionId = input.sectionId as string | undefined;
+          const content = input.content as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          if (!sectionId) return { result: null, error: "sectionId is required." };
+          if (content === undefined) return { result: null, error: "content is required." };
+          const result = await getDocumentController().insertAfterSection(
+            filePath,
+            sectionId,
+            content
+          );
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_insert_after_heading": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          const heading = input.heading as string | undefined;
+          const content = input.content as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          if (!heading) return { result: null, error: "heading is required." };
+          if (content === undefined) return { result: null, error: "content is required." };
+          const result = await getDocumentController().insertAfterHeading(
+            filePath,
+            heading,
+            content
+          );
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_replace_section": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          const sectionId = input.sectionId as string | undefined;
+          const content = input.content as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          if (!sectionId) return { result: null, error: "sectionId is required." };
+          if (content === undefined) return { result: null, error: "content is required." };
+          const result = await getDocumentController().replaceSection(filePath, sectionId, content);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_delete_section": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          const sectionId = input.sectionId as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          if (!sectionId) return { result: null, error: "sectionId is required." };
+          const result = await getDocumentController().deleteSection(filePath, sectionId);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_insert_diagram": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          const diagramPath = input.diagramPath as string | undefined;
+          const caption = input.caption as string | undefined;
+          const sectionId = input.sectionId as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          if (!diagramPath) return { result: null, error: "diagramPath is required." };
+
+          // instanceId === diagramPath in this app — export requires an open tab
+          const svg = await DiagramController.exportToSVG(diagramPath);
+          if (!svg) {
+            return {
+              result: null,
+              error: `Diagram not open or export failed. Open "${diagramPath}" in a tab first, then retry.`,
+            };
+          }
+
+          // Serialize → base64 data URL (CSP allows data: in img-src)
+          const svgString = new XMLSerializer().serializeToString(svg);
+          const base64 = btoa(unescape(encodeURIComponent(svgString)));
+          const dataUrl = `data:image/svg+xml;base64,${base64}`;
+
+          if (sectionId) {
+            // Replace existing section content with the embedded diagram
+            const imageMarkdown = caption ? `![${caption}](${dataUrl})` : `![diagram](${dataUrl})`;
+            await getDocumentController().replaceSection(filePath, sectionId, imageMarkdown);
+            return { result: JSON.stringify({ ok: true, replaced: sectionId }), error: null };
+          }
+
+          const result = await getDocumentController().insertDiagram(filePath, dataUrl, caption);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_save": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          const result = await getDocumentController().saveDocument(filePath);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_list": {
+        try {
+          const result = await getDocumentController().listDocuments();
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_delete": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          const confirm = input.confirm as boolean | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+          if (!confirm) {
+            return {
+              result: null,
+              error: "Set confirm: true to delete a document. This action cannot be undone.",
+            };
+          }
+          const result = await getDocumentController().deleteDocument(filePath);
+          return { result: JSON.stringify(result ?? { ok: true }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      case "document_set_block_color": {
+        try {
+          const filePath = input.filePath as string | undefined;
+          if (!filePath) return { result: null, error: "filePath is required." };
+          if (!isDocumentPathAllowed(filePath)) {
+            return { result: null, error: "Path traversal not allowed" };
+          }
+
+          const sectionId = input.sectionId as string | undefined;
+          if (!sectionId) return { result: null, error: "sectionId is required." };
+
+          const textColor = input.textColor as string | undefined;
+          const backgroundColor = input.backgroundColor as string | undefined;
+          if (!textColor && !backgroundColor) {
+            return {
+              result: null,
+              error: "At least one of textColor or backgroundColor is required.",
+            };
+          }
+
+          const editor = documentEditorRegistry.getEditor(filePath);
+          if (!editor) {
+            return {
+              result: null,
+              error:
+                "Editor not mounted for this document. The tab must be open and visible (keepMounted: true).",
+            };
+          }
+
+          // Resolve section → heading level + text from the controller
+          const sections = getDocumentController().getSections(filePath);
+          const sectionIdx = sections.findIndex((s) => s.id === sectionId);
+          if (sectionIdx === -1) {
+            return { result: null, error: `Section not found: ${sectionId}` };
+          }
+          const section = sections[sectionIdx];
+
+          // Occurrence index among sections with the same heading + level
+          const targetOccurrence = sections
+            .slice(0, sectionIdx)
+            .filter((s) => s.heading === section.heading && s.level === section.level).length;
+
+          // Walk top-level blocks to find the matching heading block.
+          // BlockNote markdown imports produce a flat block list — headings are top-level.
+          let occurrenceCount = 0;
+          let targetBlockId: string | undefined;
+          for (const block of editor.document as Array<{
+            id: string;
+            type: string;
+            props: Record<string, unknown>;
+            content: Array<{ type: string; text?: string }>;
+          }>) {
+            if (block.type === "heading" && block.props["level"] === section.level) {
+              const blockText = block.content
+                .filter((c) => c.type === "text")
+                .map((c) => c.text ?? "")
+                .join("");
+              if (blockText === section.heading) {
+                if (occurrenceCount === targetOccurrence) {
+                  targetBlockId = block.id;
+                  break;
+                }
+                occurrenceCount++;
+              }
+            }
+          }
+
+          if (!targetBlockId) {
+            return {
+              result: null,
+              error: `Could not find heading block for section "${sectionId}" in the editor. The editor content may not match the stored markdown.`,
+            };
+          }
+
+          const propUpdates: Record<string, string> = {};
+          if (textColor) propUpdates["textColor"] = textColor;
+          if (backgroundColor) propUpdates["backgroundColor"] = backgroundColor;
+
+          editor.updateBlock(targetBlockId, { props: propUpdates });
+
+          return { result: JSON.stringify({ ok: true, blockId: targetBlockId }), error: null };
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          return { result: null, error };
+        }
+      }
+
+      default:
+        return { result: null, error: `Unknown tool: ${tool}` };
+    }
+  } catch (err) {
+    return { result: null, error: String(err) };
+  }
+}
+
+export function useMcpBridge() {
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+
+    listen<McpCommandPayload>("mcp:command", async (event) => {
+      const { uuid, tool, input } = event.payload;
+      const { result, error } = await dispatchMcpTool(tool, input);
+      await invoke("mcp_ack", { uuid, result, error });
+    }).then((fn) => {
+      if (cancelled) {
+        fn();
+      } else {
+        unlisten = fn;
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
+}

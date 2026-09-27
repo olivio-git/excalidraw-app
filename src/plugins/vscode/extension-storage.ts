@@ -30,6 +30,7 @@ export interface InstalledExtension {
   displayName: string;
   publisher?: string;
   description?: string;
+  categories?: string[];
   /** Folder name under `extensions/`. */
   dir: string;
   iconThemes: IconThemeContribution[];
@@ -120,6 +121,7 @@ export async function installVsix(bytes: Uint8Array): Promise<InstalledExtension
     displayName: pkg.manifest.displayName ?? pkg.manifest.name,
     publisher: pkg.manifest.publisher,
     description: pkg.manifest.description,
+    categories: pkg.manifest.categories,
     dir,
     iconThemes,
     colorThemes,

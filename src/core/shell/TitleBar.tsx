@@ -54,7 +54,7 @@ const TitleBar = ({ children }: TitleBarProps) => {
   return (
     <div
       data-tauri-drag-region
-      className="h-9 flex items-center bg-background border-b border-border select-none flex-shrink-0"
+      className="h-9 flex items-center bg-background/95 border-b border-border/60 select-none flex-shrink-0"
     >
       {/* Left: title or custom content (SidebarTrigger + TabBar) */}
       {children ? (
@@ -76,14 +76,14 @@ const TitleBar = ({ children }: TitleBarProps) => {
         {/* <ThemeToggle /> */}
         <button
           onClick={handleMinimize}
-          className="h-full px-3 hover:bg-accent transition-colors inline-flex items-center justify-center"
+          className="h-full px-3 hover:bg-accent/70 transition-colors duration-100 inline-flex items-center justify-center"
           aria-label="Minimize"
         >
           <Minus className="size-3" />
         </button>
         <button
           onClick={handleMaximize}
-          className="h-full px-3 hover:bg-accent transition-colors inline-flex items-center justify-center"
+          className="h-full px-3 hover:bg-accent/70 transition-colors duration-100 inline-flex items-center justify-center"
           aria-label="Maximize"
         >
           {isMaximized ? (
@@ -94,7 +94,7 @@ const TitleBar = ({ children }: TitleBarProps) => {
         </button>
         <button
           onClick={handleClose}
-          className="h-full px-3 hover:bg-destructive hover:text-destructive-foreground transition-colors inline-flex items-center justify-center"
+          className="h-full px-3 hover:bg-destructive hover:text-destructive-foreground transition-colors duration-100 inline-flex items-center justify-center"
           aria-label="Close"
         >
           <X className="size-3.5" />

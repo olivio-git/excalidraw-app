@@ -3,6 +3,11 @@ import { useTabStore } from "@/core/tabs/store/tab-store";
 import type { DocumentAPI, Section } from "@/plugins/types";
 import type { useDocumentStore } from "@/stores/documentStore";
 import type { documentFileService } from "./documentFileService";
+import { encodeDocument, isRichNote } from "./note-format";
+import { mkdir, writeTextFile } from "@tauri-apps/plugin-fs";
+import { join } from "@tauri-apps/api/path";
+import { isValidEntryName } from "@/core/shell/panels/explorer-file-operations";
+import { openFileInWorkbench } from "@/core/shell/services/file-navigation";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -150,21 +155,28 @@ function replaceSectionContent(
 // ---------------------------------------------------------------------------
 
 export class DocumentController implements DocumentAPI {
-  constructor(
-    private readonly store: typeof useDocumentStore,
-    private readonly fileService: typeof documentFileService
-  ) {}
+  private readonly saves = new Map<string, Promise<void>>();
+  private readonly store: typeof useDocumentStore;
+  private readonly fileService: typeof documentFileService;
+  constructor(store: typeof useDocumentStore, fileService: typeof documentFileService) {
+    this.store = store;
+    this.fileService = fileService;
+  }
 
   async createDocument(title: string): Promise<string> {
     const workspaceDir = useWorkspaceStore.getState().workspaceDir;
     if (!workspaceDir) throw new Error("No workspace directory set");
-    const filePath = `${workspaceDir}/documents/${title}.md`;
-    await this.fileService.writeDocumentFile(filePath, "");
+    if (!isValidEntryName(title)) throw new Error("Invalid document title.");
+    const dir = await join(workspaceDir, "documents");
+    const filePath = await join(dir, `${title}.md`);
+    await mkdir(dir, { recursive: true });
+    await writeTextFile(filePath, "", { createNew: true });
     this.store.getState().openDocument(filePath, "");
+    openFileInWorkbench(filePath);
     return filePath;
   }
 
-  async openDocument(filePath: string): Promise<void> {
+  async openDocument(filePath: string, activate = true): Promise<void> {
     // Task 2.9: Tab deduplication — only short-circuit if the document is BOTH
     // already in the store AND has a tab. If the tab exists but the document
     // isn't loaded yet (e.g. first open after ExplorerPanel created the tab),
@@ -172,13 +184,15 @@ export class DocumentController implements DocumentAPI {
     const existingTab = useTabStore.getState().tabs.find((t) => t.instanceId === filePath);
     const documentAlreadyLoaded = !!this.store.getState().documents[filePath];
     if (existingTab && documentAlreadyLoaded) {
-      useTabStore.getState().setActiveTab(existingTab.id);
-      this.store.getState().setActive(filePath);
+      if (activate) {
+        useTabStore.getState().setActiveTab(existingTab.id);
+        this.store.getState().setActive(filePath);
+      }
       return;
     }
 
     const content = await this.fileService.readDocumentFile(filePath);
-    this.store.getState().openDocument(filePath, content);
+    this.store.getState().openDocument(filePath, content, activate);
 
     // Task 2.7: Sync tab title after opening.
     // Derive title from filename without extension (matches store logic).
@@ -194,6 +208,7 @@ export class DocumentController implements DocumentAPI {
     if (tab && tab.title !== title) {
       useTabStore.getState().updateTab(tab.id, { title });
     }
+    if (activate) openFileInWorkbench(filePath);
   }
 
   getContent(filePath: string): string | null {
@@ -207,9 +222,13 @@ export class DocumentController implements DocumentAPI {
   }
 
   async setContent(filePath: string, content: string): Promise<void> {
-    this.store.getState().setExternalContent(filePath, content);
-    await this.fileService.writeDocumentFile(filePath, content);
-    this.store.getState().markSaved(filePath);
+    const doc = this.store.getState().documents[filePath];
+    if (isRichNote(filePath)) {
+      const { reconcileMarkdownBlocks } = await import("./note-codec");
+      const blocks = reconcileMarkdownBlocks(content, doc?.blocks ?? []);
+      this.store.getState().setExternalContent(filePath, content, blocks);
+    } else this.store.getState().setExternalContent(filePath, content);
+    await this.saveDocument(filePath);
   }
 
   async appendContent(filePath: string, content: string): Promise<void> {
@@ -298,10 +317,45 @@ export class DocumentController implements DocumentAPI {
   }
 
   async saveDocument(filePath: string): Promise<void> {
-    const content = this.getContent(filePath);
-    if (content === null) throw new Error("Document not open");
-    await this.fileService.writeDocumentFile(filePath, content);
-    this.store.getState().markSaved(filePath);
+    const previous = this.saves.get(filePath) ?? Promise.resolve();
+    const task = previous
+      .catch(() => undefined)
+      .then(async () => {
+        if (isRichNote(filePath) && !this.store.getState().documents[filePath]?.blocks) {
+          const { getDocumentCodec } = await import("./note-codec");
+          const current = this.store.getState().documents[filePath];
+          if (!current) throw new Error("Document not open");
+          if (!current.blocks)
+            this.store
+              .getState()
+              .updateEditorContent(
+                filePath,
+                current.content,
+                getDocumentCodec().tryParseMarkdownToBlocks(current.content),
+                true
+              );
+        }
+        const doc = this.store.getState().documents[filePath];
+        if (!doc) throw new Error("Document not open");
+        await this.fileService.writeDocumentFile(filePath, encodeDocument(filePath, doc));
+        this.store.getState().markSaved(filePath, doc.content, doc.revision);
+      });
+    this.saves.set(filePath, task);
+    try {
+      await task;
+    } finally {
+      if (this.saves.get(filePath) === task) this.saves.delete(filePath);
+    }
+  }
+
+  async waitForSaves(filePath: string, ignoreErrors = false): Promise<void> {
+    while (this.saves.has(filePath)) {
+      try {
+        await this.saves.get(filePath);
+      } catch (error) {
+        if (!ignoreErrors) throw error;
+      }
+    }
   }
 
   async listDocuments(): Promise<string[]> {

@@ -6,7 +6,7 @@ import {
 } from "@/shared/components/ui/sidebar";
 import { Separator } from "@/shared/components/ui/separator";
 import { Toaster } from "sonner";
-import TabBar from "@/core/tabs/components/TabBar";
+import { WorkbenchToolbar } from "@/core/tabs/components/WorkbenchToolbar";
 import TabContent from "@/core/tabs/components/TabContent";
 import TitleBar from "./TitleBar";
 import DiagramSidebar from "./DiagramSidebar";
@@ -24,7 +24,7 @@ export default function Shell() {
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
   return (
-    <SidebarProvider className="h-full w-full flex flex-col overflow-hidden relative min-h-0">
+    <SidebarProvider className="qori-workbench h-full w-full flex flex-col overflow-hidden relative min-h-0">
       <Toaster position="bottom-right" theme={resolvedTheme} richColors />
       <ConfirmDialog />
       <PromptDialog />
@@ -36,7 +36,7 @@ export default function Shell() {
         <SidebarTrigger className="ml-2 size-7 flex-shrink-0" />
         <Separator orientation="vertical" className="mx-1.5 !h-4" />
         <div className="flex-1 min-w-0">
-          <TabBar alwaysVisible />
+          <WorkbenchToolbar />
         </div>
       </TitleBar>
 

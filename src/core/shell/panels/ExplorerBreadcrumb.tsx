@@ -1,5 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
+import { isSameOrDescendant } from "./explorer-file-operations";
 
 // ---------------------------------------------------------------------------
 // ExplorerBreadcrumb — Task 3.4
@@ -20,18 +21,7 @@ function getSegments(filePath: string, workspaceDir: string): string[] {
   const relative = filePath.startsWith(workspaceDir)
     ? filePath.slice(workspaceDir.length)
     : filePath;
-  return relative.split("/").filter(Boolean);
-}
-
-function getAncestorPaths(filePath: string, workspaceDir: string): string[] {
-  const segments = getSegments(filePath, workspaceDir);
-  const ancestors: string[] = [];
-  let current = workspaceDir;
-  for (let i = 0; i < segments.length - 1; i++) {
-    current = `${current}/${segments[i]}`;
-    ancestors.push(current);
-  }
-  return ancestors;
+  return relative.split(/[\\/]/).filter(Boolean);
 }
 
 export const ExplorerBreadcrumb = ({
@@ -39,7 +29,7 @@ export const ExplorerBreadcrumb = ({
   workspaceDir,
   onExpandPaths,
 }: ExplorerBreadcrumbProps) => {
-  if (!activeFilePath) return null;
+  if (!activeFilePath || !isSameOrDescendant(activeFilePath, workspaceDir)) return null;
 
   const segments = getSegments(activeFilePath, workspaceDir);
   if (segments.length === 0) return null;
@@ -48,12 +38,10 @@ export const ExplorerBreadcrumb = ({
     // Expand all ancestors up to (and including) the clicked folder segment
     const ancestors: string[] = [];
     let current = workspaceDir;
+    const separator = workspaceDir.includes("\\") ? "\\" : "/";
     for (let i = 0; i <= segmentIndex; i++) {
-      current = `${current}/${segments[i]}`;
-      if (i < segmentIndex) {
-        // Only folder segments (not the final file)
-        ancestors.push(current);
-      }
+      current = `${current}${current.endsWith(separator) ? "" : separator}${segments[i]}`;
+      ancestors.push(current);
     }
     // Always include workspace root
     onExpandPaths([workspaceDir, ...ancestors]);

@@ -25,8 +25,10 @@ export interface PermissionRequest extends ToolCallDescription {
 interface AIPermissionState {
   // ── Session decision cache ──
   decisions: Map<string, SessionDecision>;
+  allAllowed: boolean;
   getDecision: (toolName: string) => SessionDecision | undefined;
   setDecision: (toolName: string, decision: SessionDecision) => void;
+  setAllAllowed: (allowed: boolean) => void;
   reset: () => void;
 
   // ── Dialog gate ──
@@ -48,6 +50,7 @@ interface AIPermissionState {
 export const useAIPermissionStore = create<AIPermissionState>()((set, get) => ({
   // ── Session decision cache ──
   decisions: new Map(),
+  allAllowed: false,
 
   getDecision: (toolName) => get().decisions.get(toolName),
 
@@ -58,7 +61,10 @@ export const useAIPermissionStore = create<AIPermissionState>()((set, get) => ({
       return { decisions: next };
     }),
 
-  reset: () => set({ decisions: new Map(), open: false, request: null, resolver: null }),
+  setAllAllowed: (allowed) => set({ allAllowed: allowed }),
+
+  reset: () =>
+    set({ decisions: new Map(), allAllowed: false, open: false, request: null, resolver: null }),
 
   // ── Dialog gate ──
   open: false,

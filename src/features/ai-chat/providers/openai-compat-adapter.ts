@@ -18,7 +18,12 @@ type OpenAIToolCall = {
 };
 
 type OpenAIMessage =
-  | { role: "user" | "system"; content: string }
+  | {
+      role: "user" | "system";
+      content:
+        | string
+        | Array<{ type: "text" | "image_url"; text?: string; image_url?: { url: string } }>;
+    }
   | { role: "assistant"; content: string | null; tool_calls?: OpenAIToolCall[] }
   | { role: "tool"; tool_call_id: string; content: string };
 
@@ -53,6 +58,18 @@ function formatMessages(messages: AIMessage[]): OpenAIMessage[] {
       };
     }
 
+    if (msg.role === "user" && msg.images?.length) {
+      return {
+        role: "user",
+        content: [
+          { type: "text", text: msg.content },
+          ...msg.images.map((image) => ({
+            type: "image_url" as const,
+            image_url: { url: `data:${image.mediaType};base64,${image.data}` },
+          })),
+        ],
+      };
+    }
     return { role: msg.role as "user" | "assistant", content: msg.content };
   });
 }

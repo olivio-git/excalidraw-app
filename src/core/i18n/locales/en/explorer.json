@@ -1,5 +1,8 @@
 {
   "toolbar": {
+    "files": "Files",
+    "more": "Explorer options",
+    "revealActive": "Reveal active file",
     "newFile": "New file",
     "newFolder": "New folder",
     "refresh": "Refresh",
@@ -15,6 +18,8 @@
     "nameDesc": "Name Z→A"
   },
   "contextMenu": {
+    "openToSide": "Open to the side",
+    "reveal": "Reveal in file manager",
     "newFileHere": "New file here",
     "newFolderHere": "New folder here",
     "rename": "Rename",
@@ -42,6 +47,7 @@
     "noFiles": "No files in workspace",
     "navHint": "↑↓ navigate",
     "openHint": "↵ open",
+    "sideHint": "Shift+↵ open to the side",
     "closeHint": "Esc close",
     "dialogTitle": "Quick open file",
     "dialogDescription": "Type to search for files in the workspace"
@@ -53,6 +59,19 @@
     "errorMoving": "Error moving \"{{name}}\": {{message}}"
   },
   "panel": {
+    "emptyTitle": "Your workspace starts here",
+    "emptyDescription": "Open a folder to organize your diagrams and documents.",
+    "openFolder": "Open folder",
+    "loading": "Loading files…",
+    "loadFailed": "Unable to read this workspace",
+    "unreadableFolder": "Unable to read this folder",
+    "clearFilter": "Clear filter",
+    "selectedCount": "{{count}} selected",
+    "fileCount_one": "{{count}} file",
+    "fileCount_other": "{{count}} files",
+    "itemCount_one": "{{count}} item",
+    "itemCount_other": "{{count}} items",
+    "operationError": "Operation failed: {{message}}",
     "noFilesInFolder": "No files in this folder",
     "noFilterResults": "No results for \"{{query}}\"",
     "deleteFileTitle": "Delete file",
@@ -68,6 +87,12 @@
     "batchDeletedSuccess": "{{count}} items deleted"
   },
   "clipboard": {
+    "invalidTarget": "A folder cannot be pasted into itself or one of its subfolders.",
     "errorPasting": "Error pasting \"{{name}}\": {{message}}"
+  },
+  "input": {
+    "name": "File or folder name",
+    "invalidName": "Enter a valid name without path separators or reserved characters.",
+    "exists": "\"{{name}}\" already exists. Choose a different name."
   }
 }

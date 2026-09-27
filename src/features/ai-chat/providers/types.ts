@@ -1,4 +1,10 @@
-export type AIProviderName = "anthropic" | "groq" | "openai" | "gemini" | "openrouter";
+export type AIProviderName =
+  | "anthropic"
+  | "groq"
+  | "openai"
+  | "gemini"
+  | "openrouter"
+  | "openai-codex";
 
 export type AIMessageRole = "user" | "assistant" | "tool";
 
@@ -15,10 +21,17 @@ export interface AIToolResult {
   isError: boolean;
 }
 
+export interface AIImageAttachment {
+  mediaType: string;
+  data: string;
+  name?: string;
+}
+
 export interface AIMessage {
   id: string;
   role: AIMessageRole;
   content: string;
+  images?: AIImageAttachment[];
   toolCalls?: AIToolCall[];
   toolResults?: AIToolResult[];
   timestamp: number;

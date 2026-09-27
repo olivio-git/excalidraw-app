@@ -2,73 +2,48 @@ import { useState, useEffect, useRef } from "react";
 import { useDocumentStore } from "@/stores/documentStore";
 import { getDocumentController } from "../documentController.singleton";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface UseDocumentPersistenceResult {
-  isSaving: boolean;
-  lastSavedAt: number | null;
-}
-
-// ---------------------------------------------------------------------------
-// useDocumentPersistence
-//
-// Auto-save hook with 1500ms debounce.
-// Watches isDirty for the given filePath and triggers a save after the
-// debounce window expires. Cleans up the timer on unmount.
-// ---------------------------------------------------------------------------
-
-const AUTOSAVE_DEBOUNCE_MS = 1500;
-
-export function useDocumentPersistence(filePath: string): UseDocumentPersistenceResult {
+/** Debounce content revisions, and keep edits made during an in-flight save dirty. */
+export function useDocumentPersistence(filePath: string) {
   const [isSaving, setIsSaving] = useState(false);
-  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
-
-  const isDirty = useDocumentStore((s) => s.documents[filePath]?.isDirty ?? false);
-
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isSavingRef = useRef(false);
-
+  const [error, setError] = useState<string | null>(null);
+  const paused = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [resumeVersion, setResumeVersion] = useState(0);
+  const revision = useDocumentStore((state) => state.documents[filePath]?.revision);
+  const isDirty = useDocumentStore((state) => state.documents[filePath]?.isDirty ?? false);
+  const lastSavedAt = useDocumentStore((state) => state.documents[filePath]?.lastSavedAt ?? null);
   useEffect(() => {
-    // Don't queue a new debounce if already saving or doc is clean
-    if (!isDirty || isSavingRef.current) return;
-
-    // Cancel any pending debounce
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    debounceTimerRef.current = setTimeout(async () => {
-      isSavingRef.current = true;
+    if (!isDirty || paused.current) return;
+    let current = true;
+    const timer = setTimeout(async () => {
+      if (paused.current) return;
       setIsSaving(true);
-
+      setError(null);
       try {
         await getDocumentController().saveDocument(filePath);
-        setLastSavedAt(Date.now());
-      } catch (err) {
-        console.error("[useDocumentPersistence] Auto-save failed:", err);
+      } catch (reason) {
+        if (current) setError(String(reason));
       } finally {
-        isSavingRef.current = false;
-        setIsSaving(false);
+        if (current) setIsSaving(false);
       }
-    }, AUTOSAVE_DEBOUNCE_MS);
-
+    }, 1500);
+    timerRef.current = timer;
     return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
+      current = false;
+      clearTimeout(timer);
     };
-  }, [isDirty, filePath]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, []);
-
-  return { isSaving, lastSavedAt };
+  }, [filePath, revision, isDirty, resumeVersion]);
+  return {
+    isSaving: isDirty && isSaving,
+    lastSavedAt,
+    error,
+    pause: () => {
+      paused.current = true;
+      clearTimeout(timerRef.current);
+      return () => {
+        paused.current = false;
+        setResumeVersion((value) => value + 1);
+      };
+    },
+  };
 }

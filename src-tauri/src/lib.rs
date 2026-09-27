@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::net::TcpListener;
+use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use tauri::{Manager, Emitter};
@@ -6,6 +8,41 @@ use tokio::sync::{Mutex, oneshot};
 use rusqlite;
 use axum::{Router, routing::post, extract::State, Json, http::StatusCode};
 use uuid::Uuid;
+
+#[tauri::command]
+fn read_clipboard_image() -> Result<Option<String>, String> {
+    let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
+    let image = match clipboard.get_image() {
+        Ok(image) => image,
+        Err(_) => return Ok(None),
+    };
+
+    let mut bytes = Vec::new();
+    {
+        let mut encoder = png::Encoder::new(&mut bytes, image.width as u32, image.height as u32);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = encoder.write_header().map_err(|e| e.to_string())?;
+        writer.write_image_data(image.bytes.as_ref()).map_err(|e| e.to_string())?;
+    }
+
+    Ok(Some(format!("data:image/png;base64,{}", base64_encode(&bytes))))
+}
+
+fn base64_encode(bytes: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut output = String::with_capacity((bytes.len() + 2) / 3 * 4);
+    for chunk in bytes.chunks(3) {
+        let a = chunk[0] as usize;
+        let b = chunk.get(1).copied().unwrap_or(0) as usize;
+        let c = chunk.get(2).copied().unwrap_or(0) as usize;
+        output.push(TABLE[a >> 2] as char);
+        output.push(TABLE[((a & 3) << 4) | (b >> 4)] as char);
+        output.push(if chunk.len() > 1 { TABLE[((b & 15) << 2) | (c >> 6)] as char } else { '=' });
+        output.push(if chunk.len() > 2 { TABLE[c & 63] as char } else { '=' });
+    }
+    output
+}
 
 // ─── External plugin loader ───────────────────────────────────────────────────
 
@@ -191,6 +228,195 @@ async fn mcp_ack(
     Ok(())
 }
 
+// ─── Internal LLM gateway sidecar ───────────────────────────────────────────
+
+struct GatewayState {
+    port: u16,
+    token: String,
+    child: std::sync::Mutex<Option<Child>>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GatewayInfo {
+    port: u16,
+    token: String,
+}
+
+#[tauri::command]
+fn get_gateway_info(state: tauri::State<'_, GatewayState>) -> GatewayInfo {
+    GatewayInfo {
+        port: state.port,
+        token: state.token.clone(),
+    }
+}
+
+fn pick_free_port() -> Result<u16, String> {
+    let listener = TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
+    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
+    drop(listener);
+    Ok(port)
+}
+
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err("Only http(s) URLs can be opened externally".to_string());
+    }
+
+    let candidates: &[(&str, &[&str])] = &[
+        ("/usr/bin/xdg-open", &[]),
+        ("xdg-open", &[]),
+        ("/usr/bin/gio", &["open"]),
+        ("gio", &["open"]),
+        ("/usr/bin/google-chrome", &[]),
+        ("google-chrome", &[]),
+        ("/usr/bin/chromium", &[]),
+        ("chromium", &[]),
+        ("/usr/bin/firefox", &[]),
+        ("firefox", &[]),
+        ("sensible-browser", &[]),
+    ];
+
+    let mut last_error = String::new();
+    for (program, prefix_args) in candidates {
+        let mut command = Command::new(program);
+        for arg in *prefix_args {
+            command.arg(arg);
+        }
+        match command
+            .arg(&url)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+        {
+            Ok(_) => return Ok(()),
+            Err(err) => last_error = format!("{}: {}", program, err),
+        }
+    }
+
+    Err(format!("Could not open URL: {}", last_error))
+}
+
+#[allow(dead_code)]
+fn target_gateway_binary_name() -> &'static str {
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    {
+        "qori-llm-gateway-x86_64-unknown-linux-gnu"
+    }
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    {
+        "qori-llm-gateway-aarch64-apple-darwin"
+    }
+    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+    {
+        "qori-llm-gateway-x86_64-pc-windows-msvc.exe"
+    }
+    #[cfg(not(any(
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "windows", target_arch = "x86_64")
+    )))]
+    {
+        "qori-llm-gateway"
+    }
+}
+
+fn spawn_gateway(app: &tauri::App, port: u16, token: &str) -> Result<Child, String> {
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("llm-gateway");
+    std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
+
+    // Clean up orphaned gateway processes from crashed/killed previous app runs.
+    // Stale gateways can keep the fixed OAuth callback port (1455) alive and
+    // cause OpenAI's callback to hit the wrong state, producing "State mismatch".
+    #[cfg(target_os = "linux")]
+    {
+        let pattern = format!("qori-llm-gateway.*{}", data_dir.to_string_lossy());
+        let _ = Command::new("pkill")
+            .arg("-f")
+            .arg(pattern)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+
+    #[cfg(debug_assertions)]
+    {
+        let project_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .ok_or("Failed to resolve project root")?
+            .to_path_buf();
+        let gateway_entry = project_dir.join("gateway").join("src").join("index.js");
+        return Command::new("node")
+            .arg(gateway_entry)
+            .arg("--port")
+            .arg(port.to_string())
+            .arg("--token")
+            .arg(token)
+            .arg("--data-dir")
+            .arg(data_dir)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| format!("Failed to start gateway with node: {}", e));
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
+        let mut candidates = vec![
+            resource_dir.join(target_gateway_binary_name()),
+            resource_dir.join("qori-llm-gateway"),
+        ];
+
+        if let Ok(current_exe) = std::env::current_exe() {
+            if let Some(exe_dir) = current_exe.parent() {
+                candidates.push(exe_dir.join(target_gateway_binary_name()));
+                candidates.push(exe_dir.join("qori-llm-gateway"));
+            }
+        }
+
+        candidates.push(std::path::PathBuf::from("/usr/bin/qori-llm-gateway"));
+
+        let binary = candidates
+            .iter()
+            .find(|path| path.exists())
+            .cloned()
+            .unwrap_or_else(|| std::path::PathBuf::from("qori-llm-gateway"));
+
+        Command::new(&binary)
+            .arg("--port")
+            .arg(port.to_string())
+            .arg("--token")
+            .arg(token)
+            .arg("--data-dir")
+            .arg(data_dir)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| format!("Failed to start bundled gateway at {:?}: {}", binary, e))
+    }
+}
+
+impl Drop for GatewayState {
+    fn drop(&mut self) {
+        if let Ok(mut guard) = self.child.lock() {
+            if let Some(mut child) = guard.take() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+        }
+    }
+}
+
 // ─── Chat history ────────────────────────────────────────────────────────────
 
 struct ChatDb(std::sync::Mutex<rusqlite::Connection>);
@@ -363,6 +589,18 @@ pub fn run() {
                 .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())) as Box<dyn std::error::Error>)?;
             app.manage(ChatDb(std::sync::Mutex::new(conn)));
 
+            // Internal LLM gateway sidecar (OpenAI Codex / ChatGPT subscription provider)
+            let gateway_port = pick_free_port()
+                .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, e)) as Box<dyn std::error::Error>)?;
+            let gateway_token = Uuid::new_v4().to_string();
+            let gateway_child = spawn_gateway(app, gateway_port, &gateway_token)
+                .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, e)) as Box<dyn std::error::Error>)?;
+            app.manage(GatewayState {
+                port: gateway_port,
+                token: gateway_token,
+                child: std::sync::Mutex::new(Some(gateway_child)),
+            });
+
             Ok(())
         })
         .plugin(tauri_plugin_log::Builder::new().level(log::LevelFilter::Warn).build())
@@ -379,6 +617,9 @@ pub fn run() {
             chat_list_conversations,
             chat_load_conversation,
             chat_delete_conversation,
+            get_gateway_info,
+            open_external_url,
+            read_clipboard_image,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application:review logs for details");

@@ -148,6 +148,18 @@ export function AIChatMessage({ message }: AIChatMessageProps) {
             "bg-primary text-primary-foreground"
           )}
         >
+          {message.images && message.images.length > 0 && (
+            <div className="mb-1.5 flex flex-wrap gap-1">
+              {message.images.map((image, index) => (
+                <img
+                  key={`${image.name ?? image.mediaType}-${index}`}
+                  src={`data:${image.mediaType};base64,${image.data}`}
+                  alt={image.name ?? "Attached image"}
+                  className="max-h-32 max-w-full rounded object-contain"
+                />
+              ))}
+            </div>
+          )}
           {message.content}
         </div>
       </div>

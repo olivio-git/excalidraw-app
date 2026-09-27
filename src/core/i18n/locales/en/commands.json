@@ -19,6 +19,7 @@
     "document-editor": "Document Editor"
   },
   "document": {
+    "newNote": "New Rich Note",
     "new": "New Document",
     "open": "Open Document",
     "save": "Save Document",

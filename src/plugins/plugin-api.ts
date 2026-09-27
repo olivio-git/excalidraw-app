@@ -14,7 +14,6 @@ import { useAuthStore } from "@/core/auth/store/auth-store";
 import { fileIconRegistry } from "@/core/shell/panels/file-icon-registry";
 import { fileHandlerRegistry } from "@/core/shell/panels/file-handler-registry";
 import { useTabStore } from "@/core/tabs/store/tab-store";
-import { useDiagramStore } from "@/core/diagram/store/diagram-store";
 import { notify } from "@/shared/lib/notify";
 import { confirm } from "@/shared/lib/confirm";
 import { prompt } from "@/shared/lib/prompt";
@@ -31,6 +30,12 @@ import {
   closeTabsForDeletedPath,
 } from "@/core/shell/panels/explorer-tab-sync";
 import { getDocumentController } from "@/features/document-editor/documentController.singleton";
+import { prepareResourceMove } from "@/core/tabs/tab-lifecycle";
+import { closeCleanTab, closeTabManaged } from "@/core/tabs/tab-lifecycle";
+import { describeTab } from "@/core/tabs/tab-resources";
+import { workbenchActions } from "@/core/automation/workbench";
+import { noteActions } from "@/core/automation/notes";
+import { referenceActions } from "@/core/automation/references";
 import type {
   ActiveTabInfo,
   CommandHandler,
@@ -52,17 +57,7 @@ import type { RouteConfig } from "@/core/routing/types";
 
 /** Map a TabInstance to the public TabInfo shape. */
 function toTabInfo(tab: ReturnType<typeof useTabStore.getState>["tabs"][number]): TabInfo {
-  const isDirty = tab.instanceId
-    ? (useDiagramStore.getState().getDiagram(tab.instanceId)?.isDirty ?? false)
-    : false;
-  return {
-    id: tab.id,
-    title: tab.title,
-    filePath: tab.instanceId,
-    isDirty,
-    isPinned: tab.isPinned,
-    routeId: tab.routeId,
-  };
+  return describeTab(tab);
 }
 
 /**
@@ -87,6 +82,13 @@ export function createPluginAPI(
   onRegisterTabChange: (unsub: () => void) => void
 ): PluginAPI {
   return {
+    workbench: workbenchActions,
+    notes: noteActions,
+    references: {
+      refresh: referenceActions.refresh,
+      getState: referenceActions.getState,
+      query: referenceActions.query,
+    },
     registerRoutes: (routes: RouteConfig[]) => {
       RouteRegistry.register(routes);
       for (const route of routes) {
@@ -168,6 +170,7 @@ export function createPluginAPI(
         chord,
         when: declaration.when,
         source: KeybindingSource.Plugin,
+        allowInInput: declaration.allowInInput,
       });
       onRegisterKeybinding(firstKey, declaration.commandId);
     },
@@ -319,6 +322,7 @@ export function createPluginAPI(
       },
 
       async move(srcPath: string, destPath: string): Promise<void> {
+        await prepareResourceMove(srcPath);
         await fsRename(srcPath, destPath);
         updateTabsAfterMove(srcPath, destPath);
       },
@@ -331,6 +335,7 @@ export function createPluginAPI(
       async rename(oldPath: string, newName: string): Promise<string> {
         const parentDir = await dirname(oldPath);
         const newPath = await join(parentDir, newName);
+        await prepareResourceMove(oldPath);
         await fsRename(oldPath, newPath);
         updateTabsAfterRename(oldPath, newPath);
         return newPath;
@@ -388,16 +393,8 @@ export function createPluginAPI(
         });
       },
 
-      close(tabId: string, options?: { force?: boolean }): boolean {
-        const { tabs } = useTabStore.getState();
-        const tab = tabs.find((t) => t.id === tabId);
-        if (!tab) return false;
-        if (tab.isPinned && !options?.force) return false;
-        if (!tab.isClosable && !options?.force) return false;
-        if (tabs.length === 1) return false;
-        useTabStore.getState().removeTab(tabId);
-        return true;
-      },
+      close: (tabId) => closeCleanTab(tabId),
+      closeAndSave: async (tabId) => (await closeTabManaged(tabId)).closed,
 
       activate(tabId: string): boolean {
         const tab = useTabStore.getState().getTab(tabId);
@@ -407,47 +404,15 @@ export function createPluginAPI(
       },
 
       async save(tabId?: string): Promise<boolean> {
-        const { tabs, activeTabId } = useTabStore.getState();
-        const resolvedId = tabId ?? activeTabId;
-        const tab = tabs.find((t) => t.id === resolvedId);
-        if (!tab?.instanceId) return false;
-        const api = DiagramController.getApi(tab.instanceId);
-        if (!api) return false;
         try {
-          await useDiagramStore
-            .getState()
-            .saveDiagram(tab.instanceId, api.getSceneElements(), api.getAppState(), api.getFiles());
-          return true;
+          return (await workbenchActions.saveTab({ tabId })).saved;
         } catch {
           return false;
         }
       },
 
       async saveAll(): Promise<{ saved: number; failed: number }> {
-        const { tabs } = useTabStore.getState();
-        const dirtyDiagramTabs = tabs.filter(
-          (t) =>
-            t.instanceId && useDiagramStore.getState().getDiagram(t.instanceId)?.isDirty === true
-        );
-        let saved = 0;
-        let failed = 0;
-        for (const tab of dirtyDiagramTabs) {
-          const instanceId = tab.instanceId!;
-          const api = DiagramController.getApi(instanceId);
-          if (!api) {
-            failed++;
-            continue;
-          }
-          try {
-            await useDiagramStore
-              .getState()
-              .saveDiagram(instanceId, api.getSceneElements(), api.getAppState(), api.getFiles());
-            saved++;
-          } catch {
-            failed++;
-          }
-        }
-        return { saved, failed };
+        return workbenchActions.saveAll();
       },
 
       onChange(handler: (tab: TabInfo | null) => void): () => void {

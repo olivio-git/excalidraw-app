@@ -12,7 +12,7 @@ import type { DiagramContextInfo, DocumentContextInfo } from "../system-prompt";
 import { useDocumentStore } from "@/stores/documentStore";
 import { getDocumentController } from "@/features/document-editor/documentController.singleton";
 import { useThemeStore } from "@/stores/themeStore";
-import type { AIMessage } from "../providers/types";
+import type { AIMessage, AIImageAttachment } from "../providers/types";
 import { useChatHistoryStore } from "../store/chat-history-store";
 import { createConversation, saveMessage } from "./useChatHistory";
 import { prompt } from "@/shared/lib/prompt";
@@ -46,7 +46,7 @@ export function useAIChat() {
     abortController?.abort();
   };
 
-  const sendMessage = async (text: string) => {
+  const sendMessage = async (text: string, images: AIImageAttachment[] = []) => {
     const currentStatus = useAIChatStore.getState().status;
     if (currentStatus === "streaming" || currentStatus === "waiting_for_user") return;
 
@@ -59,16 +59,17 @@ export function useAIChat() {
       finalizeToolCall,
       setStatus,
       setAbortController,
+      setInspectorSnapshot,
     } = useAIChatStore.getState();
 
-    addMessage({ role: "user", content: text });
+    addMessage({ role: "user", content: text, images });
 
     // Resolve or create conversation for history persistence
     let convId: string | null = useChatHistoryStore.getState().activeConversationId;
 
     const { provider, config } = useAISettingsStore.getState().getActiveConfig();
 
-    if (!config.apiKey) {
+    if (provider !== "openai-codex" && !config.apiKey) {
       setStatus("error", "No API key configured. Go to Settings → AI.");
       return;
     }
@@ -157,15 +158,43 @@ export function useAIChat() {
         const storeMessages = useAIChatStore.getState().messages;
         const providerMessages: AIMessage[] = storeMessages.filter((m) => m.id !== assistantMsgId);
 
+        const systemPrompt = buildSystemPrompt(context, {
+          theme: resolvedTheme,
+          customInstructions,
+          diagramContext,
+          documentContext,
+        });
+        const tools = getToolsForContext(context);
+
+        setInspectorSnapshot({
+          createdAt: Date.now(),
+          iteration: iteration + 1,
+          provider,
+          model: config.model,
+          context,
+          contextInfo: {
+            diagram: diagramContext,
+            document: documentContext,
+            customInstructions: Boolean(customInstructions?.trim()),
+          },
+          systemPrompt,
+          tools,
+          messages: providerMessages,
+          stats: {
+            systemPromptChars: systemPrompt.length,
+            toolCount: tools.length,
+            messageCount: providerMessages.length,
+            approximateChars:
+              systemPrompt.length +
+              JSON.stringify(tools).length +
+              providerMessages.reduce((sum, message) => sum + message.content.length, 0),
+          },
+        });
+
         const stream = aiProvider.stream(
           providerMessages,
-          buildSystemPrompt(context, {
-            theme: resolvedTheme,
-            customInstructions,
-            diagramContext,
-            documentContext,
-          }),
-          getToolsForContext(context),
+          systemPrompt,
+          tools,
           config,
           controller.signal
         );
@@ -284,7 +313,10 @@ export function useAIChat() {
                   !result.isError &&
                   (completedTool.name === "workspace_create_document" ||
                     completedTool.name === "workspace_create_diagram" ||
-                    completedTool.name === "workspace_open_file")
+                    completedTool.name === "workspace_open_file" ||
+                    completedTool.name === "document_create_visual_report" ||
+                    completedTool.name === "document_create" ||
+                    completedTool.name === "document_open")
                 ) {
                   context = resolveAIChatContext();
                   if (context.kind === "document") {

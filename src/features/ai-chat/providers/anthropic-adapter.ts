@@ -9,10 +9,11 @@ import type {
 
 type AnthropicContentBlock =
   | { type: "text"; text: string }
+  | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
   | { type: "tool_use"; id: string; name: string; input: unknown };
 
 type AnthropicMessage =
-  | { role: "user"; content: string }
+  | { role: "user"; content: string | AnthropicContentBlock[] }
   | { role: "assistant"; content: string | AnthropicContentBlock[] }
   | {
       role: "user";
@@ -60,6 +61,18 @@ function formatMessages(messages: AIMessage[]): AnthropicMessage[] {
       return { role: "assistant", content: contentBlocks };
     }
 
+    if (msg.role === "user" && msg.images?.length) {
+      return {
+        role: "user",
+        content: [
+          { type: "text", text: msg.content },
+          ...msg.images.map((image) => ({
+            type: "image" as const,
+            source: { type: "base64" as const, media_type: image.mediaType, data: image.data },
+          })),
+        ],
+      } as AnthropicMessage;
+    }
     return { role: msg.role as "user" | "assistant", content: msg.content };
   });
 }

@@ -26,9 +26,10 @@ export async function listDocumentFiles(dir: string): Promise<string[]> {
     for (const entry of entries) {
       if (!entry.name) continue;
       const fullPath = await join(currentDir, entry.name);
+      if (entry.isSymlink) continue;
       if (entry.isDirectory) {
         await walkDir(fullPath);
-      } else if (entry.isFile && (entry.name.endsWith(".md") || entry.name.endsWith(".note"))) {
+      } else if (entry.isFile && /\.(md|note)$/i.test(entry.name)) {
         result.push(fullPath);
       }
     }

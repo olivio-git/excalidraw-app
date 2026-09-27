@@ -1,6 +1,30 @@
 import { create } from "zustand";
-import type { AIMessage, AIToolCall } from "../providers/types";
+import type { AIMessage, AIToolCall, AIToolDefinition, AIProviderName } from "../providers/types";
+import type { AIChatContext } from "../utils/context-resolver";
+import type { DiagramContextInfo, DocumentContextInfo } from "../system-prompt";
 import { useAIPermissionStore } from "./ai-permission-store";
+
+export interface AgentInspectorSnapshot {
+  createdAt: number;
+  iteration: number;
+  provider: AIProviderName;
+  model: string;
+  context: AIChatContext;
+  contextInfo: {
+    diagram?: DiagramContextInfo;
+    document?: DocumentContextInfo;
+    customInstructions?: boolean;
+  };
+  systemPrompt: string;
+  tools: AIToolDefinition[];
+  messages: AIMessage[];
+  stats: {
+    systemPromptChars: number;
+    toolCount: number;
+    messageCount: number;
+    approximateChars: number;
+  };
+}
 
 export interface PendingQuestion {
   toolCallId: string;
@@ -15,6 +39,7 @@ interface AIChatState {
   errorMessage: string | null;
   abortController: AbortController | null;
   pendingQuestion: PendingQuestion | null;
+  lastInspectorSnapshot: AgentInspectorSnapshot | null;
 
   addMessage: (msg: Omit<AIMessage, "id" | "timestamp">) => string;
   updateMessage: (id: string, patch: Partial<AIMessage>) => void;
@@ -29,6 +54,7 @@ interface AIChatState {
   setAbortController: (controller: AbortController | null) => void;
   setPendingQuestion: (pq: PendingQuestion) => void;
   clearPendingQuestion: () => void;
+  setInspectorSnapshot: (snapshot: AgentInspectorSnapshot) => void;
   clearMessages: () => void;
   setMessages: (messages: AIMessage[]) => void;
 }
@@ -39,6 +65,7 @@ export const useAIChatStore = create<AIChatState>()((set, _get) => ({
   errorMessage: null,
   abortController: null,
   pendingQuestion: null,
+  lastInspectorSnapshot: null,
 
   addMessage: (msg: Omit<AIMessage, "id" | "timestamp">) => {
     const id = crypto.randomUUID();
@@ -121,12 +148,22 @@ export const useAIChatStore = create<AIChatState>()((set, _get) => ({
     set({ pendingQuestion: null });
   },
 
+  setInspectorSnapshot: (snapshot) => {
+    set({ lastInspectorSnapshot: snapshot });
+  },
+
   clearMessages: () => {
     const pq = _get().pendingQuestion;
     if (pq) {
       pq.reject(new Error("Chat cleared"));
     }
-    set({ messages: [], status: "idle", errorMessage: null, pendingQuestion: null });
+    set({
+      messages: [],
+      status: "idle",
+      errorMessage: null,
+      pendingQuestion: null,
+      lastInspectorSnapshot: null,
+    });
     useAIPermissionStore.getState()._cancel();
     useAIPermissionStore.getState().reset();
   },

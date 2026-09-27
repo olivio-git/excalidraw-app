@@ -23,6 +23,10 @@ export class AIProviderFactory {
         const { OpenRouterAdapter } = await import("./openrouter-adapter");
         return new OpenRouterAdapter();
       }
+      case "openai-codex": {
+        const { OpenAICodexAdapter } = await import("./openai-codex-adapter");
+        return new OpenAICodexAdapter();
+      }
       default:
         throw new Error(`Unknown AI provider: ${name}`);
     }

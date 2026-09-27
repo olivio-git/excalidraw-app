@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
-import { Trash2, ChevronDown, Plus } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Trash2, ChevronDown, Plus, Bug, Copy, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
@@ -30,8 +30,12 @@ export function AIChatPanel() {
   const conversations = useChatHistoryStore((s) => s.conversations);
   const activeConversationId = useChatHistoryStore((s) => s.activeConversationId);
   const setConversations = useChatHistoryStore((s) => s.setConversations);
+  const inspectorSnapshot = useAIChatStore((s) => s.lastInspectorSnapshot);
+  const [showInspector, setShowInspector] = useState(false);
 
-  const hasApiKey = useAISettingsStore((s) => !!s.providers[s.activeProvider].apiKey);
+  const hasApiKey = useAISettingsStore(
+    (s) => s.activeProvider === "openai-codex" || !!s.providers[s.activeProvider].apiKey
+  );
 
   const { messages, status, sendMessage, cancelStream, answerPendingQuestion } = useAIChat();
   const isWaiting = status === "waiting_for_user";
@@ -119,6 +123,12 @@ export function AIChatPanel() {
     PluginManager.executeCommand("settings.action.openAITab");
   };
 
+  const copyInspectorSnapshot = async () => {
+    if (!inspectorSnapshot) return;
+    await navigator.clipboard.writeText(JSON.stringify(inspectorSnapshot, null, 2));
+    notify({ title: "Agent context copied", variant: "success" });
+  };
+
   return (
     <div className={cn("flex flex-col h-full overflow-hidden")}>
       {/* Header */}
@@ -164,16 +174,87 @@ export function AIChatPanel() {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleClear}
-          title={t("aiChat.clearChat")}
-          className="size-7 text-muted-foreground hover:text-foreground"
-        >
-          <Trash2 className="size-3.5" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowInspector((value) => !value)}
+            title="Agent context inspector"
+            className="size-7 text-muted-foreground hover:text-foreground"
+          >
+            <Bug className="size-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleClear}
+            title={t("aiChat.clearChat")}
+            className="size-7 text-muted-foreground hover:text-foreground"
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+        </div>
       </div>
+
+      {showInspector && (
+        <div className="max-h-80 shrink-0 overflow-hidden border-b border-border bg-muted/20">
+          <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 text-xs">
+            <div className="min-w-0">
+              <div className="font-medium">Agent context inspector</div>
+              <div className="truncate text-muted-foreground">
+                {inspectorSnapshot
+                  ? `${inspectorSnapshot.provider}/${inspectorSnapshot.model} · ${inspectorSnapshot.context.kind} · ${inspectorSnapshot.stats.toolCount} tools · ~${Math.ceil(inspectorSnapshot.stats.approximateChars / 4).toLocaleString()} tokens`
+                  : "Send a message to capture the next provider payload."}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                disabled={!inspectorSnapshot}
+                onClick={copyInspectorSnapshot}
+                title="Copy snapshot JSON"
+              >
+                <Copy className="size-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={() => setShowInspector(false)}
+                title="Close"
+              >
+                <X className="size-3.5" />
+              </Button>
+            </div>
+          </div>
+          <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-words p-3 text-[10px] text-muted-foreground">
+            {inspectorSnapshot
+              ? JSON.stringify(
+                  {
+                    createdAt: new Date(inspectorSnapshot.createdAt).toISOString(),
+                    iteration: inspectorSnapshot.iteration,
+                    provider: inspectorSnapshot.provider,
+                    model: inspectorSnapshot.model,
+                    context: inspectorSnapshot.context,
+                    contextInfo: inspectorSnapshot.contextInfo,
+                    stats: inspectorSnapshot.stats,
+                    tools: inspectorSnapshot.tools.map((tool) => ({
+                      name: tool.name,
+                      description: tool.description,
+                      inputSchema: tool.inputSchema,
+                    })),
+                    systemPrompt: inspectorSnapshot.systemPrompt,
+                    messages: inspectorSnapshot.messages,
+                  },
+                  null,
+                  2
+                )
+              : "No snapshot captured yet."}
+          </pre>
+        </div>
+      )}
 
       {/* No API key banner */}
       {!hasApiKey && (

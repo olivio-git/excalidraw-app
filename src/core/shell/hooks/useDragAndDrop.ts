@@ -10,12 +10,17 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { join, dirname } from "@tauri-apps/api/path";
-import { rename } from "@tauri-apps/plugin-fs";
-import { confirm } from "@/shared/lib/confirm";
+import { dirname } from "@tauri-apps/api/path";
+import { rename, lstat } from "@tauri-apps/plugin-fs";
 import { notify } from "@/shared/lib/notify";
 import type { DragData } from "@/core/shell/panels/explorer-types";
 import { updateTabsAfterMove } from "@/core/shell/panels/explorer-tab-sync";
+import { prepareResourceMove } from "@/core/tabs/tab-lifecycle";
+import {
+  availableDestination,
+  isSameOrDescendant,
+  topLevelPaths,
+} from "@/core/shell/panels/explorer-file-operations";
 
 // Re-export DndContext so ExplorerPanel can use it without importing @dnd-kit/core directly
 export { DndContext };
@@ -23,10 +28,6 @@ export { DndContext };
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function isDescendantOrSelf(srcPath: string, destPath: string): boolean {
-  return destPath === srcPath || destPath.startsWith(srcPath + "/");
-}
 
 // ---------------------------------------------------------------------------
 // Return type
@@ -84,46 +85,20 @@ export function useDragAndDrop(): UseDragAndDropReturn {
     const destDirPath = over.id as string;
     const srcPath = srcData.path;
 
-    // Determine the source's current parent directory
-    const srcParent = await dirname(srcPath);
-
-    // Guard: same parent (no-op)
-    if (srcParent === destDirPath) return;
-
-    // Guard: drop onto self or descendant
-    if (isDescendantOrSelf(srcPath, destDirPath)) return;
-
     // Paths to move — if multi-selected, move all selected; otherwise just the dragged item
     const pathsToMove =
       srcData.selectedPaths.length > 1 && srcData.selectedPaths.includes(srcPath)
         ? srcData.selectedPaths
         : [srcPath];
 
-    for (const pathToMove of pathsToMove) {
+    for (const pathToMove of topLevelPaths(pathsToMove)) {
       const name = pathToMove.split("/").pop() ?? pathToMove;
-      const newPath = await join(destDirPath, name);
-
-      // Conflict: destination already has file with same name
-      const fs = await import("@tauri-apps/plugin-fs");
-      let exists: boolean;
       try {
-        await fs.stat(newPath);
-        exists = true;
-      } catch {
-        exists = false;
-      }
-
-      if (exists) {
-        const ok = await confirm({
-          title: t("dragDrop.conflictTitle"),
-          description: t("dragDrop.conflictDescription", { name }),
-          confirmLabel: t("dragDrop.conflictConfirm"),
-          variant: "destructive",
-        });
-        if (!ok) continue;
-      }
-
-      try {
+        if ((await dirname(pathToMove)) === destDirPath) continue;
+        if (isSameOrDescendant(destDirPath, pathToMove)) continue;
+        const info = await lstat(pathToMove);
+        const newPath = await availableDestination(pathToMove, destDirPath, info.isDirectory);
+        await prepareResourceMove(pathToMove);
         await rename(pathToMove, newPath);
         updateTabsAfterMove(pathToMove, newPath);
       } catch (err) {

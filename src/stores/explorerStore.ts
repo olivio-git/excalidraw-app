@@ -35,3 +35,14 @@ export const useExplorerSelectionStore = create<ExplorerSelectionState>()((set) 
   setSelectedPaths: (paths) => set({ selectedPaths: paths }),
   clearSelection: () => set({ selectedPaths: [] }),
 }));
+
+interface ExplorerUiState {
+  quickOpenOpen: boolean;
+  setQuickOpenOpen: (open: boolean) => void;
+}
+
+// Command handlers can request the dialog before React mounts the explorer.
+export const useExplorerUiStore = create<ExplorerUiState>()((set) => ({
+  quickOpenOpen: false,
+  setQuickOpenOpen: (open) => set({ quickOpenOpen: open }),
+}));

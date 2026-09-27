@@ -9,7 +9,10 @@ import { useFileClipboard } from "./useFileClipboard";
 vi.mock("@tauri-apps/plugin-fs", () => ({
   copyFile: vi.fn(),
   rename: vi.fn(),
-  stat: vi.fn(),
+  exists: vi.fn(),
+  lstat: vi.fn(),
+  mkdir: vi.fn(),
+  readDir: vi.fn(),
   remove: vi.fn(),
 }));
 
@@ -31,25 +34,29 @@ vi.mock("@/core/shell/panels/explorer-tab-sync", () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
-import { stat, copyFile, rename } from "@tauri-apps/plugin-fs";
+import {
+  exists,
+  lstat,
+  copyFile,
+  rename,
+  mkdir,
+  readDir,
+  remove,
+  type FileInfo,
+} from "@tauri-apps/plugin-fs";
 
-const mockStat = vi.mocked(stat);
+const mockExists = vi.mocked(exists);
 const mockCopyFile = vi.mocked(copyFile);
 const mockRename = vi.mocked(rename);
 
 /** Make stat resolve (file exists) for the given paths, reject otherwise. */
 function mockFileExists(...existingPaths: string[]) {
-  mockStat.mockImplementation((path: string) => {
-    if (existingPaths.includes(path)) {
-      return Promise.resolve({ size: 0 } as any);
-    }
-    return Promise.reject(new Error("ENOENT"));
-  });
+  mockExists.mockImplementation(async (path) => existingPaths.includes(String(path)));
 }
 
 /** Make stat always reject (no files exist). */
 function mockNoFilesExist() {
-  mockStat.mockRejectedValue(new Error("ENOENT"));
+  mockExists.mockResolvedValue(false);
 }
 
 // ---------------------------------------------------------------------------
@@ -57,8 +64,9 @@ function mockNoFilesExist() {
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   mockNoFilesExist();
+  vi.mocked(lstat).mockResolvedValue({ isDirectory: false, isSymlink: false } as FileInfo);
 });
 
 // ---------------------------------------------------------------------------
@@ -66,6 +74,81 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("useFileClipboard", () => {
+  it("copies nested folders once when both parent and child are selected", async () => {
+    vi.mocked(lstat).mockImplementation(
+      async (path) => ({ isDirectory: String(path) === "/ws/folder", isSymlink: false }) as FileInfo
+    );
+    vi.mocked(readDir).mockResolvedValue([
+      { name: "a.txt", isDirectory: false, isFile: true, isSymlink: false },
+    ]);
+    const refresh = vi.fn();
+    const { result } = renderHook(() => useFileClipboard(refresh));
+    act(() => result.current.copy(["/ws/folder", "/ws/folder/a.txt"]));
+    await act(() => result.current.paste("/dest"));
+    expect(mkdir).toHaveBeenCalledWith("/dest/folder");
+    expect(copyFile).toHaveBeenCalledExactlyOnceWith("/ws/folder/a.txt", "/dest/folder/a.txt");
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("cleans up a partial directory when a nested copy fails", async () => {
+    vi.mocked(lstat).mockImplementation(
+      async (path) => ({ isDirectory: String(path) === "/ws/folder", isSymlink: false }) as FileInfo
+    );
+    vi.mocked(readDir).mockResolvedValue([
+      { name: "a.txt", isDirectory: false, isFile: true, isSymlink: false },
+    ]);
+    vi.mocked(copyFile).mockRejectedValue(new Error("disk full"));
+    const { result } = renderHook(() => useFileClipboard(vi.fn()));
+    act(() => result.current.copy(["/ws/folder"]));
+    await act(() => result.current.paste("/dest"));
+    expect(remove).toHaveBeenCalledWith("/dest/folder", { recursive: true });
+  });
+
+  it("retains only failed cut entries for retry", async () => {
+    vi.mocked(rename).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("locked"));
+    const { result } = renderHook(() => useFileClipboard(vi.fn()));
+    act(() => result.current.cut(["/ws/a.txt", "/ws/b.txt"]));
+    await act(() => result.current.paste("/dest"));
+    expect(result.current.clipboardState).toEqual({ op: "cut", paths: ["/ws/b.txt"] });
+  });
+
+  it("refuses to paste a directory inside itself before touching disk", async () => {
+    const { result } = renderHook(() => useFileClipboard(vi.fn()));
+    act(() => result.current.copy(["/ws/folder"]));
+    await act(() => result.current.paste("/ws/folder/nested"));
+    expect(lstat).not.toHaveBeenCalled();
+    expect(copyFile).not.toHaveBeenCalled();
+    expect(mkdir).not.toHaveBeenCalled();
+  });
+
+  it("does not treat permission failures as an available destination", async () => {
+    vi.mocked(exists).mockRejectedValue(new Error("permission denied"));
+    const { result } = renderHook(() => useFileClipboard(vi.fn()));
+    act(() => result.current.cut(["/ws/a.txt"]));
+    await act(() => result.current.paste("/dest"));
+    expect(rename).not.toHaveBeenCalled();
+    expect(result.current.clipboardState?.paths).toEqual(["/ws/a.txt"]);
+  });
+
+  it("preserves dotted directory names when resolving collisions", async () => {
+    vi.mocked(lstat).mockResolvedValue({ isDirectory: true, isSymlink: false } as FileInfo);
+    mockFileExists("/dest/release.v2");
+    vi.mocked(readDir).mockResolvedValue([]);
+    const { result } = renderHook(() => useFileClipboard(vi.fn()));
+    act(() => result.current.copy(["/ws/release.v2"]));
+    await act(() => result.current.paste("/dest"));
+    expect(mkdir).toHaveBeenCalledWith("/dest/release.v2 copy");
+  });
+
+  it("does not follow symlinks during recursive copies", async () => {
+    vi.mocked(lstat).mockResolvedValue({ isDirectory: true, isSymlink: true } as FileInfo);
+    const { result } = renderHook(() => useFileClipboard(vi.fn()));
+    act(() => result.current.copy(["/ws/link"]));
+    await act(() => result.current.paste("/dest"));
+    expect(readDir).not.toHaveBeenCalled();
+    expect(copyFile).not.toHaveBeenCalled();
+  });
+
   // -------------------------------------------------------------------------
   // cut
   // -------------------------------------------------------------------------

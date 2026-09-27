@@ -15,6 +15,7 @@ import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { fileHandlerRegistry } from "@/core/shell/panels/file-handler-registry";
 import { cn } from "@/shared/lib/utils";
 import type { KeybindingEntry } from "@/core/keybindings/types";
+import i18n from "@/core/i18n/i18n";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -51,7 +52,9 @@ function formatChord(entry: KeybindingEntry): string {
 function buildCommandItems(): CommandItem[] {
   const allEntries = keybindingRegistry.getAll();
   const pluginCommands = PluginManager.getCommands();
-  const labelMap = new Map(pluginCommands.map((c) => [c.id, c.name]));
+  const labelMap = new Map(
+    pluginCommands.map((c) => [c.id, i18n.t(`commands:${c.id}`, { defaultValue: c.name })])
+  );
 
   const sourcePriority: Record<KeybindingSource, number> = {
     [KeybindingSource.User]: 0,
@@ -80,7 +83,12 @@ function buildCommandItems(): CommandItem[] {
   for (const cmd of pluginCommands) {
     if (!seen.has(cmd.id)) {
       seen.add(cmd.id);
-      items.push({ kind: "command", commandId: cmd.id, label: cmd.name, keyHint: null });
+      items.push({
+        kind: "command",
+        commandId: cmd.id,
+        label: labelMap.get(cmd.id) ?? cmd.name,
+        keyHint: null,
+      });
     }
   }
 

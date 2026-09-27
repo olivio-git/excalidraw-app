@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { watch, type UnwatchFn } from "@tauri-apps/plugin-fs";
 
+const WATCH_DEBOUNCE_MS = 150;
+
 export const useFileWatcher = (dir: string | null, onChanged: () => void) => {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -20,7 +22,7 @@ export const useFileWatcher = (dir: string | null, onChanged: () => void) => {
         if (kind === "access") return;
 
         if (timerRef.current) clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(onChanged, 300);
+        timerRef.current = setTimeout(onChanged, WATCH_DEBOUNCE_MS);
       },
       { recursive: true }
     ).then((stop) => {

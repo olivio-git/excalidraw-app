@@ -1,15 +1,61 @@
 import { useState } from "react";
-import { PlugZap, RotateCcw } from "lucide-react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { readFile } from "@tauri-apps/plugin-fs";
+import { PlugZap, RotateCcw, Trash2, Upload } from "lucide-react";
 
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { PluginManager } from "@/plugins/plugin-manager";
 import { usePluginsState } from "@/plugins/hooks/usePluginsState";
+import {
+  installVsixExtension,
+  setActiveIconTheme,
+  uninstallVsixExtension,
+  useIconThemeState,
+} from "@/plugins/vscode/icon-theme-service";
+import { notify } from "@/shared/lib/notify";
 
 export default function PluginAdminPage() {
   const [isToggling, setIsToggling] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isInstalling, setIsInstalling] = useState(false);
+  const iconThemeState = useIconThemeState();
   const plugins = usePluginsState();
+
+  const handleInstallVsix = async () => {
+    const selected = await open({ filters: [{ name: "VS Code Extension", extensions: ["vsix"] }] });
+    if (!selected || Array.isArray(selected)) return;
+    setIsInstalling(true);
+    try {
+      const extension = await installVsixExtension(await readFile(selected));
+      notify(`${extension.displayName} instalado y activado`, { type: "success" });
+    } catch (error) {
+      console.error("Failed to install VSIX icon theme", error);
+      notify("No se pudo instalar la extensión", { type: "error", description: String(error) });
+    } finally {
+      setIsInstalling(false);
+    }
+  };
+
+  const handleActivateIconTheme = async (key: string | null, label?: string) => {
+    try {
+      await setActiveIconTheme(key);
+      notify(key ? `Tema activo: ${label}` : "Tema de iconos desactivado", {
+        type: key ? "success" : "info",
+      });
+    } catch (error) {
+      notify("No se pudo cambiar el tema de iconos", { type: "error", description: String(error) });
+    }
+  };
+
+  const handleUninstallExtension = async (id: string, name: string) => {
+    try {
+      await uninstallVsixExtension(id);
+      notify(`${name} desinstalado`, { type: "info" });
+    } catch (error) {
+      notify("No se pudo desinstalar la extensión", { type: "error", description: String(error) });
+    }
+  };
 
   const handleTogglePlugin = async (id: string, nextActive: boolean) => {
     setIsToggling(id);
@@ -60,6 +106,16 @@ export default function PluginAdminPage() {
             Active: <span className="ml-1 font-semibold">{activeCount}</span>
           </Badge>
           <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void handleInstallVsix()}
+            disabled={isInstalling}
+            className="gap-2"
+          >
+            <Upload className="size-4" />
+            Instalar VSIX
+          </Button>
+          <Button
             variant="ghost"
             size="icon"
             onClick={handleRefresh}
@@ -70,6 +126,65 @@ export default function PluginAdminPage() {
           </Button>
         </div>
       </header>
+
+      {iconThemeState.extensions.length > 0 && (
+        <section className="rounded-xl border border-border bg-card/70 p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold">Extensiones VS Code instaladas</h2>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!iconThemeState.activeKey}
+              onClick={() => void handleActivateIconTheme(null)}
+            >
+              Desactivar tema de iconos
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {iconThemeState.extensions.map((extension) => (
+              <div
+                key={extension.id}
+                className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 px-3 py-2"
+              >
+                <div className="mr-auto min-w-0">
+                  <p className="text-sm font-medium leading-tight">
+                    {extension.displayName}
+                    <span className="ml-2 text-[10px] text-muted-foreground">
+                      v{extension.version}
+                    </span>
+                  </p>
+                  <p className="text-[11px] text-muted-foreground truncate">{extension.id}</p>
+                </div>
+                {iconThemeState.themes
+                  .filter((theme) => theme.extension.id === extension.id)
+                  .map((theme) => {
+                    const isActive = iconThemeState.activeKey === theme.key;
+                    return (
+                      <Button
+                        key={theme.key}
+                        size="sm"
+                        variant={isActive ? "default" : "secondary"}
+                        disabled={isActive}
+                        onClick={() => void handleActivateIconTheme(theme.key, theme.label)}
+                      >
+                        {theme.label}
+                        {isActive ? " · Activo" : ""}
+                      </Button>
+                    );
+                  })}
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  title="Desinstalar"
+                  onClick={() => void handleUninstallExtension(extension.id, extension.displayName)}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {plugins.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-muted/40 px-6 py-10 text-center text-sm text-muted-foreground">

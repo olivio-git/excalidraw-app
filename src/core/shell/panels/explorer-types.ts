@@ -8,6 +8,7 @@ export interface FileEntry {
   path: string;
   isDir: boolean;
   children?: FileEntry[];
+  loadError?: string;
 }
 
 export interface FlatNode {
@@ -60,6 +61,7 @@ export interface UseKeyboardNavOptions {
   onOpen: (path: string, name: string) => void;
   onStartRename: (path: string) => void;
   onDelete: (path: string, isDir: boolean) => void;
+  onBatchDelete?: (paths: string[]) => void;
   onToggle: (path: string) => void;
   selectedPaths: Set<string>;
   setSelectedPaths: React.Dispatch<React.SetStateAction<Set<string>>>;

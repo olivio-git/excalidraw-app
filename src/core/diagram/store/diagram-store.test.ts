@@ -29,6 +29,27 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("DiagramStore", () => {
+  it("does not mark a newer scene clean when an earlier write finishes", async () => {
+    const { diagramFileService } = await import("../services/diagram-file.service");
+    let finish: () => void = () => undefined;
+    vi.mocked(diagramFileService.writeDiagram).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        })
+    );
+    await useDiagramStore.getState().loadDiagram("race", "/ws/race.excalidraw");
+    useDiagramStore.getState().markDirty("race");
+    const saving = useDiagramStore.getState().saveDiagram("race", [], {}, {});
+    await Promise.resolve();
+    await Promise.resolve();
+    useDiagramStore.getState().markDirty("race");
+    finish();
+    await saving;
+    expect(useDiagramStore.getState().getDiagram("race")?.isDirty).toBe(true);
+    await useDiagramStore.getState().saveDiagram("race", [], {}, {});
+    expect(useDiagramStore.getState().getDiagram("race")?.isDirty).toBe(false);
+  });
   // -------------------------------------------------------------------------
   // loadDiagram
   // -------------------------------------------------------------------------

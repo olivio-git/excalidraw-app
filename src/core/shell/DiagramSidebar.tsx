@@ -14,6 +14,7 @@ import {
   Monitor,
   Bot,
   BookOpen,
+  Link2,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
@@ -43,10 +44,11 @@ import { PluginsPanel } from "./panels/PluginsPanel";
 import { NavigationPanel } from "./panels/NavigationPanel";
 import { AIChatPanel } from "@/features/ai-chat/AIChatPanel";
 import { LibraryBrowserPanel } from "@/features/library-browser/LibraryBrowserPanel";
+import { ReferencesPanel } from "./panels/ReferencesPanel";
 
 const COMPACT_THRESHOLD = 100;
 
-type Panel = "explorer" | "plugins" | "navigation" | "ai-chat" | "library";
+type Panel = "explorer" | "plugins" | "navigation" | "ai-chat" | "library" | "references";
 
 interface PanelTab {
   id: Panel;
@@ -61,6 +63,7 @@ const DiagramSidebar = () => {
 
   const PANEL_TABS: PanelTab[] = [
     { id: "explorer", icon: Files, label: t("panels.explorer") },
+    { id: "references", icon: Link2, label: t("connected.references") },
     { id: "plugins", icon: Blocks, label: t("panels.plugins") },
     { id: "navigation", icon: Compass, label: t("panels.navigation") },
     { id: "ai-chat", icon: Bot, label: t("panels.aiChat") },
@@ -69,20 +72,18 @@ const DiagramSidebar = () => {
 
   const { sidebarWidth, setSidebarWidth, toggleSidebar } = useSidebar();
 
-  // Register workbench.action.toggleSidebar via the formal command system.
-  // Uses a ref so the handler always calls the latest toggleSidebar without re-registering.
+  // Core commands are registered before plugins activate; React only handles the UI event.
   const toggleSidebarRef = useRef(toggleSidebar);
   useEffect(() => {
     toggleSidebarRef.current = toggleSidebar;
   }, [toggleSidebar]);
 
   useEffect(() => {
-    PluginManager.registerCommandHandler("workbench.action.toggleSidebar", () => {
+    const handleToggle = () => {
       toggleSidebarRef.current();
-    });
-    return () => {
-      PluginManager.unregisterCommandHandler("workbench.action.toggleSidebar");
     };
+    window.addEventListener("workbench:toggle-sidebar", handleToggle);
+    return () => window.removeEventListener("workbench:toggle-sidebar", handleToggle);
   }, []);
   const isCompact = sidebarWidth < COMPACT_THRESHOLD;
 
@@ -116,7 +117,7 @@ const DiagramSidebar = () => {
       <div
         className={cn(
           "flex gap-0.5 p-1.5 border-b border-border/50 shrink-0",
-          isCompact ? "flex-col items-center" : "flex-row items-center"
+          isCompact ? "flex-col items-center" : "flex-row flex-wrap items-center"
         )}
       >
         <TooltipWrapper
@@ -150,6 +151,7 @@ const DiagramSidebar = () => {
                 variant="ghost"
                 size="icon"
                 onClick={() => setActivePanel(tab.id)}
+                aria-label={tab.label}
                 className={cn(
                   "size-7 shrink-0",
                   isActive
@@ -167,13 +169,20 @@ const DiagramSidebar = () => {
       {/* Content: siempre en DOM con flex-1 para mantener el footer abajo.
           El contenido interno se oculta en compact. */}
       <SidebarContent className="p-0">
+        {/* Keep the tree and quick-open portal alive when switching or compacting panels. */}
+        <div
+          data-explorer-visible={!isCompact && resolvedPanel === "explorer"}
+          className={cn("h-full min-h-0", (isCompact || resolvedPanel !== "explorer") && "hidden")}
+        >
+          <ExplorerPanel />
+        </div>
         {!isCompact && (
           <>
-            {resolvedPanel === "explorer" && <ExplorerPanel />}
             {resolvedPanel === "plugins" && <PluginsPanel />}
             {resolvedPanel === "navigation" && <NavigationPanel />}
             {resolvedPanel === "ai-chat" && <AIChatPanel />}
             {resolvedPanel === "library" && <LibraryBrowserPanel />}
+            {resolvedPanel === "references" && <ReferencesPanel />}
           </>
         )}
       </SidebarContent>

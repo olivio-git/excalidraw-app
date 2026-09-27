@@ -11,6 +11,7 @@ import { setActiveIconTheme, useIconThemeState } from "@/plugins/vscode/icon-the
 import { setActiveColorTheme, useColorThemeState } from "@/plugins/vscode/color-theme-service";
 import { installVsixExtension, uninstallVsixExtension } from "@/plugins/vscode/extension-manager";
 import { notify } from "@/shared/lib/notify";
+import { ExtensionStore } from "./ExtensionStore";
 
 export default function PluginAdminPage() {
   const [isToggling, setIsToggling] = useState<string | null>(null);
@@ -227,6 +228,8 @@ export default function PluginAdminPage() {
           </div>
         </section>
       )}
+
+      <ExtensionStore />
 
       {plugins.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-muted/40 px-6 py-10 text-center text-sm text-muted-foreground">

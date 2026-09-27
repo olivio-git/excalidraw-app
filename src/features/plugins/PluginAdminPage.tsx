@@ -1,15 +1,44 @@
 import { useState } from "react";
-import { PlugZap, RotateCcw } from "lucide-react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { readFile } from "@tauri-apps/plugin-fs";
+import { PlugZap, RotateCcw, Upload } from "lucide-react";
 
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { PluginManager } from "@/plugins/plugin-manager";
 import { usePluginsState } from "@/plugins/hooks/usePluginsState";
+import {
+  getActiveVsixIconThemeId,
+  installVsixIconTheme,
+  listVsixIconThemes,
+  setActiveVsixIconTheme,
+} from "@/plugins/vsix-icon-themes";
+import { notify } from "@/shared/lib/notify";
 
 export default function PluginAdminPage() {
   const [isToggling, setIsToggling] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isInstalling, setIsInstalling] = useState(false);
+  const [iconThemes, setIconThemes] = useState(listVsixIconThemes);
+  const [activeIconTheme, setActiveIconTheme] = useState(getActiveVsixIconThemeId);
   const plugins = usePluginsState();
+
+  const handleInstallVsix = async () => {
+    const selected = await open({ filters: [{ name: "VS Code Extension", extensions: ["vsix"] }] });
+    if (!selected || Array.isArray(selected)) return;
+    setIsInstalling(true);
+    try {
+      const themes = installVsixIconTheme(await readFile(selected));
+      setIconThemes(themes);
+      setActiveIconTheme(getActiveVsixIconThemeId());
+      notify("Tema de iconos instalado y activado", { type: "success" });
+    } catch (error) {
+      console.error("Failed to install VSIX icon theme", error);
+      notify("No se pudo instalar la extensión", { type: "error", description: String(error) });
+    } finally {
+      setIsInstalling(false);
+    }
+  };
 
   const handleTogglePlugin = async (id: string, nextActive: boolean) => {
     setIsToggling(id);
@@ -60,6 +89,16 @@ export default function PluginAdminPage() {
             Active: <span className="ml-1 font-semibold">{activeCount}</span>
           </Badge>
           <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void handleInstallVsix()}
+            disabled={isInstalling}
+            className="gap-2"
+          >
+            <Upload className="size-4" />
+            Instalar VSIX
+          </Button>
+          <Button
             variant="ghost"
             size="icon"
             onClick={handleRefresh}
@@ -70,6 +109,46 @@ export default function PluginAdminPage() {
           </Button>
         </div>
       </header>
+
+      {iconThemes.length > 0 && (
+        <section className="rounded-xl border border-border bg-card/70 p-4">
+          <h2 className="text-sm font-semibold">Temas de iconos VS Code instalados</h2>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {iconThemes.map((theme) => (
+              <div key={theme.id} className="flex items-center gap-2">
+                <Badge variant={activeIconTheme === theme.id ? "default" : "secondary"}>
+                  {theme.name}
+                  {theme.version ? ` · ${theme.version}` : ""}
+                </Badge>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={activeIconTheme === theme.id}
+                  onClick={() => {
+                    setActiveVsixIconTheme(theme.id);
+                    setActiveIconTheme(theme.id);
+                    notify(`Tema activo: ${theme.name}`, { type: "success" });
+                  }}
+                >
+                  {activeIconTheme === theme.id ? "Activo" : "Activar"}
+                </Button>
+              </div>
+            ))}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!activeIconTheme}
+              onClick={() => {
+                setActiveVsixIconTheme(null);
+                setActiveIconTheme(null);
+                notify("Tema de iconos desactivado", { type: "info" });
+              }}
+            >
+              Desactivar tema VS Code
+            </Button>
+          </div>
+        </section>
+      )}
 
       {plugins.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-muted/40 px-6 py-10 text-center text-sm text-muted-foreground">

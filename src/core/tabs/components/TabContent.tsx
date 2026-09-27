@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState, type CSSProperties } from "react";
+import { Suspense, lazy, memo, useEffect, useRef, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { ErrorBoundary } from "@/shared/components/error/ErrorBoundary";
@@ -8,7 +8,8 @@ import { contextKeyService } from "@/core/keybindings/context-key-service";
 import { TabContext } from "../hooks/use-tab-context";
 import { useTabStore } from "../store/tab-store";
 import { tabGroup } from "../store/editor-layout";
-import { EDITOR_GROUP, type EditorGroupId, type SplitDirection, type TabInstance } from "../types";
+import { EDITOR_GROUP, type EditorGroupId, type SplitDirection } from "../types";
+import { useResizePreview } from "@/shared/hooks/useResizePreview";
 import TabBar from "./TabBar";
 import { cn } from "@/shared/lib/utils";
 
@@ -19,35 +20,36 @@ const TabSkeleton = () => (
   </div>
 );
 
-function paneBounds(
-  group: EditorGroupId,
-  direction: SplitDirection | null,
-  ratio: number
-): CSSProperties {
+function paneBounds(group: EditorGroupId, direction: SplitDirection | null): CSSProperties {
   if (!direction) return { left: 0, top: 0, width: "100%", height: "100%" };
   const primary = group === EDITOR_GROUP.PRIMARY;
-  const offset = primary ? "0px" : `calc(${ratio}% + 3px)`;
-  const extent = `calc(${primary ? ratio : 100 - ratio}% - 3px)`;
+  const offset = primary ? "0px" : "calc(var(--editor-split-ratio) + 3px)";
+  const extent = primary
+    ? "calc(var(--editor-split-ratio) - 3px)"
+    : "calc(100% - var(--editor-split-ratio) - 3px)";
   return direction === "horizontal"
     ? { left: offset, width: extent, top: 0, height: "100%" }
     : { top: offset, height: extent, left: 0, width: "100%" };
 }
 
-function TabRenderer({
-  tab,
+// The app does not enable React Compiler. Keep layout renders outside editor trees.
+const TabRenderer = memo(function TabRenderer({
+  tabId,
+  routeId,
   isActive,
   isVisible,
 }: {
-  tab: TabInstance;
+  tabId: string;
+  routeId: string;
   isActive: boolean;
   isVisible: boolean;
 }) {
-  const route = RouteRegistry.getRoute(tab.routeId);
+  const route = RouteRegistry.getRoute(routeId);
   const Component = route?.component;
   const { t } = useTranslation("tabs");
   return (
-    <TabContext.Provider value={{ tabId: tab.id, isActive, isVisible }}>
-      <ErrorBoundary fallback={ErrorFallback} name={`TabBoundary-${tab.routeId}`}>
+    <TabContext.Provider value={{ tabId, isActive, isVisible }}>
+      <ErrorBoundary fallback={ErrorFallback} name={`TabBoundary-${routeId}`}>
         <Suspense fallback={<TabSkeleton />}>
           {isVisible || route?.tabConfig?.keepMounted ? (
             Component ? (
@@ -60,7 +62,7 @@ function TabRenderer({
       </ErrorBoundary>
     </TabContext.Provider>
   );
-}
+});
 
 export default function TabContent() {
   const { t } = useTranslation("tabs");
@@ -70,9 +72,8 @@ export default function TabContent() {
   const groupActiveIds = useTabStore((state) => state.groupActiveTabIds);
   const direction = useTabStore((state) => state.splitDirection);
   const savedRatio = useTabStore((state) => state.splitRatio);
-  const [previewRatio, setPreviewRatio] = useState<number | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const ratio = previewRatio ?? savedRatio;
+  const resize = useResizePreview();
   const activeRoute = tabs.find((tab) => tab.id === activeTabId)?.routeId;
   const groups = direction ? Object.values(EDITOR_GROUP) : [EDITOR_GROUP.PRIMARY];
 
@@ -86,6 +87,7 @@ export default function TabContent() {
       ref={rootRef}
       className="relative h-full min-h-0 w-full overflow-hidden"
       data-editor-workspace
+      style={{ "--editor-split-ratio": `${savedRatio}%` } as CSSProperties}
       onAuxClick={(event) => {
         if (event.button !== 3 && event.button !== 4) return;
         event.preventDefault();
@@ -93,7 +95,7 @@ export default function TabContent() {
       }}
     >
       {groups.map((group) => {
-        const bounds = paneBounds(group, direction, ratio);
+        const bounds = paneBounds(group, direction);
         const hasTab = tabs.some((tab) => tabGroup(tab) === group);
         return (
           <section
@@ -133,7 +135,7 @@ export default function TabContent() {
       {tabs.map((tab) => {
         const group = tabGroup(tab);
         const visible = groups.includes(group) && groupActiveIds[group] === tab.id;
-        const bounds = paneBounds(group, direction, ratio);
+        const bounds = paneBounds(group, direction);
         return (
           <div
             key={tab.id}
@@ -146,7 +148,8 @@ export default function TabContent() {
               ...bounds,
               top: `calc(${bounds.top === 0 ? "0px" : bounds.top} + 36px)`,
               height: `calc(${bounds.height} - 36px)`,
-              visibility: visible ? "visible" : "hidden",
+              // Keep editor/undo state alive, but remove hidden DOM from layout and painting.
+              display: visible ? undefined : "none",
               zIndex: visible ? 1 : 0,
             }}
             onPointerDownCapture={() => {
@@ -156,7 +159,12 @@ export default function TabContent() {
               if (visible && activeTabId !== tab.id) useTabStore.getState().setActiveTab(tab.id);
             }}
           >
-            <TabRenderer tab={tab} isActive={activeTabId === tab.id} isVisible={visible} />
+            <TabRenderer
+              tabId={tab.id}
+              routeId={tab.routeId}
+              isActive={activeTabId === tab.id}
+              isVisible={visible}
+            />
           </div>
         );
       })}
@@ -168,7 +176,7 @@ export default function TabContent() {
           aria-orientation={direction === "horizontal" ? "vertical" : "horizontal"}
           aria-valuemin={20}
           aria-valuemax={80}
-          aria-valuenow={Math.round(ratio)}
+          aria-valuenow={Math.round(savedRatio)}
           className={cn(
             "absolute z-20 touch-none bg-border/60 hover:bg-primary/50 focus:bg-primary/50 focus:outline-none",
             direction === "horizontal"
@@ -177,29 +185,34 @@ export default function TabContent() {
           )}
           style={
             direction === "horizontal"
-              ? { left: `calc(${ratio}% - 3px)` }
-              : { top: `calc(${ratio}% - 3px)` }
+              ? { left: "calc(var(--editor-split-ratio) - 3px)" }
+              : { top: "calc(var(--editor-split-ratio) - 3px)" }
           }
           onPointerDown={(event) => {
-            event.currentTarget.setPointerCapture(event.pointerId);
-            setPreviewRatio(savedRatio);
-          }}
-          onPointerMove={(event) => {
-            if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-            const rect = rootRef.current?.getBoundingClientRect();
-            if (!rect) return;
+            const element = rootRef.current;
+            if (!element) return;
+            const rect = element.getBoundingClientRect();
             const extent = direction === "horizontal" ? rect.width : rect.height;
             if (extent <= 0) return;
-            const position =
-              direction === "horizontal" ? event.clientX - rect.left : event.clientY - rect.top;
-            setPreviewRatio(Math.max(20, Math.min(80, (position / extent) * 100)));
+            resize.start(event, {
+              element,
+              property: "--editor-split-ratio",
+              initial: savedRatio,
+              measure: (pointer) => {
+                const position =
+                  direction === "horizontal"
+                    ? pointer.clientX - rect.left
+                    : pointer.clientY - rect.top;
+                return Math.max(20, Math.min(80, (position / extent) * 100));
+              },
+              format: (value) => `${value}%`,
+              onCommit: (value) => useTabStore.getState().setSplitRatio(value),
+            });
           }}
-          onPointerUp={(event) => {
-            if (previewRatio !== null) useTabStore.getState().setSplitRatio(previewRatio);
-            setPreviewRatio(null);
-            event.currentTarget.releasePointerCapture(event.pointerId);
-          }}
-          onPointerCancel={() => setPreviewRatio(null)}
+          onPointerMove={resize.onPointerMove}
+          onPointerUp={resize.onPointerUp}
+          onPointerCancel={resize.onPointerCancel}
+          onLostPointerCapture={resize.onLostPointerCapture}
           onDoubleClick={() => useTabStore.getState().setSplitRatio(50)}
           onKeyDown={(event) => {
             const decrease = direction === "horizontal" ? "ArrowLeft" : "ArrowUp";

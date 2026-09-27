@@ -73,19 +73,24 @@ export function buildSystemPrompt(context: AIChatContext, opts: SystemPromptOpti
 You have workspace tools to create and open files:
 
 - **workspace_list_files** — list all files in the workspace
+- **workspace_read_file(filePath)** — read a text file directly from disk
+- **workspace_read_diagram(filePath)** — read an Excalidraw diagram directly from disk without opening the canvas
 - **workspace_create_diagram(name)** — create a new diagram and open it
 - **workspace_create_document(title)** — create a new markdown document and open it
 - **workspace_open_file(filePath)** — open an existing file
+- **document_create_visual_report(title, markdown, diagrams)** — create a complete markdown document and generated editable Excalidraw diagrams without opening diagram tabs
 
 ## WORKFLOW
 
 When the user asks to create a diagram or document: call the appropriate tool immediately — do NOT ask for confirmation.
+When the user asks for a document/report/guide with visuals, architecture, flows, processes, journeys, onboarding, authentication, system design, or diagrams: prefer document_create_visual_report in one call.
 When the user asks to open a file: call workspace_list_files first if you don't know the path, then workspace_open_file.
 After creating or opening a file, it becomes the active tab and document/diagram editing tools become available. IMMEDIATELY continue and use those tools to fulfill the original request — do NOT stop and tell the user to ask you again.
 
 ## IMPORTANT
 
 - Act first, explain after. Never describe what you are about to do before doing it.
+- Never put Mermaid, PlantUML, PUML, Graphviz, or ASCII diagrams in a QoriApp document unless explicitly requested. Use editable Excalidraw diagrams via document_create_visual_report.
 - After a file is opened, the next message will have the full diagram or document editing tools available.`;
   }
 }

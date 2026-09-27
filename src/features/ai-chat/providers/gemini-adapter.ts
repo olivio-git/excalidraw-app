@@ -9,6 +9,7 @@ import type {
 
 type GeminiPart =
   | { text: string }
+  | { inlineData: { mimeType: string; data: string } }
   | { functionCall: { name: string; args: Record<string, unknown> } }
   | { functionResponse: { name: string; response: { content: string } } };
 
@@ -68,7 +69,15 @@ function formatMessages(messages: AIMessage[]): GeminiContent[] {
       continue;
     }
 
-    result.push({ role: "user", parts: [{ text: msg.content }] });
+    result.push({
+      role: "user",
+      parts: [
+        { text: msg.content },
+        ...(msg.images ?? []).map((image) => ({
+          inlineData: { mimeType: image.mediaType, data: image.data },
+        })),
+      ],
+    });
   }
 
   return result;

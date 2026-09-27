@@ -30,7 +30,7 @@ interface TabProps {
   onTabClick: (tab: TabInstance) => void;
   onCloseTab: (e: React.MouseEvent, tabId: string) => void;
   onCloseOthers: (tabId: string) => void;
-  onCloseAll: () => void;
+  onCloseAll: (tabId: string) => void;
   onCloseToRight: (tabId: string) => void;
   onPin: (tabId: string) => void;
   onUnpin: (tabId: string) => void;
@@ -125,14 +125,14 @@ const Tab = React.memo(
                   ?.focus();
               }}
               className={cn(
-                "group relative flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium transition-colors",
-                "hover:bg-accent",
+                "group relative flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-xs font-medium transition-[background-color,color,opacity] duration-100",
+                "hover:bg-accent/70",
                 "cursor-grab active:cursor-grabbing",
-                isDragging && "shadow-lg ring-2 ring-primary/20",
+                isDragging && "opacity-70 ring-1 ring-primary/30",
                 tab.isPinned
                   ? "min-w-[40px] max-w-[40px] h-7 justify-center"
                   : "min-w-[120px] max-w-[200px] h-7",
-                isActive ? "bg-accent text-primary" : "text-foreground hover:text-primary"
+                isActive ? "bg-accent text-primary" : "text-muted-foreground hover:text-foreground"
               )}
             >
               {tab.isPinned ? (
@@ -244,7 +244,9 @@ const Tab = React.memo(
               {t("tab.closeToRight")}
             </ContextMenuItem>
             {!isLastTab && (
-              <ContextMenuItem onClick={() => onCloseAll()}>{t("tab.closeAll")}</ContextMenuItem>
+              <ContextMenuItem onClick={() => onCloseAll(tab.id)}>
+                {t("tab.closeAll")}
+              </ContextMenuItem>
             )}
           </ContextMenuContent>
         </ContextMenu>

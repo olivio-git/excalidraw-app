@@ -4,6 +4,7 @@ import { notify } from "@/shared/lib/notify";
 import i18n from "@/core/i18n/i18n";
 import { isSameOrDescendant } from "@/core/shell/panels/explorer-file-operations";
 import { useTabsSettingsStore } from "@/stores/tabsSettingsStore";
+import { exists } from "@tauri-apps/plugin-fs";
 import {
   tabIsDirty,
   saveTabResource,
@@ -48,6 +49,26 @@ export interface CloseTabResult {
   error?: string;
 }
 
+async function resourceWasDeletedExternally(
+  tab: ReturnType<typeof useTabStore.getState>["tabs"][number]
+): Promise<boolean> {
+  if (!tab.instanceId || !["document-editor", "diagram"].includes(tab.routeId)) return false;
+  try {
+    // Never let a filesystem probe block the close lifecycle (for example while
+    // the Tauri FS plugin is reconnecting). A short timeout falls back to the
+    // normal save path.
+    const probe = exists(tab.instanceId);
+    const available = await Promise.race([
+      probe,
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(true), 150)),
+    ]);
+    return !available;
+  } catch {
+    // If the path cannot be inspected, retain the normal save/error behavior.
+    return false;
+  }
+}
+
 function closeBlocker(tabId: string): string | null {
   const state = useTabStore.getState();
   const tab = state.getTab(tabId);
@@ -78,6 +99,15 @@ export async function closeTabManaged(
   pending.add(tabId);
   let resume: (() => void) | void = undefined;
   try {
+    // The user may delete an open file from the system file manager. In that
+    // case saving on close can only fail with ENOENT; the on-disk resource is
+    // already gone, so release the in-memory buffer and close the tab cleanly.
+    if (tab && (await resourceWasDeletedExternally(tab))) {
+      useTabStore.getState().removeTab(tabId);
+      discardResourceBuffer(tab);
+      return { closed: true, wasDirty, reason: "resource_deleted" };
+    }
+
     if (options.discard) {
       resume = await discardHandlers.get(tabId)?.();
       await waitForResourceSaves(tab!, true);

@@ -60,31 +60,35 @@ const buildTree = async (dir: string, showDotfiles: boolean): Promise<FileEntry[
   const entries = await readDir(dir);
   const result: FileEntry[] = [];
 
-  for (const entry of entries) {
-    if (!entry.name) continue;
-    if (!showDotfiles && entry.name.startsWith(".")) continue;
-    const fullPath = await join(dir, entry.name);
-
-    if (entry.isDirectory && !entry.isSymlink) {
+  // Resolve sibling paths and recurse concurrently. The previous sequential traversal
+  // multiplied Tauri IPC latency across every directory, which was especially visible
+  // after deleting many files from the system file manager.
+  const visibleEntries = entries.filter(
+    (entry) => entry.name && (showDotfiles || !entry.name.startsWith("."))
+  );
+  const resolved = await Promise.all(
+    visibleEntries.map(async (entry) => {
+      const fullPath = await join(dir, entry.name!);
+      if (!entry.isDirectory || entry.isSymlink) {
+        return { name: entry.name!, path: fullPath, isDir: false } satisfies FileEntry;
+      }
       try {
         const children = await buildTree(fullPath, showDotfiles);
-        result.push({ name: entry.name, path: fullPath, isDir: true, children });
+        return { name: entry.name!, path: fullPath, isDir: true, children } satisfies FileEntry;
       } catch (error) {
-        result.push({
-          name: entry.name,
+        return {
+          name: entry.name!,
           path: fullPath,
           isDir: true,
           children: [],
           loadError: String(error),
-        });
+        } satisfies FileEntry;
       }
-    } else {
-      result.push({ name: entry.name, path: fullPath, isDir: false });
-    }
-  }
+    })
+  );
 
   // Default sort (type-first) — will be re-sorted via sortTree in display useMemo
-  return result.sort((a, b) => {
+  return resolved.sort((a, b) => {
     if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
     return a.name.localeCompare(b.name);
   });

@@ -150,6 +150,12 @@
       "clear_canvas": "Clearing canvas",
       "get_elements": "Reading canvas",
       "update_element": "Updating element",
+      "workspace_list_files": "Listing files",
+      "workspace_read_file": "Reading file",
+      "workspace_read_diagram": "Reading diagram",
+      "workspace_create_diagram": "Creating diagram",
+      "workspace_create_document": "Creating document",
+      "workspace_open_file": "Opening file",
       "ask_user": "Waiting for answer"
     },
     "newConversation": "New conversation",

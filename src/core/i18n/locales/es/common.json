@@ -150,6 +150,12 @@
       "clear_canvas": "Limpiando el lienzo",
       "get_elements": "Leyendo el lienzo",
       "update_element": "Actualizando elemento",
+      "workspace_list_files": "Listando archivos",
+      "workspace_read_file": "Leyendo archivo",
+      "workspace_read_diagram": "Leyendo diagrama",
+      "workspace_create_diagram": "Creando diagrama",
+      "workspace_create_document": "Creando documento",
+      "workspace_open_file": "Abriendo archivo",
       "ask_user": "Esperando respuesta"
     },
     "newConversation": "Nueva conversación",

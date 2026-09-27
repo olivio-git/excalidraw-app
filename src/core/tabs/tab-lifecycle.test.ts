@@ -13,6 +13,7 @@ import { notify } from "@/shared/lib/notify";
 vi.mock("@/core/i18n/i18n", () => ({ default: { t: (key: string) => key } }));
 vi.mock("@/shared/lib/notify", () => ({ notify: vi.fn() }));
 vi.mock("@/shared/lib/confirm", () => ({ confirm: vi.fn().mockResolvedValue(false) }));
+vi.mock("@tauri-apps/plugin-fs", () => ({ exists: vi.fn().mockResolvedValue(true) }));
 beforeEach(() => {
   vi.clearAllMocks();
   useTabsSettingsStore.setState({ allowCloseLastTab: true });
@@ -41,6 +42,7 @@ describe("editor close lifecycle", () => {
         })
     );
     const closing = closeTabManaged(id, { discard: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
     useTabStore.getState().pinTab(id);
     finish(resume);
     expect(await closing).toMatchObject({ closed: false, reason: "pinned" });
@@ -73,6 +75,7 @@ describe("editor close lifecycle", () => {
         })
     );
     const closing = requestCloseTab(id);
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(useTabStore.getState().getTab(id)).toBeDefined();
     finish(true);
     await closing;

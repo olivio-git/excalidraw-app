@@ -1,4 +1,4 @@
-import { useState, useRef, type MouseEvent } from "react";
+import { useState, useRef, useEffect, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FolderOpen,
@@ -31,6 +31,7 @@ import { TooltipWrapper } from "@/shared/common/TooltipWrapper";
 import { tildify } from "@/shared/lib/path";
 import { InlineInput } from "./InlineInput";
 import { fileIconRegistry } from "./file-icon-registry";
+import { getVsixIconForFolder } from "@/plugins/vsix-icon-themes";
 import { fileHandlerRegistry } from "./file-handler-registry";
 import { formatFileSize, formatDate } from "./explorer-utils";
 import type { FileEntry, CreatingState, ClipboardState, DragData } from "./explorer-types";
@@ -70,6 +71,12 @@ export interface FileTreeNodeProps {
 }
 
 export const FileTreeNode = (props: FileTreeNodeProps) => {
+  const [, refreshIcons] = useState(0);
+  useEffect(() => {
+    const refresh = () => refreshIcons((value) => value + 1);
+    window.addEventListener("qori-vsix-themes-changed", refresh);
+    return () => window.removeEventListener("qori-vsix-themes-changed", refresh);
+  }, []);
   const {
     entry,
     depth,
@@ -111,6 +118,7 @@ export const FileTreeNode = (props: FileTreeNodeProps) => {
   const focused = focusedPath === entry.path;
   const cut = clipboardState?.op === "cut" && clipboardState.paths.includes(entry.path);
   const paths = selected && selectedPaths.size > 1 ? [...selectedPaths] : [entry.path];
+  const folderIcon = entry.isDir ? getVsixIconForFolder(entry.name, expanded) : null;
   const { icon: Icon, colorClass } = fileIconRegistry.resolve(entry.name);
   const hasHandler = !!fileHandlerRegistry.resolve(entry.name);
   const dragData: DragData = {
@@ -209,7 +217,14 @@ export const FileTreeNode = (props: FileTreeNodeProps) => {
                 ))}
             </span>
             {entry.isDir ? (
-              expanded ? (
+              folderIcon ? (
+                <img
+                  src={folderIcon}
+                  alt=""
+                  aria-hidden
+                  className="size-4 shrink-0 object-contain"
+                />
+              ) : expanded ? (
                 <FolderOpen className="size-4 shrink-0 text-amber-500" />
               ) : (
                 <FolderClosed className="size-4 shrink-0 text-amber-500/80" />

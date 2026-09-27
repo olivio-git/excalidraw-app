@@ -18,6 +18,26 @@ export const DIAGRAM_TOOLS: AIToolDefinition[] = [
     inputSchema: { type: "object", properties: {} },
   },
   {
+    name: "set_elements",
+    description:
+      "Replace the full canvas with the provided elements. Useful for exact scene rewrites.",
+    inputSchema: {
+      type: "object",
+      properties: { elements: { type: "array", items: { type: "object" } } },
+      required: ["elements"],
+    },
+  },
+  {
+    name: "export_svg",
+    description: "Export the active/open diagram canvas as an SVG string",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "save_diagram",
+    description: "Save the active/open diagram to disk",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
     name: "clear_canvas",
     description: "Clear all elements from the canvas",
     inputSchema: {

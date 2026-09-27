@@ -1,5 +1,6 @@
-import { Excalidraw, useHandleLibrary } from "@excalidraw/excalidraw";
+import { Excalidraw, hashElementsVersion, useHandleLibrary } from "@excalidraw/excalidraw";
 import { useEffect, useLayoutEffect, useRef, useCallback, useState } from "react";
+import { shallow } from "zustand/shallow";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTabContext } from "@/core/tabs/hooks/use-tab-context";
 import { useTabStore } from "@/core/tabs/store/tab-store";
@@ -17,6 +18,12 @@ import { isLocalFileReference, openFileReference } from "@/core/shell/services/f
 import { tabGroup } from "@/core/tabs/store/editor-layout";
 
 const AUTOSAVE_DEBOUNCE_MS = 1000;
+
+interface DiagramChangeSnapshot {
+  version: number;
+  appState: AppState;
+  files: BinaryFiles;
+}
 
 const DiagramCanvas = () => {
   const { tabId, isActive, isVisible = isActive } = useTabContext();
@@ -38,6 +45,7 @@ const DiagramCanvas = () => {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savingPausedRef = useRef(false);
   const filesRef = useRef<BinaryFiles>({});
+  const lastChangeRef = useRef<DiagramChangeSnapshot | null>(null);
   const isActiveRef = useRef(isVisible);
   // Excalidraw fires onChange once on mount with initialData — skip that init fire
   const skipInitChangeRef = useRef(true);
@@ -48,7 +56,7 @@ const DiagramCanvas = () => {
   useLayoutEffect(() => {
     excalidrawAPI?.refresh();
   }, [excalidrawAPI, tab?.groupId, splitDirection, splitRatio]);
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLFormElement>(null);
 
   // Block Excalidraw's native HTML5 file drop handler via capture on the wrapper div.
   // Tauri fires onDragDropEvent through IPC (independent of DOM events), so
@@ -256,8 +264,14 @@ const DiagramCanvas = () => {
   }, [diagram, tab, tabId, updateTab]);
 
   const handleChange = useCallback(
-    (_elements: readonly ExcalidrawElement[], _appState: AppState, files: BinaryFiles) => {
+    (elements: readonly ExcalidrawElement[], appState: AppState, files: BinaryFiles) => {
       if (!instanceId) return;
+      // Excalidraw also emits onChange on parent-driven renders (including save completion).
+      // Snapshot versions because scene elements can be mutated in place by the editor.
+      const previous = lastChangeRef.current;
+      const version = hashElementsVersion(elements);
+      lastChangeRef.current = { version, appState, files };
+      filesRef.current = files;
       // Inactive tabs can receive onChange from internal scene updates (e.g. updateScene
       // clearing selections on tab switch). Ignore these — only active tabs can have
       // real user-driven changes.
@@ -267,7 +281,12 @@ const DiagramCanvas = () => {
         skipInitChangeRef.current = false;
         return;
       }
-      filesRef.current = files;
+      if (
+        previous?.version === version &&
+        shallow(previous.appState, appState) &&
+        shallow(previous.files, files)
+      )
+        return;
       // Mark dirty WITHOUT storing elements/appState — keeps initialData stable
       // and avoids feedback loops that freeze Excalidraw's zoom indicator.
       // Live state is read from the API at save time.
@@ -325,7 +344,15 @@ const DiagramCanvas = () => {
   }
 
   return (
-    <div ref={wrapperRef} className="relative h-full w-full">
+    <form
+      ref={wrapperRef}
+      className="relative h-full w-full"
+      onSubmit={(event) => {
+        // Each canvas needs its own form owner for Excalidraw's identically named radios.
+        // Portaled library dialogs own real forms; let their submit handlers run normally.
+        if (event.target === event.currentTarget) event.preventDefault();
+      }}
+    >
       {isDragging && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-primary/10 border-2 border-dashed border-primary pointer-events-none rounded-sm">
           <p className="text-primary font-medium text-sm">Drop files here</p>
@@ -361,7 +388,7 @@ const DiagramCanvas = () => {
           },
         }}
       />
-    </div>
+    </form>
   );
 };
 

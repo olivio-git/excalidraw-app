@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useTabStore } from "./tab-store";
 import { initialEditorLayout, reconcileLayout } from "./editor-layout";
 import { useTabsSettingsStore } from "@/stores/tabsSettingsStore";
@@ -16,6 +16,33 @@ beforeEach(() => {
 });
 
 describe("editor groups", () => {
+  it("preserves unrelated tab snapshots when focus changes", () => {
+    const first = open("first");
+    const second = open("second");
+    const background = useTabStore.getState().getTab(second);
+    useTabStore.getState().setActiveTab(first);
+    expect(useTabStore.getState().getTab(second)).toBe(background);
+  });
+
+  it("does not publish or persist already-focused editor pointer and focus events", () => {
+    const first = open("first");
+    const storage = useTabStore.persist.getOptions().storage!;
+    const writes = vi.spyOn(storage, "setItem");
+    const listener = vi.fn();
+    const unsubscribe = useTabStore.subscribe(listener);
+    try {
+      for (let index = 0; index < 20; index++) {
+        useTabStore.getState().setActiveGroup("primary");
+        useTabStore.getState().setActiveTab(first);
+      }
+      expect(listener).not.toHaveBeenCalled();
+      expect(writes).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+      writes.mockRestore();
+    }
+  });
+
   it("closes an empty primary pane without resetting the secondary navigation", () => {
     const first = open("first");
     useTabStore.getState().openToSide(first);

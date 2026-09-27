@@ -71,6 +71,10 @@ export function prompt(options: PromptOptions): Promise<PromptResult> {
   });
 }
 
+export function dismissPrompt() {
+  usePromptStore.getState()._settle(null);
+}
+
 // ---------------------------------------------------------------------------
 // PromptDialog — mount once in Shell
 // ---------------------------------------------------------------------------

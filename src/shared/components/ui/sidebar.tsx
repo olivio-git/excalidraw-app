@@ -4,6 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
 
 import { useIsMobile } from "@/shared/hooks/use-mobile";
+import { useResizePreview } from "@/shared/hooks/useResizePreview";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
@@ -20,9 +21,10 @@ import { DialogTitle } from "@/shared/components/ui/dialog";
 
 const SIDEBAR_COOKIE_NAME = "sidebar:state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
-const SIDEBAR_WIDTH = 210;
-const SIDEBAR_WIDTH_MIN = 50;
-const SIDEBAR_WIDTH_MAX = 480;
+// Workbench sizing follows the wider, editor-oriented proportions used by Keel/VS Code.
+const SIDEBAR_WIDTH = 240;
+const SIDEBAR_WIDTH_MIN = 180;
+const SIDEBAR_WIDTH_MAX = 640;
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
@@ -104,6 +106,11 @@ const SidebarProvider = React.forwardRef<
     // This makes it easier to style the sidebar with Tailwind classes.
     const state = open ? "expanded" : "collapsed";
 
+    React.useEffect(() => {
+      document.body.toggleAttribute("data-resizing", isResizing);
+      return () => document.body.removeAttribute("data-resizing");
+    }, [isResizing]);
+
     const contextValue = React.useMemo<SidebarContext>(
       () => ({
         state,
@@ -136,6 +143,7 @@ const SidebarProvider = React.forwardRef<
       <SidebarContext.Provider value={contextValue}>
         <TooltipProvider delayDuration={0}>
           <div
+            data-sidebar-wrapper
             style={
               {
                 "--sidebar-width": `${sidebarWidth}px`,
@@ -227,7 +235,7 @@ const Sidebar = React.forwardRef<
         style={widthStyle}
         className={cn(
           "group peer hidden md:flex h-full flex-row text-sidebar-foreground flex-shrink-0 relative overflow-hidden",
-          !isResizing && "duration-200 transition-[width] ease-linear",
+          !isResizing && "transition-[width] duration-150 ease-out",
           className
         )}
         data-state={state}
@@ -711,46 +719,53 @@ SidebarMenuSubButton.displayName = "SidebarMenuSubButton";
 const SidebarResizeHandle = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(
   ({ className, ...props }, ref) => {
     const { sidebarWidth, setSidebarWidth, isResizing, setIsResizing, state } = useSidebar();
+    const resize = useResizePreview();
 
     if (state !== "expanded") return null;
-
-    const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      const startX = e.clientX;
-      const startWidth = sidebarWidth;
-
-      setIsResizing(true);
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-
-      const onMove = (ev: MouseEvent) => {
-        const next = Math.min(
-          SIDEBAR_WIDTH_MAX,
-          Math.max(SIDEBAR_WIDTH_MIN, startWidth + (ev.clientX - startX))
-        );
-        setSidebarWidth(next);
-      };
-
-      const onUp = () => {
-        setIsResizing(false);
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-      };
-
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
-    };
 
     return (
       <div
         ref={ref}
-        onMouseDown={handleMouseDown}
+        data-sidebar-resize
+        onPointerDown={(event) => {
+          const element = event.currentTarget.closest<HTMLElement>("[data-sidebar-wrapper]");
+          if (!element) return;
+          const startX = event.clientX;
+          const startWidth = sidebarWidth;
+          const cursor = document.body.style.cursor;
+          const userSelect = document.body.style.userSelect;
+          if (
+            resize.start(event, {
+              element,
+              property: "--sidebar-width",
+              initial: startWidth,
+              measure: (pointer) =>
+                Math.min(
+                  SIDEBAR_WIDTH_MAX,
+                  Math.max(SIDEBAR_WIDTH_MIN, startWidth + pointer.clientX - startX)
+                ),
+              format: (value) => `${value}px`,
+              onCommit: setSidebarWidth,
+              onFinish: () => {
+                setIsResizing(false);
+                document.body.style.cursor = cursor;
+                document.body.style.userSelect = userSelect;
+              },
+            })
+          ) {
+            setIsResizing(true);
+            document.body.style.cursor = "col-resize";
+            document.body.style.userSelect = "none";
+          }
+        }}
+        onPointerMove={resize.onPointerMove}
+        onPointerUp={resize.onPointerUp}
+        onPointerCancel={resize.onPointerCancel}
+        onLostPointerCapture={resize.onLostPointerCapture}
         className={cn(
-          "w-1 flex-shrink-0 cursor-col-resize group/resize z-10",
-          "bg-border hover:bg-primary/40 active:bg-primary/50 transition-colors duration-150",
-          isResizing && "bg-primary/50",
+          "w-px flex-shrink-0 cursor-col-resize group/resize z-10 touch-none",
+          "bg-border/70 hover:bg-primary/50 active:bg-primary transition-colors duration-100",
+          isResizing && "bg-primary",
           className
         )}
         title="Arrastra para cambiar el ancho del panel"

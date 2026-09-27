@@ -24,7 +24,7 @@ export default function Shell() {
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
   return (
-    <SidebarProvider className="h-full w-full flex flex-col overflow-hidden relative min-h-0">
+    <SidebarProvider className="qori-workbench h-full w-full flex flex-col overflow-hidden relative min-h-0">
       <Toaster position="bottom-right" theme={resolvedTheme} richColors />
       <ConfirmDialog />
       <PromptDialog />

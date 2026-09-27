@@ -34,6 +34,7 @@ export const useAISettingsStore = create<AISettingsState>()(
         openai: { apiKey: "", model: "gpt-4o" },
         gemini: { apiKey: "", model: "gemini-2.5-pro" },
         openrouter: { apiKey: "", model: "deepseek/deepseek-r1-0528" },
+        "openai-codex": { apiKey: "", model: "gpt-5.6-luna" },
       },
 
       setActiveProvider: (provider: AIProviderName) => {

@@ -33,28 +33,34 @@ export function useToolPermission() {
       return Promise.resolve<PermissionOutcome>({ decision: "auto-allow" });
     }
 
-    const { getDecision, setDecision } = useAIPermissionStore.getState();
+    const { allAllowed, getDecision, setAllAllowed } = useAIPermissionStore.getState();
+
+    // (c) Session-wide allow all write tools
+    if (allAllowed) {
+      return Promise.resolve<PermissionOutcome>({ decision: "auto-allow" });
+    }
+
     const cached = getDecision(toolName);
 
-    // (c) Session-cached allow
+    // (d) Session-cached allow
     if (cached === "allowed") {
       return Promise.resolve<PermissionOutcome>({ decision: "auto-allow" });
     }
 
-    // (d) Session-cached deny
+    // (e) Session-cached deny
     if (cached === "denied") {
       return Promise.resolve<PermissionOutcome>({ decision: "deny" });
     }
 
-    // (e) No prior decision — open dialog, await user choice
+    // (f) No prior decision — open dialog, await user choice
     const description = describeToolCall(toolName, input);
     const request = { toolName, input, ...description };
 
     return new Promise<PermissionOutcome>((resolve) => {
       useAIPermissionStore.getState()._show(request, (outcome) => {
-        // Write session cache for "allow-always" decisions only
+        // "Allow always" means allow all write tools for this chat session.
         if (outcome.decision === "allow-always") {
-          setDecision(toolName, "allowed");
+          setAllAllowed(true);
         }
         resolve(outcome);
       });

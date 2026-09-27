@@ -90,7 +90,35 @@
     },
     "model": {
       "title": "Model",
-      "selectLabel": "Select Model"
+      "selectLabel": "Select Model",
+      "refresh": "Refresh models",
+      "customPlaceholder": "Enter a custom model",
+      "customHelp": "Select one from the list or type any model manually.",
+      "loaded": "Models updated",
+      "noModels": "No available models found",
+      "loadFailed": "Could not load models"
+    },
+    "codex": {
+      "title": "ChatGPT / Codex",
+      "description": "Connect your ChatGPT Plus/Pro account through the local gateway. Tokens are kept outside the webview.",
+      "connectBrowser": "Connect with browser",
+      "connectDevice": "Connect with code",
+      "logout": "Log out",
+      "openLoginUrl": "Open login URL",
+      "copyLoginUrl": "Copy URL",
+      "browserOpenFailed": "Could not open the browser automatically",
+      "connected": "Connected to ChatGPT",
+      "completeInBrowser": "Complete login in the browser. If it shows a callback URL, paste it here.",
+      "waitingForCode": "Waiting for the authorization code or callback URL from the browser.",
+      "manualCodeTitle": "Finish ChatGPT login",
+      "manualCodeDescription": "Paste the authorization code or full callback URL shown by the browser.",
+      "manualCodeLabel": "Code or callback URL",
+      "submitCode": "Submit code",
+      "cancelLogin": "Cancel login",
+      "deviceCode": "Code",
+      "notConnected": "Not connected",
+      "gatewayUnavailable": "Local gateway unavailable",
+      "loginFailed": "Login failed"
     },
     "customInstructions": {
       "title": "Custom Instructions",

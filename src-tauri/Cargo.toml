@@ -28,6 +28,8 @@ axum = { version = "0.7", features = ["json"] }
 uuid = { version = "1", features = ["v4"] }
 tokio = { version = "1", features = ["sync", "time", "net"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
+arboard = "3"
+png = "0.17"
 
 [profile.release]
 panic = "abort"

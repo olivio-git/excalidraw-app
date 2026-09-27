@@ -9,6 +9,7 @@ import { RouteRegistry } from "@/core/routing/route-registry";
 import { useTabContext } from "../hooks/use-tab-context";
 import { contextKeyService } from "@/core/keybindings/context-key-service";
 import { registerTabCloseHandler } from "../tab-lifecycle";
+import { mockPointerCapture, pointer } from "@/test/pointer";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -19,8 +20,12 @@ vi.mock("@/core/i18n/i18n", () => ({ default: { t: (key: string) => key } }));
 vi.mock("@/shared/hooks/useHomeDir", () => ({ useHomeDir: () => "" }));
 const mounted = vi.fn();
 const unmounted = vi.fn();
+const rendered = vi.fn();
 function FakeEditor() {
   const { tabId, isActive } = useTabContext();
+  // Real editors subscribe to their own tab metadata as well as the focus context.
+  useTabStore((state) => state.getTab(tabId));
+  rendered(tabId);
   const [value, setValue] = useState("");
   useEffect(() => {
     mounted(tabId);
@@ -63,6 +68,90 @@ beforeEach(() => {
 });
 
 describe("split editor workspace", () => {
+  it("previews a drag without editor renders or persistence and commits only the final ratio", async () => {
+    add("first.md");
+    const second = add("second.md");
+    useTabStore.getState().openToSide(second);
+    const { container } = render(<TabContent />);
+    await screen.findByRole("textbox", { name: `editor-${second}` });
+    const root = container.querySelector<HTMLElement>("[data-editor-workspace]")!;
+    const handle = screen.getByRole("separator");
+    mockPointerCapture(handle);
+    vi.spyOn(root, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 1000,
+      height: 500,
+    } as DOMRect);
+    let frame: FrameRequestCallback = () => undefined;
+    const animation = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      frame = callback;
+      return 123;
+    });
+    const cancel = vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => undefined);
+    const writes = vi.spyOn(useTabStore.persist.getOptions().storage!, "setItem");
+    rendered.mockClear();
+    try {
+      pointer(handle, "pointerdown", 500);
+      for (let x = 510; x <= 700; x += 10) pointer(handle, "pointermove", x);
+      expect(animation).toHaveBeenCalledOnce();
+      act(() => frame(0));
+      expect(root.style.getPropertyValue("--editor-split-ratio")).toBe("70%");
+      expect(rendered).not.toHaveBeenCalled();
+      expect(writes).not.toHaveBeenCalled();
+      expect(useTabStore.getState().splitRatio).toBe(50);
+      // Release before the next frame: commit the latest pointer, not a stale render.
+      pointer(handle, "pointermove", 750);
+      pointer(handle, "pointerup", 750);
+      expect(cancel).toHaveBeenCalledWith(123);
+      expect(useTabStore.getState().splitRatio).toBe(75);
+      expect(root.style.getPropertyValue("--editor-split-ratio")).toBe("75%");
+      expect(writes).toHaveBeenCalledOnce();
+      expect(unmounted).not.toHaveBeenCalled();
+    } finally {
+      animation.mockRestore();
+      cancel.mockRestore();
+      writes.mockRestore();
+    }
+  });
+
+  it("only renders the two affected editors when switching among many open tabs", async () => {
+    const ids = Array.from({ length: 16 }, (_, index) => add(`note-${index}.md`));
+    render(<TabContent />);
+    await screen.findByRole("textbox", { name: `editor-${ids[15]}` });
+    await waitFor(() => expect(mounted).toHaveBeenCalledTimes(16));
+    rendered.mockClear();
+
+    act(() => useTabStore.getState().setActiveTab(ids[0]));
+
+    expect(new Set(rendered.mock.calls.map(([id]) => id))).toEqual(new Set([ids[0], ids[15]]));
+    expect(unmounted).not.toHaveBeenCalled();
+  });
+
+  it("does not render unrelated editors when opening and closing a background tab", async () => {
+    const first = add("first.md");
+    render(<TabContent />);
+    await screen.findByRole("textbox", { name: `editor-${first}` });
+    let second = "";
+    act(() => {
+      second = add("second.md");
+    });
+    await screen.findByRole("textbox", { name: `editor-${second}` });
+    rendered.mockClear();
+    let third = "";
+    act(() => {
+      third = add("third.md");
+    });
+    await screen.findByRole("textbox", { name: `editor-${third}` });
+    expect(rendered.mock.calls.some(([id]) => id === first)).toBe(false);
+    rendered.mockClear();
+
+    act(() => useTabStore.getState().removeTab(second));
+
+    expect(rendered).not.toHaveBeenCalled();
+    expect(unmounted).toHaveBeenCalledWith(second);
+  });
+
   it("lets an already-empty parallel pane be closed with its own X", async () => {
     const user = userEvent.setup();
     const first = add("notes.md");

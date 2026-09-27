@@ -184,6 +184,7 @@ export const useTabStore = create<TabState>()(
 
         setActiveTab: (tabId: string) => {
           const state = get();
+          if (state.activeTabId === tabId) return;
           const tab = state.tabs.find((t) => t.id === tabId);
           if (tab) {
             // Update openedAt for LRU tracking
@@ -280,16 +281,27 @@ export const useTabStore = create<TabState>()(
           });
         },
         setActiveGroup: (groupId) => {
-          if (groupId === EDITOR_GROUP.SECONDARY && !get().splitDirection) return;
-          commit({ activeGroupId: groupId, activeTabId: get().groupActiveTabIds[groupId] });
+          const state = get();
+          if (groupId === EDITOR_GROUP.SECONDARY && !state.splitDirection) return;
+          if (
+            state.activeGroupId === groupId &&
+            state.activeTabId === state.groupActiveTabIds[groupId]
+          )
+            return;
+          commit({ activeGroupId: groupId, activeTabId: state.groupActiveTabIds[groupId] });
         },
         closeEmptyGroup: (groupId) => {
           const state = get();
           if (!state.splitDirection || state.tabs.some((tab) => tabGroup(tab) === groupId)) return;
           set(reconcileLayout(collapseEmptyGroups(state)));
         },
-        setSplitDirection: (direction) => commit({ splitDirection: direction }),
-        setSplitRatio: (ratio) => set({ splitRatio: Math.max(20, Math.min(80, ratio)) }),
+        setSplitDirection: (direction) => {
+          if (get().splitDirection !== direction) commit({ splitDirection: direction });
+        },
+        setSplitRatio: (ratio) => {
+          const next = Math.max(20, Math.min(80, ratio));
+          if (Number.isFinite(next) && get().splitRatio !== next) set({ splitRatio: next });
+        },
         moveTabToGroup: (tabId, groupId) => {
           const tab = get().getTab(tabId);
           if (!tab) return;

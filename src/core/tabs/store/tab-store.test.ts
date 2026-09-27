@@ -468,13 +468,14 @@ describe("TabStore", () => {
       expect(useTabStore.getState().activeTabId).toBe(firstTabId);
     });
 
-    it("updates openedAt for LRU tracking", () => {
+    it("updates openedAt for LRU tracking when activating a different tab", () => {
       vi.useFakeTimers();
       vi.setSystemTime(1000);
 
       useTabStore.getState().addTab({ routeId: "r1", path: "/a", title: "A" });
       const tabId = useTabStore.getState().tabs[0].id;
       const originalOpenedAt = useTabStore.getState().tabs[0].openedAt;
+      useTabStore.getState().addTab({ routeId: "r2", path: "/b", title: "B" });
 
       vi.setSystemTime(5000);
       useTabStore.getState().setActiveTab(tabId);
@@ -649,22 +650,18 @@ describe("TabStore", () => {
   // -------------------------------------------------------------------------
   describe("findTabByPath", () => {
     it("returns the tab matching path + instanceId", () => {
-      useTabStore
-        .getState()
-        .addTab({
-          routeId: "diagram",
-          path: "/diagram",
-          title: "A",
-          instanceId: "/ws/a.excalidraw",
-        });
-      useTabStore
-        .getState()
-        .addTab({
-          routeId: "diagram",
-          path: "/diagram",
-          title: "B",
-          instanceId: "/ws/b.excalidraw",
-        });
+      useTabStore.getState().addTab({
+        routeId: "diagram",
+        path: "/diagram",
+        title: "A",
+        instanceId: "/ws/a.excalidraw",
+      });
+      useTabStore.getState().addTab({
+        routeId: "diagram",
+        path: "/diagram",
+        title: "B",
+        instanceId: "/ws/b.excalidraw",
+      });
 
       const found = useTabStore.getState().findTabByPath("/diagram", "/ws/b.excalidraw");
 
@@ -674,14 +671,12 @@ describe("TabStore", () => {
     });
 
     it("returns undefined when instanceId does not match any tab", () => {
-      useTabStore
-        .getState()
-        .addTab({
-          routeId: "diagram",
-          path: "/diagram",
-          title: "A",
-          instanceId: "/ws/a.excalidraw",
-        });
+      useTabStore.getState().addTab({
+        routeId: "diagram",
+        path: "/diagram",
+        title: "A",
+        instanceId: "/ws/a.excalidraw",
+      });
 
       const found = useTabStore.getState().findTabByPath("/diagram", "/ws/nonexistent.excalidraw");
 
@@ -689,22 +684,18 @@ describe("TabStore", () => {
     });
 
     it("when two tabs share the same path, never confuses them by returning the wrong one", () => {
-      useTabStore
-        .getState()
-        .addTab({
-          routeId: "diagram",
-          path: "/diagram",
-          title: "First",
-          instanceId: "/ws/first.excalidraw",
-        });
-      useTabStore
-        .getState()
-        .addTab({
-          routeId: "diagram",
-          path: "/diagram",
-          title: "Second",
-          instanceId: "/ws/second.excalidraw",
-        });
+      useTabStore.getState().addTab({
+        routeId: "diagram",
+        path: "/diagram",
+        title: "First",
+        instanceId: "/ws/first.excalidraw",
+      });
+      useTabStore.getState().addTab({
+        routeId: "diagram",
+        path: "/diagram",
+        title: "Second",
+        instanceId: "/ws/second.excalidraw",
+      });
 
       const first = useTabStore.getState().findTabByPath("/diagram", "/ws/first.excalidraw");
       const second = useTabStore.getState().findTabByPath("/diagram", "/ws/second.excalidraw");
@@ -725,14 +716,12 @@ describe("TabStore", () => {
     });
 
     it("does NOT match an instanceId tab when called with undefined", () => {
-      useTabStore
-        .getState()
-        .addTab({
-          routeId: "diagram",
-          path: "/diagram",
-          title: "A",
-          instanceId: "/ws/a.excalidraw",
-        });
+      useTabStore.getState().addTab({
+        routeId: "diagram",
+        path: "/diagram",
+        title: "A",
+        instanceId: "/ws/a.excalidraw",
+      });
 
       const found = useTabStore.getState().findTabByPath("/diagram", undefined);
 
@@ -745,14 +734,12 @@ describe("TabStore", () => {
   // -------------------------------------------------------------------------
   describe("updateTab - metadata.isDirty", () => {
     it("sets metadata.isDirty to true without mutating the title", () => {
-      useTabStore
-        .getState()
-        .addTab({
-          routeId: "diagram",
-          path: "/diagram",
-          title: "file.excalidraw",
-          instanceId: "/ws/file.excalidraw",
-        });
+      useTabStore.getState().addTab({
+        routeId: "diagram",
+        path: "/diagram",
+        title: "file.excalidraw",
+        instanceId: "/ws/file.excalidraw",
+      });
       const tabId = useTabStore.getState().tabs[0].id;
 
       useTabStore.getState().updateTab(tabId, { metadata: { isDirty: true } });
@@ -764,14 +751,12 @@ describe("TabStore", () => {
     });
 
     it("clears metadata.isDirty back to false (simulates autosave)", () => {
-      useTabStore
-        .getState()
-        .addTab({
-          routeId: "diagram",
-          path: "/diagram",
-          title: "file.excalidraw",
-          instanceId: "/ws/file.excalidraw",
-        });
+      useTabStore.getState().addTab({
+        routeId: "diagram",
+        path: "/diagram",
+        title: "file.excalidraw",
+        instanceId: "/ws/file.excalidraw",
+      });
       const tabId = useTabStore.getState().tabs[0].id;
 
       useTabStore.getState().updateTab(tabId, { metadata: { isDirty: true } });
@@ -781,22 +766,18 @@ describe("TabStore", () => {
     });
 
     it("isDirty on one tab does not affect sibling tabs", () => {
-      useTabStore
-        .getState()
-        .addTab({
-          routeId: "diagram",
-          path: "/diagram",
-          title: "A",
-          instanceId: "/ws/a.excalidraw",
-        });
-      useTabStore
-        .getState()
-        .addTab({
-          routeId: "diagram",
-          path: "/diagram",
-          title: "B",
-          instanceId: "/ws/b.excalidraw",
-        });
+      useTabStore.getState().addTab({
+        routeId: "diagram",
+        path: "/diagram",
+        title: "A",
+        instanceId: "/ws/a.excalidraw",
+      });
+      useTabStore.getState().addTab({
+        routeId: "diagram",
+        path: "/diagram",
+        title: "B",
+        instanceId: "/ws/b.excalidraw",
+      });
 
       const tabAId = useTabStore.getState().tabs[0].id;
       useTabStore.getState().updateTab(tabAId, { metadata: { isDirty: true } });

@@ -38,7 +38,9 @@ export function collapseEmptyGroups(state: WorkspaceSnapshot): WorkspaceSnapshot
   const activeTabId = active?.id ?? previous?.id ?? state.tabs[0]?.id ?? null;
   return {
     ...state,
-    tabs: state.tabs.map((tab) => ({ ...tab, groupId: EDITOR_GROUP.PRIMARY })),
+    tabs: state.tabs.map((tab) =>
+      tab.groupId === EDITOR_GROUP.PRIMARY ? tab : { ...tab, groupId: EDITOR_GROUP.PRIMARY }
+    ),
     splitDirection: null,
     activeGroupId: EDITOR_GROUP.PRIMARY,
     activeTabId,
@@ -55,10 +57,15 @@ export function reconcileLayout(
   state: WorkspaceSnapshot,
   recordNavigation = true
 ): WorkspaceSnapshot {
-  const tabs = state.tabs.map((tab) => ({
-    ...tab,
-    groupId: state.splitDirection ? tabGroup(tab) : EDITOR_GROUP.PRIMARY,
-  }));
+  // A focus change must not invalidate every editor's tab subscription.
+  let groupsChanged = false;
+  const normalized = state.tabs.map((tab) => {
+    const groupId = state.splitDirection ? tabGroup(tab) : EDITOR_GROUP.PRIMARY;
+    if (tab.groupId === groupId) return tab;
+    groupsChanged = true;
+    return { ...tab, groupId };
+  });
+  const tabs = groupsChanged ? normalized : state.tabs;
   const active = tabs.find((tab) => tab.id === state.activeTabId);
   const activeGroupId = active
     ? tabGroup(active)
@@ -69,20 +76,18 @@ export function reconcileLayout(
   const navigation = { ...state.navigation };
   for (const group of Object.values(EDITOR_GROUP)) {
     const members = tabs.filter((tab) => tabGroup(tab) === group);
+    const memberIds = new Set(members.map((tab) => tab.id));
     const candidate = active && tabGroup(active) === group ? active.id : groupActiveTabIds[group];
-    groupActiveTabIds[group] = members.some((tab) => tab.id === candidate)
-      ? candidate
-      : (members[0]?.id ?? null);
+    groupActiveTabIds[group] =
+      candidate && memberIds.has(candidate) ? candidate : (members[0]?.id ?? null);
     const previous = navigation[group];
     const currentEntry = previous.entries[previous.index];
-    const entries = previous.entries.filter((id) => members.some((tab) => tab.id === id));
+    const entries = previous.entries.filter((id) => memberIds.has(id));
     let index = Math.min(previous.index, entries.length - 1);
     if (currentEntry && entries.includes(currentEntry)) {
       // Preserve the cursor even when an earlier history entry was closed.
       index =
-        previous.entries
-          .slice(0, previous.index + 1)
-          .filter((id) => members.some((tab) => tab.id === id)).length - 1;
+        previous.entries.slice(0, previous.index + 1).filter((id) => memberIds.has(id)).length - 1;
     }
     const nextId = groupActiveTabIds[group];
     if (recordNavigation && group === activeGroupId && nextId && entries[index] !== nextId) {

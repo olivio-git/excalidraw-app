@@ -6,9 +6,11 @@ class TauriStorageAdapter implements StateStorage {
   private initialized = false;
   private initPromise: Promise<void> | null = null;
   private storeName: string;
+  private autoSave: false | number;
 
-  constructor(storeName = "app-storage.json") {
+  constructor(storeName = "app-storage.json", autoSave: false | number = false) {
     this.storeName = storeName;
+    this.autoSave = autoSave;
   }
 
   private async ensureInitialized(): Promise<void> {
@@ -29,7 +31,7 @@ class TauriStorageAdapter implements StateStorage {
   private async initialize(): Promise<void> {
     try {
       this.store = await Store.load(this.storeName, {
-        autoSave: false,
+        autoSave: this.autoSave,
         defaults: {},
       });
       this.initialized = true;
@@ -58,7 +60,7 @@ class TauriStorageAdapter implements StateStorage {
 
     try {
       await this.store.set(name, value);
-      await this.store.save();
+      if (this.autoSave === false) await this.store.save();
     } catch (error) {
       console.error(`Error setting item ${name}:`, error);
       throw error;
@@ -82,7 +84,8 @@ class TauriStorageAdapter implements StateStorage {
 export const tauriLanguageStorage = new TauriStorageAdapter("language-storage.json");
 export const tauriAppearanceStorage = new TauriStorageAdapter("appearance-storage.json");
 export const tauriThemeStorage = new TauriStorageAdapter("theme-storage.json");
-export const tauriTabStorage = new TauriStorageAdapter("tab-storage.json");
+// Coalesce rapid navigation writes in Rust. The store plugin flushes all stores on app exit.
+export const tauriTabStorage = new TauriStorageAdapter("tab-storage.json", 250);
 export const tauriAuthStorage = new TauriStorageAdapter("auth-storage.json");
 export const tauriAISettingsStorage = new TauriStorageAdapter("ai-settings-storage.json");
 export const tauriTabsSettingsStorage = new TauriStorageAdapter("tabs-settings-storage.json");

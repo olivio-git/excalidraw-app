@@ -53,6 +53,12 @@ export async function saveTabResource(tab: TabInstance): Promise<boolean> {
     await controller.waitForSaves(path);
     return !useDocumentStore.getState().documents[path]?.isDirty;
   }
+  if (tab.routeId === "markdown-editor") {
+    const { markdownEditorRegistry } = await import("@/features/markdown-editor/editor-registry");
+    const editor = markdownEditorRegistry.get(path);
+    if (!editor) return !tab.metadata?.isDirty;
+    return (await editor.save()) && !editor.isDirty();
+  }
   if (tab.routeId === "diagram") {
     const { DiagramController } = await import("@/core/diagram/DiagramController");
     const api = DiagramController.getApi(path);
@@ -74,6 +80,11 @@ export async function waitForResourceSaves(tab: TabInstance, ignoreErrors = fals
     await getDocumentController().waitForSaves(tab.instanceId, ignoreErrors);
   } else if (tab.routeId === "diagram")
     await useDiagramStore.getState().waitForSaves(tab.instanceId, ignoreErrors);
+  else if (tab.routeId === "markdown-editor") {
+    const { markdownEditorRegistry } = await import("@/features/markdown-editor/editor-registry");
+    const saved = await markdownEditorRegistry.get(tab.instanceId)?.save();
+    if (saved === false && !ignoreErrors) throw new Error("Markdown note could not be saved.");
+  }
 }
 
 export function discardResourceBuffer(tab: TabInstance): void {

@@ -8,6 +8,7 @@ import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useTabsSettingsStore } from "@/stores/tabsSettingsStore";
 import { useLanguageStore } from "@/stores/languageStore";
 import { useSettingsStore, type SettingsTab } from "@/stores/settingsStore";
+import { useEditorPreferencesStore } from "@/stores/editorPreferencesStore";
 import KeybindingsPanel from "./keybindings/KeybindingsPanel";
 import { AISettingsPanel } from "./ai/AISettingsPanel";
 import { Button } from "@/shared/components/ui/button";
@@ -57,6 +58,8 @@ export default function SettingsPage() {
   const setHighContrast = useAppearanceStore((s) => s.setHighContrast);
   const setReduceAnimations = useAppearanceStore((s) => s.setReduceAnimations);
   const resetToDefaults = useAppearanceStore((s) => s.resetToDefaults);
+  const markdownEditor = useEditorPreferencesStore((s) => s.markdownEditor);
+  const setMarkdownEditor = useEditorPreferencesStore((s) => s.setMarkdownEditor);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -135,6 +138,35 @@ export default function SettingsPage() {
                     {t("workspace.removeWorkspace")}
                   </Button>
                 )}
+              </div>
+            </section>
+
+            <section className="space-y-3">
+              <h2 className="text-base font-semibold">{t("markdownEditor.title")}</h2>
+              <p className="text-sm text-muted-foreground">{t("markdownEditor.description")}</p>
+              <div className="grid gap-2 sm:grid-cols-2" role="radiogroup">
+                {(["markdown", "classic"] as const).map((choice) => (
+                  <button
+                    key={choice}
+                    type="button"
+                    role="radio"
+                    aria-checked={markdownEditor === choice}
+                    onClick={() => setMarkdownEditor(choice)}
+                    className={cn(
+                      "rounded-md border px-3 py-2.5 text-left transition-colors",
+                      markdownEditor === choice
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:bg-accent"
+                    )}
+                  >
+                    <span className="block text-sm font-medium">
+                      {t(`markdownEditor.${choice}`)}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {t(`markdownEditor.${choice}Hint`)}
+                    </span>
+                  </button>
+                ))}
               </div>
             </section>
           </div>

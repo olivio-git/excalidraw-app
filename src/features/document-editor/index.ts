@@ -12,6 +12,7 @@ import { rename as fsRename } from "@tauri-apps/plugin-fs";
 import { join, dirname } from "@tauri-apps/api/path";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { useDocumentStore } from "@/stores/documentStore";
+import { markdownRouteId } from "@/stores/editorPreferencesStore";
 import { requestCloseTab, prepareResourceMove } from "@/core/tabs/tab-lifecycle";
 import { updateTabsAfterRename } from "@/core/shell/panels/explorer-tab-sync";
 import { prompt } from "@/shared/lib/prompt";
@@ -24,6 +25,10 @@ import { isValidEntryName } from "@/core/shell/panels/explorer-file-operations";
 
 // Lazy-loaded container — keepMounted: true in route config preserves editor state
 const DocumentEditorContainer = lazy(() => import("./DocumentEditorContainer"));
+// CodeMirror 6 Markdown editor (beta), chosen for .md files in Settings.
+const MarkdownEditorContainer = lazy(
+  () => import("@/features/markdown-editor/MarkdownEditorContainer")
+);
 
 function activate(api: PluginAPI): void {
   api.registerRoutes([
@@ -43,11 +48,30 @@ function activate(api: PluginAPI): void {
       showSidebar: false,
       showInCommandPalette: false,
     },
+    {
+      id: "markdown-editor",
+      path: "/markdown-editor",
+      name: "Markdown Editor",
+      type: "protected",
+      component: MarkdownEditorContainer,
+      security: { requiresAuth: false },
+      tabConfig: {
+        singleton: false,
+        closable: true,
+        // Keeps undo history and scroll position while switching tabs.
+        keepMounted: true,
+      },
+      showSidebar: false,
+      showInCommandPalette: false,
+    },
   ]);
 
-  // Register .md file handler
+  // Register .md file handler. The route is read when a file is opened, so the
+  // "Markdown editor" preference applies to the next .md file you open.
   api.registerFileHandler("md", {
-    routeId: "document-editor",
+    get routeId() {
+      return markdownRouteId();
+    },
     defaultExtension: "md",
     create: async (dir: string, name: string): Promise<string> => {
       const fileName = /\.md$/i.test(name) ? name : `${name}.md`;

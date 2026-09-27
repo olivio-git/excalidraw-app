@@ -40,6 +40,8 @@ interface PluginEventListener {
 export class PluginManagerClass {
   private plugins: Map<string, PluginEntry> = new Map();
   private commandHandlers: Map<string, CommandHandler> = new Map();
+  /** Commands registered at runtime (not declared in a plugin manifest). */
+  private dynamicCommands: Map<string, PluginCommand> = new Map();
   private sidebarSections: SidebarSection[] = [];
   private footerActions: SidebarFooterAction[] = [];
 
@@ -97,6 +99,21 @@ export class PluginManagerClass {
   }
 
   unregisterCommandHandler(commandId: string): void {
+    this.commandHandlers.delete(commandId);
+  }
+
+  /**
+   * Register a command whose existence depends on runtime state (e.g. one per
+   * installed theme), so it shows in the command palette with its label.
+   * Re-registering an id replaces it.
+   */
+  registerDynamicCommand(command: PluginCommand, handler: CommandHandler): void {
+    this.dynamicCommands.set(command.id, command);
+    this.commandHandlers.set(command.id, handler);
+  }
+
+  unregisterDynamicCommand(commandId: string): void {
+    if (!this.dynamicCommands.delete(commandId)) return;
     this.commandHandlers.delete(commandId);
   }
 
@@ -300,6 +317,7 @@ export class PluginManagerClass {
         commands.push(...entry.plugin.manifest.commands);
       }
     }
+    commands.push(...this.dynamicCommands.values());
     return commands;
   }
 

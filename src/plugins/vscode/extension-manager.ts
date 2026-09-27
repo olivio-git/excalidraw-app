@@ -13,13 +13,24 @@ import {
 } from "./color-theme-service";
 
 /**
- * Install a `.vsix` and activate the first icon theme and the first color theme
- * it contributes, if any.
+ * Whether installing this extension should switch the active themes, like VS
+ * Code does for theme extensions. Other extensions that merely ship a theme
+ * (e.g. PowerShell's "PowerShell ISE") must not change the look on install.
+ */
+export function isThemeExtension(extension: Pick<InstalledExtension, "categories">): boolean {
+  return extension.categories?.includes("Themes") ?? true;
+}
+
+/**
+ * Install a `.vsix`. For theme extensions, activate the first icon theme and
+ * the first color theme it contributes.
  */
 export async function installVsixExtension(bytes: Uint8Array): Promise<InstalledExtension> {
   await Promise.all([ensureIconThemesInitialized(), ensureColorThemesInitialized()]);
   const extension = await installVsix(bytes);
   await reloadInstalledExtensions();
+
+  if (!isThemeExtension(extension)) return extension;
 
   const [iconTheme] = extension.iconThemes;
   if (iconTheme) await setActiveIconTheme(iconThemeKey(extension, iconTheme.id));

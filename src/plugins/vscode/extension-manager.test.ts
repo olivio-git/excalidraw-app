@@ -153,4 +153,39 @@ describe("VS Code extension manager", () => {
     // Uninstalling the extension also removes its color theme.
     expect(document.documentElement.style.getPropertyValue("--background")).toBe("");
   });
+
+  it("does not switch themes when a non-theme extension ships one (PowerShell)", async () => {
+    await installVsixExtension(buildVsix("3.0.0"));
+    const { result } = renderHook(() => useColorThemeState());
+    await waitFor(() => expect(result.current.activeKey).toBe("acme.demo-icons/Demo Light"));
+    const background = document.documentElement.style.getPropertyValue("--background");
+
+    await installVsixExtension(
+      zipSync({
+        "extension/package.json": strToU8(
+          JSON.stringify({
+            name: "powershell",
+            publisher: "ms-vscode",
+            version: "2025.4.0",
+            categories: ["Programming Languages", "Debuggers"],
+            contributes: {
+              themes: [{ label: "PowerShell ISE", uiTheme: "vs", path: "./theme.json" }],
+            },
+          })
+        ),
+        "extension/theme.json": strToU8(
+          JSON.stringify({ colors: { "editor.background": "#fafafa" } })
+        ),
+      })
+    );
+
+    // Installed and selectable, but the active theme is untouched.
+    await waitFor(() =>
+      expect(result.current.themes.map((theme) => theme.key)).toContain(
+        "ms-vscode.powershell/PowerShell ISE"
+      )
+    );
+    expect(result.current.activeKey).toBe("acme.demo-icons/Demo Light");
+    expect(document.documentElement.style.getPropertyValue("--background")).toBe(background);
+  });
 });

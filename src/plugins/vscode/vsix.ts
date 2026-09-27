@@ -23,6 +23,8 @@ export interface VsCodeExtensionManifest {
   version?: string;
   displayName?: string;
   description?: string;
+  /** Marketplace categories, e.g. ["Themes"] or ["Programming Languages", "Debuggers"]. */
+  categories?: string[];
   contributes?: {
     iconThemes?: IconThemeContribution[];
     themes?: ColorThemeContribution[];

@@ -76,6 +76,9 @@ function buildVsix(version: string) {
         colors: { "editor.background": "#ffffff", focusBorder: "#0000ff80" },
       })
     ),
+    // Hidden files must not be written: Tauri's fs scope rejects them.
+    "extension/.gitignore": strToU8("node_modules"),
+    "extension/.vscode/settings.json": strToU8("{}"),
     "extension/icons/ts.svg": strToU8("<svg id='ts'/>"),
     "extension/icons/folder.svg": strToU8("<svg id='folder'/>"),
   });
@@ -95,6 +98,7 @@ describe("VS Code extension manager", () => {
     const extension = await installVsixExtension(buildVsix("1.0.0"));
     expect(extension.dir).toBe("acme.demo-icons-1.0.0");
     expect(disk.has("extensions/acme.demo-icons-1.0.0/icons/ts.svg")).toBe(true);
+    expect([...disk.keys()].filter((key) => key.includes("/."))).toEqual([]);
     expect(JSON.parse(disk.get("extensions/extensions.json") as string)).toHaveLength(1);
     expect(setItem).not.toHaveBeenCalled();
 

@@ -70,6 +70,15 @@ export function listInstalledExtensions(): Promise<InstalledExtension[]> {
 }
 
 /**
+ * Hidden files/folders (`.gitignore`, `.vscode/`, ...) are never needed by a
+ * theme, and the fs scope glob (`$APPDATA/**`) does not match dot-prefixed
+ * segments on Unix (`requireLiteralLeadingDot`), so writing them is rejected.
+ */
+export function isHiddenPath(path: string): boolean {
+  return path.split("/").some((segment) => segment.startsWith("."));
+}
+
+/**
  * Unpack a `.vsix` into the extensions folder and register it.
  * Reinstalling the same extension replaces the previous version.
  */
@@ -87,19 +96,19 @@ export async function installVsix(bytes: Uint8Array): Promise<InstalledExtension
   const dir = `${pkg.id}-${version}`;
   const root = `${EXTENSIONS_DIR}/${dir}`;
 
+  const files = Object.entries(pkg.files).filter(([path]) => !isHiddenPath(path));
+
   await removeDir(dir);
   try {
     const folders = new Set<string>([root]);
-    for (const path of Object.keys(pkg.files)) {
+    for (const [path] of files) {
       const folder = dirname(path);
       if (folder) folders.add(`${root}/${folder}`);
     }
     for (const folder of [...folders].sort()) {
       await mkdir(folder, { ...opts(), recursive: true });
     }
-    await Promise.all(
-      Object.entries(pkg.files).map(([path, data]) => writeFile(`${root}/${path}`, data, opts()))
-    );
+    await Promise.all(files.map(([path, data]) => writeFile(`${root}/${path}`, data, opts())));
   } catch (error) {
     await removeDir(dir).catch(() => undefined);
     throw error;

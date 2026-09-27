@@ -14,7 +14,7 @@ vi.mock("./workspace-files", () => ({
 
 import { encodeLinkPath, relativePath } from "./paths";
 import { insertLink, toggleInline, toggleTaskAt } from "./formatting";
-import { EMBED_LINE, embedHref, embeds, findMathBlocks } from "./embeds";
+import { EMBED_LINE, embedHref, embeds, findMathBlocks, refreshEmbeds } from "./embeds";
 import { findHeading } from "./headings";
 import { linkCompletions, linkMarkdown, slashCompletions } from "./completions";
 import { livePreview } from "./live-preview";
@@ -27,7 +27,8 @@ const context: NoteContext = {
   resolve: async (href) => href,
   open: vi.fn(),
   readFile: async () => new Uint8Array(),
-  renderDiagram: async () => new Blob(["<svg/>"], { type: "image/svg+xml" }),
+  modifiedAt: vi.fn(async () => 1),
+  renderDiagram: vi.fn(async () => new Blob(["<svg/>"], { type: "image/svg+xml" })),
 };
 
 function run(command: StateCommand, doc: string, anchor: number, head = anchor): EditorState {
@@ -202,5 +203,28 @@ describe("live preview (in the DOM)", () => {
     editor.dispatch({ selection: { anchor: doc.indexOf("const") } });
     expect(editor.contentDOM.querySelector(".cm-md-code-lang")).toBeNull();
     expect(editor.contentDOM.querySelector(".cm-md-codeblock-first")?.textContent).toBe("```ts");
+  });
+
+  it("re-renders a diagram preview on refresh only when the file changed", async () => {
+    URL.createObjectURL = vi.fn(() => "blob:preview");
+    URL.revokeObjectURL = vi.fn();
+    const render = vi.mocked(context.renderDiagram);
+    const modifiedAt = vi.mocked(context.modifiedAt);
+    render.mockClear();
+    modifiedAt.mockResolvedValue(100);
+
+    const editor = mount("Intro\n![D](cache-test.excalidraw)", 0);
+    await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(1));
+
+    // Unchanged file: refreshing (e.g. re-activating the tab) reuses the preview.
+    editor.dispatch({ effects: refreshEmbeds.of(null) });
+    await vi.waitFor(() => expect(modifiedAt).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(render).toHaveBeenCalledTimes(1);
+
+    // Diagram edited on disk: the next refresh renders it again.
+    modifiedAt.mockResolvedValue(200);
+    editor.dispatch({ effects: refreshEmbeds.of(null) });
+    await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(2));
   });
 });

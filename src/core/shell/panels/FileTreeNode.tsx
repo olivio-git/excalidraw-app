@@ -1,4 +1,4 @@
-import { useState, useRef, type MouseEvent } from "react";
+import { memo, useState, useRef, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FolderOpen,
@@ -30,6 +30,8 @@ import {
 import { TooltipWrapper } from "@/shared/common/TooltipWrapper";
 import { tildify } from "@/shared/lib/path";
 import { InlineInput } from "./InlineInput";
+import { useTabStore } from "@/core/tabs/store/tab-store";
+import { selectActiveFilePath } from "./active-file";
 import { fileIconRegistry } from "./file-icon-registry";
 import { getFolderIconUrl, useIconThemeState } from "@/plugins/vscode/icon-theme-service";
 import { fileHandlerRegistry } from "./file-handler-registry";
@@ -40,7 +42,6 @@ export interface FileTreeNodeProps {
   entry: FileEntry;
   depth: number;
   expandedPaths: Set<string>;
-  activeFilePath?: string;
   renamingPath: string | null;
   creating: CreatingState | null;
   workspaceDir: string;
@@ -70,14 +71,18 @@ export interface FileTreeNodeProps {
   overFolderPath: string | null;
 }
 
-export const FileTreeNode = (props: FileTreeNodeProps) => {
+/**
+ * Memoized: a tab switch only re-renders the nodes whose `active` state changes
+ * (each node selects it from the tab store) instead of the whole tree.
+ * Callers must pass stable callbacks and Sets.
+ */
+export const FileTreeNode = memo(function FileTreeNode(props: FileTreeNodeProps) {
   // Re-render when the VS Code icon theme changes or its icons finish loading.
   useIconThemeState();
   const {
     entry,
     depth,
     expandedPaths,
-    activeFilePath,
     renamingPath,
     creating,
     workspaceDir,
@@ -108,7 +113,7 @@ export const FileTreeNode = (props: FileTreeNodeProps) => {
   } = props;
   const { t } = useTranslation("explorer");
   const expanded = expandedPaths.has(entry.path);
-  const active = entry.path === activeFilePath;
+  const active = useTabStore((state) => selectActiveFilePath(state) === entry.path);
   const renaming = entry.path === renamingPath;
   const selected = selectedPaths.has(entry.path);
   const focused = focusedPath === entry.path;
@@ -387,4 +392,4 @@ export const FileTreeNode = (props: FileTreeNodeProps) => {
       )}
     </div>
   );
-};
+});

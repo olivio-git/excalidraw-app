@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { readFile, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { readFile, readTextFile, stat, writeTextFile } from "@tauri-apps/plugin-fs";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import "katex/dist/katex.min.css";
 import { useTabContext } from "@/core/tabs/hooks/use-tab-context";
@@ -12,7 +12,7 @@ import { renderDiagramPreview } from "@/features/document-editor/diagram-preview
 import { useThemeStore } from "@/stores/themeStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { notify } from "@/shared/lib/notify";
-import { clearPreviewCache, refreshEmbeds } from "./embeds";
+import { refreshEmbeds } from "./embeds";
 import { markdownEditorRegistry } from "./editor-registry";
 import { findHeading } from "./headings";
 import type { NoteContext } from "./note-context";
@@ -106,6 +106,7 @@ export default function MarkdownEditorContainer() {
             );
           },
           readFile: (path) => readFile(path),
+          modifiedAt: async (path) => (await stat(path)).mtime?.getTime() ?? null,
           renderDiagram: renderDiagramPreview,
         };
         const view = new EditorView({
@@ -170,11 +171,10 @@ export default function MarkdownEditorContainer() {
     }
   }, [dirty, tabId]);
 
-  // Re-render diagram previews when coming back to the tab (the diagram may
-  // have been edited) or when light/dark mode changes.
+  // Coming back to the tab (a diagram may have been edited) or switching
+  // light/dark: previews re-check their file's mtime and re-render only if needed.
   useEffect(() => {
     if (!isActive || load.status !== "ready") return;
-    clearPreviewCache();
     viewRef.current?.dispatch({ effects: refreshEmbeds.of(null) });
   }, [isActive, resolvedTheme, load.status]);
 

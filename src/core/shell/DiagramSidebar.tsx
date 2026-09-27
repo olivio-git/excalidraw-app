@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { useLocation, matchPath } from "react-router";
 import {
   Files,
   Blocks,
@@ -19,6 +18,7 @@ import {
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { TooltipWrapper } from "@/shared/common/TooltipWrapper";
+import { useTabStore } from "@/core/tabs/store/tab-store";
 import { useThemeStore } from "@/stores/themeStore";
 import { usePluginSidebarResources } from "@/plugins/hooks/usePluginSidebarResources";
 import {
@@ -87,8 +87,11 @@ const DiagramSidebar = () => {
   }, []);
   const isCompact = sidebarWidth < COMPACT_THRESHOLD;
 
-  const { pathname } = useLocation();
-  const isOnSettings = Boolean(matchPath({ path: "/settings", end: false }, pathname));
+  // From the tab store (a boolean), not useLocation(): the URL changes on every
+  // tab switch, which re-rendered the whole sidebar and file tree.
+  const isOnSettings = useTabStore(
+    (state) => state.tabs.find((tab) => tab.id === state.activeTabId)?.routeId === "settings"
+  );
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.setTheme);
   const { pluginSections, pluginFooterActions } = usePluginSidebarResources();

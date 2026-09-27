@@ -22,6 +22,12 @@ import { useTabsSettingsStore } from "@/stores/tabsSettingsStore";
 interface TabState extends EditorLayoutState {
   tabs: TabInstance[];
   activeTabId: string | null;
+  /**
+   * Last activation time per tab id, for LRU eviction. Kept outside `tabs` so
+   * switching tabs doesn't replace the array and re-render every `tabs`
+   * subscriber (explorer, toolbars…). Falls back to `openedAt`.
+   */
+  lastActivatedAt: Record<string, number>;
 
   addTab: (params: {
     routeId: string;
@@ -73,6 +79,7 @@ export const useTabStore = create<TabState>()(
         ...initialEditorLayout(),
         tabs: [],
         activeTabId: null,
+        lastActivatedAt: {},
 
         addTab: ({ routeId, path, title, icon, instanceId, metadata, groupId }) => {
           const state = get();
@@ -123,7 +130,11 @@ export const useTabStore = create<TabState>()(
                   t.id !== state.activeTabId &&
                   !Object.values(state.groupActiveTabIds).includes(t.id)
               )
-              .sort((a, b) => a.openedAt - b.openedAt);
+              .sort(
+                (a, b) =>
+                  (state.lastActivatedAt[a.id] ?? a.openedAt) -
+                  (state.lastActivatedAt[b.id] ?? b.openedAt)
+              );
 
             if (unpinnedTabs.length > 0) {
               const toRemove = unpinnedTabs[0];
@@ -187,10 +198,10 @@ export const useTabStore = create<TabState>()(
           if (state.activeTabId === tabId) return;
           const tab = state.tabs.find((t) => t.id === tabId);
           if (tab) {
-            // Update openedAt for LRU tracking
+            // LRU tracking without touching `tabs` (see lastActivatedAt).
             commit({
               activeTabId: tabId,
-              tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, openedAt: Date.now() } : t)),
+              lastActivatedAt: { ...state.lastActivatedAt, [tabId]: Date.now() },
             });
           }
         },

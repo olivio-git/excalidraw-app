@@ -18,6 +18,7 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
     fs.files.set(path, content);
   }),
   readFile: vi.fn(async () => new Uint8Array()),
+  stat: vi.fn(async () => ({ mtime: new Date(1) })),
   exists: vi.fn(async () => true),
 }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));

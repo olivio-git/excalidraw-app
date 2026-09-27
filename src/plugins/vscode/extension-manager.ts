@@ -1,5 +1,6 @@
 import { installVsix, uninstallExtension, type InstalledExtension } from "./extension-storage";
 import { reloadInstalledExtensions } from "./extension-registry";
+import { downloadOpenVsxExtension } from "./open-vsx";
 import {
   ensureIconThemesInitialized,
   iconThemeKey,
@@ -32,4 +33,12 @@ export async function uninstallVsixExtension(id: string): Promise<void> {
   await Promise.all([ensureIconThemesInitialized(), ensureColorThemesInitialized()]);
   await uninstallExtension(id);
   await reloadInstalledExtensions();
+}
+
+/** Download the latest version from Open VSX and install it (also used to update). */
+export async function installFromOpenVsx(
+  namespace: string,
+  name: string
+): Promise<InstalledExtension> {
+  return installVsixExtension(await downloadOpenVsxExtension(namespace, name));
 }

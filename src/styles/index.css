@@ -73,6 +73,14 @@ body[data-resizing] * {
     font-family: var(--font-family-active);
   }
 
+  /* Monospace surfaces set their font on a container; the rule above would
+     otherwise override it on every child (terminal rows, code editor lines). */
+  .xterm .xterm-rows *,
+  .xterm .xterm-helper-textarea,
+  [data-code-editor] .cm-editor * {
+    font-family: inherit;
+  }
+
   /* High contrast mode */
   .high-contrast {
     --foreground: 0 0% 0%;

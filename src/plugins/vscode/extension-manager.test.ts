@@ -30,6 +30,9 @@ vi.mock("@tauri-apps/plugin-fs", () => {
   };
 });
 
+// plugin-api pulls in Excalidraw, which does not load under jsdom.
+vi.mock("@/plugins/plugin-api", () => ({ createPluginAPI: vi.fn() }));
+
 import {
   ensureIconThemesInitialized,
   getFileIconUrl,
@@ -40,6 +43,11 @@ import {
 import { setActiveColorTheme, useColorThemeState } from "./color-theme-service";
 import { installVsixExtension, uninstallVsixExtension } from "./extension-manager";
 import { useThemeStore } from "@/stores/themeStore";
+import { PluginManager } from "@/plugins/plugin-manager";
+import { keybindingRegistry } from "@/core/keybindings/keybinding-registry";
+import { keyNormalizer } from "@/core/keybindings/key-normalizer";
+import { initExtensionContributions } from "./contribution-service";
+import { loadInstalledExtensions } from "./extension-registry";
 import { renderHook, waitFor } from "@testing-library/react";
 
 function buildVsix(version: string) {
@@ -187,5 +195,71 @@ describe("VS Code extension manager", () => {
     );
     expect(result.current.activeKey).toBe("acme.demo-icons/Demo Light");
     expect(document.documentElement.style.getPropertyValue("--background")).toBe(background);
+  });
+
+  it("installs code extensions without themes and exposes their contributions", async () => {
+    keybindingRegistry.registerDefault({
+      commandId: "workbench.action.toggleSidebar",
+      chord: keyNormalizer.normalizeChord("ctrl+b"),
+      source: "builtin",
+    });
+    await initExtensionContributions();
+    const extension = await installVsixExtension(
+      zipSync({
+        "extension/package.json": strToU8(
+          JSON.stringify({
+            name: "hello",
+            publisher: "acme",
+            version: "1.0.0",
+            main: "./out/extension.js",
+            activationEvents: ["onStartupFinished"],
+            contributes: {
+              commands: [{ command: "hello.say", title: "%cmd%", category: "Hello" }],
+              keybindings: [
+                { command: "hello.say", key: "ctrl+alt+h" },
+                // Taken by the app (toggle sidebar): must not be hijacked.
+                { command: "hello.say", key: "ctrl+b" },
+              ],
+              configuration: { properties: { "hello.name": { type: "string", default: "mundo" } } },
+            },
+          })
+        ),
+        "extension/package.nls.json": strToU8(JSON.stringify({ cmd: "Say Hello" })),
+        "extension/out/extension.js": strToU8("exports.activate = () => {};"),
+      })
+    );
+
+    expect(extension).toMatchObject({
+      main: "out/extension.js",
+      activationEvents: ["onStartupFinished"],
+    });
+    expect(extension.contributions.commands[0].title).toBe("Say Hello");
+    expect((await loadInstalledExtensions()).map((ext) => ext.id)).toContain("acme.hello");
+
+    expect(PluginManager.getCommands()).toContainEqual(
+      expect.objectContaining({ id: "hello.say", name: "Hello: Say Hello" })
+    );
+    expect(keybindingRegistry.resolve(keyNormalizer.normalizeChord("ctrl+alt+h"))?.commandId).toBe(
+      "hello.say"
+    );
+    expect(keybindingRegistry.resolve(keyNormalizer.normalizeChord("ctrl+b"))?.commandId).not.toBe(
+      "hello.say"
+    );
+
+    await uninstallVsixExtension("acme.hello");
+    expect(PluginManager.getCommands().map((c) => c.id)).not.toContain("hello.say");
+    expect(keybindingRegistry.resolve(keyNormalizer.normalizeChord("ctrl+alt+h"))).toBeNull();
+  });
+
+  it("rejects web-only extensions with a clear message", async () => {
+    await expect(
+      installVsixExtension(
+        zipSync({
+          "extension/package.json": strToU8(
+            JSON.stringify({ name: "web", publisher: "acme", browser: "./dist/web.js" })
+          ),
+        })
+      )
+    ).rejects.toThrow(/solo web/);
   });
 });

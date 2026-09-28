@@ -9,13 +9,28 @@ import { PluginManager } from "@/plugins/plugin-manager";
 import { usePluginsState } from "@/plugins/hooks/usePluginsState";
 import { setActiveIconTheme, useIconThemeState } from "@/plugins/vscode/icon-theme-service";
 import { setActiveColorTheme, useColorThemeState } from "@/plugins/vscode/color-theme-service";
-import {
-  installVsixExtension,
-  isThemeExtension,
-  uninstallVsixExtension,
-} from "@/plugins/vscode/extension-manager";
+import { installVsixExtension, uninstallVsixExtension } from "@/plugins/vscode/extension-manager";
+import type { InstalledExtension } from "@/plugins/vscode/extension-storage";
+import { summarizeContributions } from "@/plugins/vscode/contributions";
 import { notify } from "@/shared/lib/notify";
 import { ExtensionStore } from "./ExtensionStore";
+
+function ExtensionContributionBadges({ extension }: { extension: InstalledExtension }) {
+  const parts = summarizeContributions(extension);
+  if (parts.length === 0) return null;
+  return (
+    <div className="mt-1 flex flex-wrap gap-1" aria-label="Aportes de la extensión">
+      {parts.map((part) => (
+        <span
+          key={part}
+          className="rounded border border-border/60 bg-muted/50 px-1.5 py-px text-[10px] text-muted-foreground"
+        >
+          {part}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export default function PluginAdminPage() {
   const [isToggling, setIsToggling] = useState<string | null>(null);
@@ -179,12 +194,7 @@ export default function PluginAdminPage() {
                       </span>
                     </p>
                     <p className="text-[11px] text-muted-foreground truncate">{extension.id}</p>
-                    {!isThemeExtension(extension) && (
-                      <p className="text-[11px] text-muted-foreground">
-                        Solo se usan sus temas: sus comandos y funciones necesitan el entorno de
-                        extensiones de VS Code.
-                      </p>
-                    )}
+                    <ExtensionContributionBadges extension={extension} />
                   </div>
                   {colorThemeState.themes
                     .filter((theme) => theme.extension.id === extension.id)

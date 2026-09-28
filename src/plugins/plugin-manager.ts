@@ -112,6 +112,10 @@ export class PluginManagerClass {
     this.commandHandlers.set(command.id, handler);
   }
 
+  hasCommand(commandId: string): boolean {
+    return this.commandHandlers.has(commandId);
+  }
+
   unregisterDynamicCommand(commandId: string): void {
     if (!this.dynamicCommands.delete(commandId)) return;
     this.commandHandlers.delete(commandId);

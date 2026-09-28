@@ -25,9 +25,18 @@ export interface VsCodeExtensionManifest {
   description?: string;
   /** Marketplace categories, e.g. ["Themes"] or ["Programming Languages", "Debuggers"]. */
   categories?: string[];
+  /** Node entry point, run by the extension host. */
+  main?: string;
+  /** Web-worker entry point (web extensions); not supported. */
+  browser?: string;
+  activationEvents?: string[];
+  engines?: { vscode?: string };
+  /** Other extensions this one needs (`publisher.name`). */
+  extensionDependencies?: string[];
   contributes?: {
     iconThemes?: IconThemeContribution[];
     themes?: ColorThemeContribution[];
+    [point: string]: unknown;
   };
 }
 
@@ -37,6 +46,8 @@ export interface VsixPackage {
   manifest: VsCodeExtensionManifest;
   /** Files of the extension, keyed by path relative to the extension root. */
   files: Record<string, Uint8Array>;
+  /** `package.nls.json` (English strings for `%key%` placeholders), if present. */
+  nls: Record<string, unknown>;
 }
 
 const EXTENSION_PREFIX = "extension/";
@@ -66,5 +77,15 @@ export function readVsix(bytes: Uint8Array): VsixPackage {
   const manifest = parseJsonc<VsCodeExtensionManifest>(strFromU8(packageJson));
   if (!manifest.name) throw new Error("El package.json de la extensión no tiene 'name'");
 
-  return { id: getExtensionId(manifest), manifest, files };
+  let nls: Record<string, unknown> = {};
+  const nlsFile = files["package.nls.json"];
+  if (nlsFile) {
+    try {
+      nls = parseJsonc<Record<string, unknown>>(strFromU8(nlsFile));
+    } catch {
+      // Untranslated `%key%` strings are shown as-is.
+    }
+  }
+
+  return { id: getExtensionId(manifest), manifest, files, nls };
 }

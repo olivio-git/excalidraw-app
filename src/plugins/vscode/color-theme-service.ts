@@ -9,6 +9,8 @@ import {
 import {
   kindFromUiTheme,
   loadColorThemeColors,
+  loadColorThemeTokenColors,
+  type TokenColorRule,
   mapColorsToCssVariables,
   type ColorThemeDocument,
 } from "./color-theme";
@@ -44,11 +46,19 @@ let initPromise: Promise<void> | null = null;
 let generation = 0;
 /** Raw workbench colors of the active theme (`terminal.ansiRed`, ...). */
 let activeColors: Record<string, string> = {};
+/** TextMate `tokenColors` of the active theme (empty when none/unsupported). */
+let activeTokenColors: TokenColorRule[] = [];
 const colorListeners = new Set<(colors: Record<string, string>) => void>();
 
-function setActiveColors(colors: Record<string, string>): void {
+function setActiveColors(colors: Record<string, string>, tokenColors: TokenColorRule[] = []): void {
   activeColors = colors;
+  activeTokenColors = tokenColors;
   colorListeners.forEach((listener) => listener(colors));
+}
+
+/** Syntax token colors of the active VS Code theme; empty when none is active. */
+export function getActiveTokenColors(): TokenColorRule[] {
+  return activeTokenColors;
 }
 
 /** Workbench colors of the active VS Code theme; empty when none is active. */
@@ -117,10 +127,12 @@ async function applyTheme(key: string | null): Promise<string | null> {
   }
 
   try {
-    const colors = await loadColorThemeColors(
-      (path) => readExtensionJson<ColorThemeDocument>(option.extension, path),
-      themePath
-    );
+    const readJson = (path: string) =>
+      readExtensionJson<ColorThemeDocument>(option.extension, path);
+    const [colors, tokenColors] = await Promise.all([
+      loadColorThemeColors(readJson, themePath),
+      loadColorThemeTokenColors(readJson, themePath).catch(() => []),
+    ]);
     if (requestGeneration !== generation) return state.activeKey;
 
     const kind = kindFromUiTheme(option.contribution.uiTheme);
@@ -128,7 +140,7 @@ async function applyTheme(key: string | null): Promise<string | null> {
       useThemeStore.getState().setTheme(kind);
     }
     applyVariables(mapColorsToCssVariables(colors, kind));
-    setActiveColors(colors);
+    setActiveColors(colors, tokenColors);
     return option.key;
   } catch (error) {
     console.error(`[color-theme] Failed to load ${key}`, error);

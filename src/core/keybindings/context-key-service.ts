@@ -19,6 +19,8 @@ import type { WhenExpression } from "./types";
  */
 export class ContextKeyServiceClass {
   private store: Map<string, unknown> = new Map();
+  /** Extra keys for a single evaluateWith() call (e.g. `view`, `viewItem`). */
+  private overlay: Record<string, unknown> | null = null;
 
   set(key: string, value: unknown): void {
     this.store.set(key, value);
@@ -26,6 +28,21 @@ export class ContextKeyServiceClass {
 
   get(key: string): unknown {
     return this.store.get(key);
+  }
+
+  private lookup(key: string): unknown {
+    if (this.overlay && key in this.overlay) return this.overlay[key];
+    return this.store.get(key);
+  }
+
+  /** Evaluate with additional, temporary context keys layered on top. */
+  evaluateWith(when: WhenExpression | undefined, overlay: Record<string, unknown>): boolean {
+    this.overlay = overlay;
+    try {
+      return this.evaluate(when);
+    } finally {
+      this.overlay = null;
+    }
   }
 
   /**
@@ -106,14 +123,14 @@ export class ContextKeyServiceClass {
       this._skipWhitespace(input, cursor);
 
       const value = this._parseValue(input, cursor);
-      const contextValue = this.store.get(keyName);
+      const contextValue = this.lookup(keyName);
 
       if (operator === "==") return contextValue === value;
       if (operator === "!=") return contextValue !== value;
     }
 
     // Simple boolean key lookup — missing keys default to false
-    const raw = this.store.get(keyName);
+    const raw = this.lookup(keyName);
     if (raw === undefined || raw === null || raw === false || raw === 0 || raw === "") return false;
     return true;
   }

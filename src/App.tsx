@@ -13,12 +13,18 @@ import { ErrorBoundary } from "@/shared/components/error/ErrorBoundary";
 import { ErrorFallback } from "@/shared/components/error/ErrorFallback";
 import { registerDefaultKeybindings } from "@/core/keybindings/default-keybindings";
 import { initializeCoreCommands } from "@/core/keybindings/default-commands";
+import { initTerminal } from "@/features/terminal";
+import { initCodeEditor } from "@/features/code-editor";
+import { initExtensionContributions } from "@/plugins/vscode/contribution-service";
+import { initExtensionHostUi } from "@/plugins/vscode/host";
 import { useLanguageStore } from "@/stores/languageStore";
 import i18n from "@/core/i18n/i18n";
 
 registerFeatureRoutes();
 registerDefaultKeybindings();
 initializeCoreCommands();
+initTerminal();
+initCodeEditor();
 PluginManager.loadInternalPlugins();
 
 export default function App() {
@@ -36,6 +42,8 @@ export default function App() {
       // Restore the VS Code color theme before the first paint of the shell.
       await ensureColorThemesInitialized();
       await initThemeCommands();
+      await initExtensionContributions();
+      initExtensionHostUi();
       if (import.meta.env.DEV) {
         (window as any).__pluginManager = PluginManager;
       }

@@ -5,7 +5,7 @@ import { dirname, resolveRelative } from "./paths";
  *
  * Only workbench `colors` are used: they are mapped onto the app's shadcn CSS
  * variables (`--background`, `--primary`, ...), which hold `H S% L%` triplets.
- * `tokenColors` (syntax highlighting) is ignored — the app has no code editor.
+ * `tokenColors` (syntax highlighting) are loaded separately for the code editor.
  */
 
 export type ColorThemeKind = "light" | "dark";
@@ -15,6 +15,23 @@ export interface ColorThemeDocument {
   type?: string;
   include?: string;
   colors?: Record<string, string | null>;
+  /** TextMate rules, or a path to a `.tmTheme` file (not supported). */
+  tokenColors?: unknown;
+}
+
+export interface TokenColorRule {
+  name?: string;
+  scope?: string | string[];
+  settings: { foreground?: string; background?: string; fontStyle?: string };
+}
+
+function isTokenColorRule(value: unknown): value is TokenColorRule {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as TokenColorRule).settings === "object" &&
+    (value as TokenColorRule).settings !== null
+  );
 }
 
 /** Light/dark from `contributes.themes[].uiTheme` (`vs`, `vs-dark`, `hc-black`, `hc-light`). */
@@ -47,6 +64,28 @@ export async function loadColorThemeColors(
   };
   await visit(themePath, 0);
   return colors;
+}
+
+/**
+ * `tokenColors` of a theme and its `include` chain; included rules come first
+ * so the including theme's rules take precedence.
+ */
+export async function loadColorThemeTokenColors(
+  readJson: (path: string) => Promise<ColorThemeDocument>,
+  themePath: string
+): Promise<TokenColorRule[]> {
+  const rules: TokenColorRule[] = [];
+  const visit = async (path: string, depth: number): Promise<void> => {
+    if (depth > MAX_INCLUDE_DEPTH) return;
+    const doc = await readJson(path);
+    if (doc.include) {
+      const included = resolveRelative(dirname(path), doc.include);
+      if (included) await visit(included, depth + 1);
+    }
+    if (Array.isArray(doc.tokenColors)) rules.push(...doc.tokenColors.filter(isTokenColorRule));
+  };
+  await visit(themePath, 0);
+  return rules;
 }
 
 interface Rgba {

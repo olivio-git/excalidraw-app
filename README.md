@@ -26,19 +26,22 @@ The architecture diagram below was generated entirely by Claude Code — without
 
 ## Features
 
-| System                  | Description                                                                                                                                        |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **MCP server**          | Standalone MCP server (`excalidraw-mcp`) that exposes the live canvas to any external agent — Claude Code, Claude Desktop, or custom automation.   |
-| **AI Chat**             | Sidebar panel with streaming AI that draws directly on the canvas — no copy-paste, no JSON. Natural language → diagram.                            |
-| **Multi-provider AI**   | Swap between Anthropic (Claude), Groq (Llama), OpenAI (GPT), and Google (Gemini) from Settings. API keys stored securely in Tauri Store.           |
-| **Diagram canvas**      | Full Excalidraw editor per tab — open, edit, and save `.excalidraw` files from your filesystem.                                                    |
-| **DiagramController**   | Imperative API registry that exposes the live Excalidraw instance to AI, plugins, drag-drop, and MCP.                                              |
-| **OS drag & drop**      | Drop `.excalidraw` files to open them as tabs. Drop images (`png`, `jpg`, `svg`…) to insert directly on canvas.                                    |
-| **Tab system**          | Multi-tab UI with LRU eviction, pin/unpin, dirty indicator, and per-tab canvas isolation.                                                          |
-| **Plugin architecture** | Extend the app from isolated plugin modules — register routes, sidebar sections, commands, keybindings, and `api.diagram.*` to control the canvas. |
-| **Keybinding engine**   | Chord sequences (`Ctrl+K Ctrl+S`), `when` context expressions, per-source priority.                                                                |
-| **Persistent storage**  | Zustand `persist` over Tauri Store — settings, theme, and appearance survive restarts.                                                             |
-| **Theming**             | Light/dark/system theme + appearance config (font size, border radius, high contrast).                                                             |
+| System                  | Description                                                                                                                                                                                                       |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **MCP server**          | Standalone MCP server (`excalidraw-mcp`) that exposes the live canvas to any external agent — Claude Code, Claude Desktop, or custom automation.                                                                  |
+| **AI Chat**             | Sidebar panel with streaming AI that draws directly on the canvas — no copy-paste, no JSON. Natural language → diagram.                                                                                           |
+| **Multi-provider AI**   | Swap between Anthropic (Claude), Groq (Llama), OpenAI (GPT), and Google (Gemini) from Settings. API keys stored securely in Tauri Store.                                                                          |
+| **Diagram canvas**      | Full Excalidraw editor per tab — open, edit, and save `.excalidraw` files from your filesystem.                                                                                                                   |
+| **DiagramController**   | Imperative API registry that exposes the live Excalidraw instance to AI, plugins, drag-drop, and MCP.                                                                                                             |
+| **OS drag & drop**      | Drop `.excalidraw` files to open them as tabs. Drop images (`png`, `jpg`, `svg`…) to insert directly on canvas.                                                                                                   |
+| **Tab system**          | Multi-tab UI with LRU eviction, pin/unpin, dirty indicator, and per-tab canvas isolation.                                                                                                                         |
+| **Plugin architecture** | Extend the app from isolated plugin modules — register routes, sidebar sections, commands, keybindings, and `api.diagram.*` to control the canvas.                                                                |
+| **Keybinding engine**   | Chord sequences (`Ctrl+K Ctrl+S`), `when` context expressions, per-source priority.                                                                                                                               |
+| **Persistent storage**  | Zustand `persist` over Tauri Store — settings, theme, and appearance survive restarts.                                                                                                                            |
+| **Theming**             | Light/dark/system theme + appearance config (font size, border radius, high contrast).                                                                                                                            |
+| **VS Code extensions**  | Install `.vsix` from Open VSX: themes, languages, TextMate grammars, snippets, commands, views, webviews and LSP extensions run in an extension host. See [docs/vscode-extensions.md](docs/vscode-extensions.md). |
+| **Integrated terminal** | PTY-backed terminal panel (Ctrl+\`) with a shell picker (bash, zsh, PowerShell, cmd…) and an Output panel.                                                                                                        |
+| **Code editor**         | CodeMirror editor for any text file, with extension grammars, snippets, completion, hover, diagnostics and go to definition.                                                                                      |
 
 ---
 

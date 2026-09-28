@@ -11,8 +11,12 @@ export interface FileHandler {
   displayName?: (filename: string) => string;
 }
 
+/** Picks a handler for files no extension-specific handler claims (e.g. any text file). */
+export type FileHandlerResolver = (filename: string) => FileHandler | null;
+
 class FileHandlerRegistryClass {
   private readonly handlers = new Map<string, FileHandler>();
+  private fallbackResolver: FileHandlerResolver | null = null;
   private fallback: FileHandler = {
     routeId: "diagram",
     defaultExtension: "excalidraw",
@@ -24,8 +28,12 @@ class FileHandlerRegistryClass {
   }
 
   resolve(filename: string): FileHandler | null {
-    const ext = filename.split(".").pop()?.toLowerCase() ?? "";
-    return this.handlers.get(ext) ?? null;
+    const ext = filename.includes(".") ? (filename.split(".").pop()?.toLowerCase() ?? "") : "";
+    return this.handlers.get(ext) ?? this.fallbackResolver?.(filename) ?? null;
+  }
+
+  setFallbackResolver(resolver: FileHandlerResolver | null): void {
+    this.fallbackResolver = resolver;
   }
 
   resolveOrDefault(filename: string): FileHandler {

@@ -9,8 +9,14 @@ import {
   writeTextFile,
 } from "@tauri-apps/plugin-fs";
 import { parseJsonc } from "./jsonc";
-import { dirname } from "./paths";
+import { dirname, normalizeRelativePath } from "./paths";
 import { readVsix, type ColorThemeContribution, type IconThemeContribution } from "./vsix";
+import {
+  emptyContributions,
+  hasUsableContributions,
+  parseContributions,
+  type ExtensionContributions,
+} from "./contributions";
 
 /**
  * On-disk layout, mirroring VS Code's `~/.vscode/extensions`:
@@ -35,6 +41,12 @@ export interface InstalledExtension {
   dir: string;
   iconThemes: IconThemeContribution[];
   colorThemes: ColorThemeContribution[];
+  /** Commands, languages, grammars, snippets, views, ... */
+  contributions: ExtensionContributions;
+  /** Node entry point relative to the extension root (runs in the extension host). */
+  main?: string;
+  activationEvents: string[];
+  extensionDependencies?: string[];
 }
 
 async function readIndex(): Promise<InstalledExtension[]> {
@@ -42,11 +54,13 @@ async function readIndex(): Promise<InstalledExtension[]> {
     if (!(await exists(INDEX_FILE, opts()))) return [];
     const parsed = JSON.parse(await readTextFile(INDEX_FILE, opts()));
     if (!Array.isArray(parsed)) return [];
-    // Entries written before color theme support have no `colorThemes`.
+    // Older entries lack fields added later (`colorThemes`, `contributions`, ...).
     return (parsed as InstalledExtension[]).map((ext) => ({
       ...ext,
       iconThemes: ext.iconThemes ?? [],
       colorThemes: ext.colorThemes ?? [],
+      contributions: { ...emptyContributions(), ...ext.contributions },
+      activationEvents: ext.activationEvents ?? [],
     }));
   } catch (error) {
     console.error("[extensions] Failed to read extensions index", error);
@@ -87,9 +101,18 @@ export async function installVsix(bytes: Uint8Array): Promise<InstalledExtension
   const pkg = readVsix(bytes);
   const iconThemes = pkg.manifest.contributes?.iconThemes ?? [];
   const colorThemes = pkg.manifest.contributes?.themes ?? [];
-  if (iconThemes.length === 0 && colorThemes.length === 0) {
+  const contributions = parseContributions(pkg.manifest, pkg.nls);
+  const main = pkg.manifest.main ? normalizeRelativePath(pkg.manifest.main) : null;
+  if (
+    iconThemes.length === 0 &&
+    colorThemes.length === 0 &&
+    !main &&
+    !hasUsableContributions(contributions)
+  ) {
     throw new Error(
-      "La extensión no aporta ninguna contribución compatible (por ahora: themes e iconThemes)"
+      pkg.manifest.browser
+        ? "Es una extensión solo web (sin 'main' de Node); no es compatible todavía"
+        : "La extensión no aporta nada que la app pueda usar"
     );
   }
 
@@ -125,6 +148,10 @@ export async function installVsix(bytes: Uint8Array): Promise<InstalledExtension
     dir,
     iconThemes,
     colorThemes,
+    contributions,
+    main: main ?? undefined,
+    activationEvents: pkg.manifest.activationEvents ?? [],
+    extensionDependencies: pkg.manifest.extensionDependencies,
   };
 
   const previous = await readIndex();

@@ -1,0 +1,13 @@
+{
+  "name": "qori-extension-host",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Runs VS Code extensions for QoriApp (no dependencies, Node built-ins only).",
+  "main": "src/main.cjs",
+  "scripts": {
+    "start": "node src/main.cjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

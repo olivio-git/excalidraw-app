@@ -42,6 +42,26 @@ let appliedVariables: string[] = [];
 let initPromise: Promise<void> | null = null;
 /** Invalidates in-flight loads when another theme is selected. */
 let generation = 0;
+/** Raw workbench colors of the active theme (`terminal.ansiRed`, ...). */
+let activeColors: Record<string, string> = {};
+const colorListeners = new Set<(colors: Record<string, string>) => void>();
+
+function setActiveColors(colors: Record<string, string>): void {
+  activeColors = colors;
+  colorListeners.forEach((listener) => listener(colors));
+}
+
+/** Workbench colors of the active VS Code theme; empty when none is active. */
+export function getActiveThemeColors(): Record<string, string> {
+  return activeColors;
+}
+
+export function onActiveThemeColorsChanged(
+  listener: (colors: Record<string, string>) => void
+): () => void {
+  colorListeners.add(listener);
+  return () => colorListeners.delete(listener);
+}
 
 function emit(): void {
   state = { ...state };
@@ -71,6 +91,7 @@ function toOptions(extensions: InstalledExtension[]): ColorThemeOption[] {
 }
 
 function clearVariables(): void {
+  if (Object.keys(activeColors).length > 0) setActiveColors({});
   const root = document.documentElement;
   for (const variable of appliedVariables) root.style.removeProperty(variable);
   appliedVariables = [];
@@ -107,6 +128,7 @@ async function applyTheme(key: string | null): Promise<string | null> {
       useThemeStore.getState().setTheme(kind);
     }
     applyVariables(mapColorsToCssVariables(colors, kind));
+    setActiveColors(colors);
     return option.key;
   } catch (error) {
     console.error(`[color-theme] Failed to load ${key}`, error);

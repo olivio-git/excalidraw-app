@@ -17,6 +17,7 @@ import { useThemeStore } from "@/stores/themeStore";
 import { ConfirmDialog } from "@/shared/lib/confirm";
 import { PromptDialog } from "@/shared/lib/prompt";
 import { ToolPermissionDialog } from "@/features/ai-chat/components/ToolPermissionDialog";
+import { BottomPanel } from "@/core/panel/BottomPanel";
 
 export default function Shell() {
   useKeybindingBridge();
@@ -52,6 +53,7 @@ export default function Shell() {
           <div className="bg-secondary flex-1 min-h-0 overflow-hidden">
             <TabContent />
           </div>
+          <BottomPanel />
         </SidebarInset>
       </div>
     </SidebarProvider>

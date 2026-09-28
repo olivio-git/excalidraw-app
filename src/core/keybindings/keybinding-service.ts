@@ -22,6 +22,17 @@ function isInputTarget(event: KeyboardEvent): boolean {
   return false;
 }
 
+/**
+ * Commands whose keybindings still fire while an integrated terminal has
+ * focus. Every other key goes to the shell (VS Code's "commandsToSkipShell").
+ */
+export const commandsAllowedInTerminal = new Set<string>();
+
+function isTerminalTarget(event: KeyboardEvent): boolean {
+  const target = event.target;
+  return target instanceof Element && target.closest(".xterm") !== null;
+}
+
 // ── KeybindingService ─────────────────────────────────────────────────────────
 
 /**
@@ -99,6 +110,7 @@ export class KeybindingServiceClass {
       const entry = keybindingRegistry.resolve(chord);
       if (!entry) return;
       if (isInputTarget(event) && !entry.allowInInput) return;
+      if (isTerminalTarget(event) && !commandsAllowedInTerminal.has(entry.commandId)) return;
 
       event.preventDefault();
       void PluginManager.executeCommand(entry.commandId);
@@ -179,7 +191,8 @@ export class KeybindingServiceClass {
         (entry) =>
           entry.chord.length === 2 &&
           entry.chord[0] === firstKey &&
-          contextKeyService.evaluate(entry.when)
+          contextKeyService.evaluate(entry.when) &&
+          (!isTerminalTarget(event) || commandsAllowedInTerminal.has(entry.commandId))
       );
 
       if (hasPartialCandidate) {
@@ -219,6 +232,11 @@ export class KeybindingServiceClass {
 
     // Target input guard — skip unless binding opts in via allowInInput
     if (isInputTarget(event) && !entry.allowInInput) {
+      this._reset();
+      return false;
+    }
+
+    if (isTerminalTarget(event) && !commandsAllowedInTerminal.has(entry.commandId)) {
       this._reset();
       return false;
     }

@@ -9,6 +9,8 @@ use rusqlite;
 use axum::{Router, routing::post, extract::State, Json, http::StatusCode};
 use uuid::Uuid;
 
+mod pty;
+
 #[tauri::command]
 fn read_clipboard_image() -> Result<Option<String>, String> {
     let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
@@ -569,6 +571,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(mcp_state)
+        .manage(pty::PtyState::default())
         .setup(move |app| {
             let handle = app.handle().clone();
             let port: u16 = std::env::var("MCP_PORT")
@@ -620,6 +623,11 @@ pub fn run() {
             get_gateway_info,
             open_external_url,
             read_clipboard_image,
+            pty::pty_list_shells,
+            pty::pty_spawn,
+            pty::pty_write,
+            pty::pty_resize,
+            pty::pty_kill,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application:review logs for details");

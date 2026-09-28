@@ -13,12 +13,14 @@ import { ErrorBoundary } from "@/shared/components/error/ErrorBoundary";
 import { ErrorFallback } from "@/shared/components/error/ErrorFallback";
 import { registerDefaultKeybindings } from "@/core/keybindings/default-keybindings";
 import { initializeCoreCommands } from "@/core/keybindings/default-commands";
+import { initTerminal } from "@/features/terminal";
 import { useLanguageStore } from "@/stores/languageStore";
 import i18n from "@/core/i18n/i18n";
 
 registerFeatureRoutes();
 registerDefaultKeybindings();
 initializeCoreCommands();
+initTerminal();
 PluginManager.loadInternalPlugins();
 
 export default function App() {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { KeybindingServiceClass } from "./keybinding-service";
+import { KeybindingServiceClass, commandsAllowedInTerminal } from "./keybinding-service";
 import { KeybindingRegistryClass } from "./keybinding-registry";
 import { KeybindingSource } from "./types";
 import type { KeybindingEntry, NormalizedKey, KeyChord } from "./types";
@@ -113,6 +113,63 @@ describe("KeybindingService", () => {
       expect(result).toBe(true);
       expect(event.preventDefault).toHaveBeenCalled();
       expect(PluginManager.executeCommand).toHaveBeenCalledWith("editor.save");
+    });
+  });
+
+  // ── integrated terminal focus ─────────────────────────────────────────────
+
+  describe("integrated terminal focus", () => {
+    function terminalTextarea(): HTMLTextAreaElement {
+      const xterm = document.createElement("div");
+      xterm.className = "xterm";
+      const textarea = document.createElement("textarea");
+      xterm.appendChild(textarea);
+      return textarea;
+    }
+
+    afterEach(() => commandsAllowedInTerminal.clear());
+
+    it("leaves keys to the shell even for allowInInput bindings", async () => {
+      const { PluginManager } = await import("../../plugins/plugin-manager");
+      const { keybindingRegistry } = await import("./keybinding-registry");
+      const entry = makeEntry("workbench.action.closeActiveTab", "ctrl+w", { allowInInput: true });
+      vi.spyOn(keybindingRegistry, "resolve").mockReturnValue(entry);
+      vi.spyOn(keybindingRegistry, "getAll").mockReturnValue([entry]);
+
+      const event = makeEvent({ key: "w", ctrlKey: true, targetEl: terminalTextarea() });
+      expect(service.handleKeyEvent(event)).toBe(false);
+      expect(event.preventDefault).not.toHaveBeenCalled();
+      expect(PluginManager.executeCommand).not.toHaveBeenCalled();
+    });
+
+    it("dispatches commands allowed in the terminal", async () => {
+      const { PluginManager } = await import("../../plugins/plugin-manager");
+      const { keybindingRegistry } = await import("./keybinding-registry");
+      commandsAllowedInTerminal.add("workbench.action.terminal.toggleTerminal");
+      const entry = makeEntry("workbench.action.terminal.toggleTerminal", "ctrl+`", {
+        allowInInput: true,
+      });
+      vi.spyOn(keybindingRegistry, "resolve").mockReturnValue(entry);
+      vi.spyOn(keybindingRegistry, "getAll").mockReturnValue([entry]);
+
+      const event = makeEvent({ key: "`", ctrlKey: true, targetEl: terminalTextarea() });
+      expect(service.handleKeyEvent(event)).toBe(true);
+      expect(PluginManager.executeCommand).toHaveBeenCalledWith(
+        "workbench.action.terminal.toggleTerminal"
+      );
+    });
+
+    it("maps the physical Backquote key even when it is a dead key", async () => {
+      const { PluginManager } = await import("../../plugins/plugin-manager");
+      const { keybindingRegistry } = await import("./keybinding-registry");
+      const entry = makeEntry("workbench.action.terminal.toggleTerminal", "ctrl+`");
+      const resolve = vi.spyOn(keybindingRegistry, "resolve").mockReturnValue(entry);
+      vi.spyOn(keybindingRegistry, "getAll").mockReturnValue([entry]);
+
+      const event = makeEvent({ key: "Dead", code: "Backquote", ctrlKey: true });
+      service.handleKeyEvent(event);
+      expect(resolve).toHaveBeenCalledWith(["ctrl+`"]);
+      expect(PluginManager.executeCommand).toHaveBeenCalled();
     });
   });
 

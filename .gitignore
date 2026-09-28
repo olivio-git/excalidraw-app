@@ -36,3 +36,4 @@ coverage/
 .env
 # Performance benchmark build (perf/)
 dist-perf/
+extension-host/test/.tmp-*

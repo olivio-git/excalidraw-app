@@ -18,6 +18,8 @@ const { createWebviews } = require("./api/webviews.cjs");
 const { createEnv } = require("./api/env.cjs");
 const { createLanguages } = require("./api/languages.cjs");
 const { createMemento, createSecretStorage } = require("./api/memento.cjs");
+const { createEditors } = require("./api/editors.cjs");
+const { createLanguageFeatures } = require("./api/language-features.cjs");
 
 const { EventEmitter, Uri, ExtensionMode, LogLevel, noneEvent } = types;
 
@@ -75,6 +77,8 @@ class ExtensionHost {
     };
     this.activeTextEditor = undefined;
     this.visibleTextEditors = [];
+    this.editors = createEditors(this);
+    this.languageFeatures = createLanguageFeatures(this);
 
     const host = this;
     this.extensionsApi = {
@@ -394,11 +398,41 @@ class ExtensionHost {
     const uri = documentOrUri instanceof Uri ? documentOrUri : documentOrUri?.uri;
     if (!uri) return undefined;
     const options = typeof columnOrOptions === "object" && columnOrOptions ? columnOrOptions : {};
+    const isTarget = (editor) => editor && editor.document.uri.toString() === uri.toString();
+    // The app reports the editor once it is open and focused.
+    const opened = isTarget(this.activeTextEditor)
+      ? Promise.resolve(this.activeTextEditor)
+      : new Promise((resolve) => {
+          const timer = setTimeout(() => {
+            subscription.dispose();
+            resolve(undefined);
+          }, 3000);
+          const subscription = this.editorEvents.onDidChangeActiveTextEditor.event((editor) => {
+            if (!isTarget(editor)) return;
+            clearTimeout(timer);
+            subscription.dispose();
+            resolve(editor);
+          });
+        });
     await this.rpc.request("window.showTextDocument", {
       path: uri.fsPath,
-      options: this.toTransferable({ preview: options.preview, selection: options.selection }),
+      options: this.toTransferable({
+        preview: options.preview,
+        selection: options.selection
+          ? {
+              start: {
+                line: options.selection.start.line,
+                character: options.selection.start.character,
+              },
+              end: { line: options.selection.end.line, character: options.selection.end.character },
+            }
+          : undefined,
+      }),
     });
-    return this.activeTextEditor;
+    const editor = await opened;
+    if (editor) return editor;
+    const data = this.workspace.documents.get(uri.toString());
+    return data ? this.editors.editorFor(data) : undefined;
   }
 
   // ── Helpers used by the API modules ──────────────────────────────────────

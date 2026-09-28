@@ -20,6 +20,8 @@ import {
   showQuickPick,
 } from "./quick-input";
 import { registerTerminalBridge } from "./terminal-bridge";
+import { getLanguageBridge, registerLanguageHandlers } from "./language-bridge";
+import { revealInEditor } from "@/features/code-editor/reveal";
 import { updateUserExtensionSetting } from "../extension-settings";
 
 export const OUTPUT_VIEW_ID = "output";
@@ -167,7 +169,11 @@ export function registerHostHandlers(
       const { save } = await import("@tauri-apps/plugin-dialog");
       return (await save({ title, defaultPath, filters })) ?? undefined;
     }),
-    on("window.showTextDocument", ({ path }) => Boolean(openFileInWorkbench(path))),
+    on("window.showTextDocument", ({ path, options }) => {
+      const selection = options?.selection;
+      if (selection) return revealInEditor(path, selection.start, selection.end);
+      return Boolean(openFileInWorkbench(path));
+    }),
 
     // ── Progress ─────────────────────────────────────────────────────────
     on("progress.start", ({ id, title, location, cancellable }) => {
@@ -290,6 +296,7 @@ export function registerHostHandlers(
     }),
 
     ...registerTerminalBridge(connection),
+    ...(getLanguageBridge() ? registerLanguageHandlers(connection, getLanguageBridge()!) : []),
   ];
 }
 

@@ -22,6 +22,8 @@ import {
 } from "./setup";
 import { codeHighlightStyle } from "./theme";
 import { codeEditorRegistry } from "./code-editor-registry";
+import { toOffset } from "./setup";
+import type { RevealRequest } from "./reveal";
 
 const AUTOSAVE_MS = 1000;
 
@@ -50,6 +52,7 @@ export default function CodeEditorContainer() {
   const tab = useTabStore((s) => s.getTab(tabId));
   const filePath = (tab?.instanceId ?? tab?.metadata?.filePath ?? "") as string;
   const languageOverride = tab?.metadata?.languageId as string | undefined;
+  const reveal = tab?.metadata?.reveal as RevealRequest | undefined;
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
   const hostRef = useRef<HTMLDivElement>(null);
@@ -155,14 +158,16 @@ export default function CodeEditorContainer() {
             extensions: createCodeEditorExtensions(
               compartments,
               {
-                onChange: (next) => {
+                onChange: (next, changes) => {
                   version++;
                   setDirty(next !== savedRef.current);
-                  editorContributions.didChange(doc);
+                  editorContributions.didChange(doc, changes);
                   if (timerRef.current) clearTimeout(timerRef.current);
                   timerRef.current = setTimeout(() => void save(), AUTOSAVE_MS);
                 },
                 onSave: () => void save(),
+                onSelectionChange: (selections) =>
+                  editorContributions.didChangeSelection(doc, selections),
                 onFocusChange: (focused) => {
                   setEditorContext(doc, focused);
                   if (focused) editorContributions.didFocus(doc);
@@ -245,6 +250,17 @@ export default function CodeEditorContainer() {
       editorContributions.didFocus(docRef.current);
     }
   }, [isActive, load.status]);
+
+  // Jump to a position (go to definition, extensions' showTextDocument).
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!reveal || !view || load.status !== "ready") return;
+    const doc = view.state.doc;
+    const anchor = toOffset(doc, reveal.start);
+    const head = reveal.end ? toOffset(doc, reveal.end) : anchor;
+    view.dispatch({ selection: { anchor, head }, scrollIntoView: true });
+    view.focus();
+  }, [reveal, load.status]);
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-background" data-code-editor>

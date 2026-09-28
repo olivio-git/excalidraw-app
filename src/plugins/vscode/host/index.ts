@@ -10,6 +10,7 @@ import { extensionHost, initExtensionHost } from "./extension-host-service";
 import { HOST_LOG_CHANNEL, useOutputStore } from "./output-store";
 import { OUTPUT_VIEW_ID, WEBVIEW_ROUTE_ID } from "./host-handlers";
 import { subscribeViewModel, type ViewContainerInfo } from "./view-containers";
+import { initLanguageBridge } from "./language-bridge";
 
 const WebviewPanelTab = lazy(() => import("./WebviewPanelTab"));
 const OutputPanel = lazy(() => import("./OutputPanel").then((m) => ({ default: m.OutputPanel })));
@@ -107,6 +108,7 @@ export function initExtensionHostUi(): void {
     onDidOpen: (doc) => void extensionHost.activateByEvent(`onLanguage:${doc.languageId}`),
   });
 
+  initLanguageBridge(extensionHost);
   initExtensionHost();
 }
 

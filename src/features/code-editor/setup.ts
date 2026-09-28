@@ -35,9 +35,12 @@ import { getLanguageConfiguration, type LanguageConfiguration } from "./extensio
 import { textMateService } from "./textmate/textmate-service";
 import { textMateHighlighting } from "./textmate/highlighter";
 import { codeEditorTheme, codeHighlightStyle } from "./theme";
+import type { ContentChange, EditorSelection, TextPosition } from "./editor-contributions";
+import type { ChangeSet, Text } from "@codemirror/state";
 
 export interface CodeEditorCallbacks {
-  onChange: (content: string) => void;
+  onChange: (content: string, changes: ContentChange[]) => void;
+  onSelectionChange?: (selections: EditorSelection[]) => void;
   onSave: () => void;
   onFocusChange: (focused: boolean) => void;
 }
@@ -56,6 +59,33 @@ export function createCompartments(): CodeEditorCompartments {
     contributions: new Compartment(),
     completion: new Compartment(),
   };
+}
+
+export function toTextPosition(doc: Text, offset: number): TextPosition {
+  const line = doc.lineAt(offset);
+  return { line: line.number - 1, character: offset - line.from };
+}
+
+export function toOffset(doc: Text, position: TextPosition): number {
+  const lineNumber = Math.min(Math.max(position.line + 1, 1), doc.lines);
+  const line = doc.line(lineNumber);
+  return Math.min(line.from + Math.max(position.character, 0), line.to);
+}
+
+/**
+ * CodeMirror changes → VS Code content changes. Changes are listed from the
+ * end of the document backwards, so each range is still valid in the text
+ * produced by the changes before it.
+ */
+export function toContentChanges(startDoc: Text, changes: ChangeSet): ContentChange[] {
+  const result: ContentChange[] = [];
+  changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+    result.push({
+      range: { start: toTextPosition(startDoc, fromA), end: toTextPosition(startDoc, toA) },
+      text: inserted.toString(),
+    });
+  });
+  return result.reverse();
 }
 
 /** Completion with every source (snippets, language servers) in one list. */
@@ -162,7 +192,20 @@ export function createCodeEditorExtensions(
       indentWithTab,
     ]),
     EditorView.updateListener.of((update) => {
-      if (update.docChanged) callbacks.onChange(update.state.doc.toString());
+      if (update.docChanged) {
+        callbacks.onChange(
+          update.state.doc.toString(),
+          toContentChanges(update.startState.doc, update.changes)
+        );
+      }
+      if ((update.selectionSet || update.docChanged) && callbacks.onSelectionChange) {
+        callbacks.onSelectionChange(
+          update.state.selection.ranges.map((range) => ({
+            anchor: toTextPosition(update.state.doc, range.anchor),
+            active: toTextPosition(update.state.doc, range.head),
+          }))
+        );
+      }
       if (update.focusChanged) callbacks.onFocusChange(update.view.hasFocus);
     }),
     codeEditorTheme,

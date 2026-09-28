@@ -17,12 +17,31 @@ export interface CodeDocument {
   getText(): string;
 }
 
+export interface TextPosition {
+  /** 0-based, like VS Code. */
+  line: number;
+  /** UTF-16 offset within the line. */
+  character: number;
+}
+
+export interface ContentChange {
+  range: { start: TextPosition; end: TextPosition };
+  text: string;
+}
+
+export interface EditorSelection {
+  anchor: TextPosition;
+  active: TextPosition;
+}
+
 export interface CodeEditorContribution {
   id: string;
   extensions?(doc: CodeDocument): Extension[];
   completionSources?(doc: CodeDocument): CompletionSource[];
   onDidOpen?(doc: CodeDocument): void;
-  onDidChange?(doc: CodeDocument): void;
+  /** `changes` apply in order, each relative to the text after the previous one. */
+  onDidChange?(doc: CodeDocument, changes: ContentChange[]): void;
+  onDidChangeSelection?(doc: CodeDocument, selections: EditorSelection[]): void;
   onDidSave?(doc: CodeDocument): void;
   onDidClose?(doc: CodeDocument): void;
   onDidFocus?(doc: CodeDocument | null): void;
@@ -79,8 +98,12 @@ class EditorContributionRegistry {
     this.each((c) => c.onDidOpen?.(doc));
   }
 
-  didChange(doc: CodeDocument): void {
-    this.each((c) => c.onDidChange?.(doc));
+  didChange(doc: CodeDocument, changes: ContentChange[] = []): void {
+    this.each((c) => c.onDidChange?.(doc, changes));
+  }
+
+  didChangeSelection(doc: CodeDocument, selections: EditorSelection[]): void {
+    this.each((c) => c.onDidChangeSelection?.(doc, selections));
   }
 
   didSave(doc: CodeDocument): void {

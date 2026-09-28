@@ -100,9 +100,16 @@ function createRpc(writeLine, options = {}) {
     } else if (message.type === "ntf") {
       const handler = handlers.get(message.method);
       if (!handler) return;
-      Promise.resolve()
-        .then(() => handler(message.params ?? {}))
-        .catch((error) => log(`Notification ${message.method} failed`, error));
+      // Run now, not in a microtask: a request that follows must see its effects
+      // (e.g. `document.closed` then a language request for that document).
+      try {
+        const result = handler(message.params ?? {});
+        if (result && typeof result.catch === "function") {
+          result.catch((error) => log(`Notification ${message.method} failed`, error));
+        }
+      } catch (error) {
+        log(`Notification ${message.method} failed`, error);
+      }
     }
   }
 

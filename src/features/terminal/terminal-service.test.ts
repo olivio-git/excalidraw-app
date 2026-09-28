@@ -15,10 +15,7 @@ const { FakeTerminal, xtermInstances, ptyHandlers } = vi.hoisted(() => {
       xtermInstances.push(this);
     }
     loadAddon() {}
-    open(host: HTMLElement) {
-      // Stand-in for the panel mounting the terminal.
-      document.body.appendChild(host);
-    }
+    open() {}
     onData(handler: (data: string) => void) {
       this.dataHandler = handler;
     }
@@ -75,15 +72,24 @@ import {
   useTerminalStore,
 } from "./terminal-service";
 
+let unmountPanel: (() => void) | null = null;
+
 beforeEach(() => {
   vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
     cb(0);
     return 0;
   });
   usePanelStore.setState({ open: false, activeViewId: null });
+  // Stand-in for the terminal panel: attach the active session like the view does.
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  unmountPanel = useTerminalStore.subscribe((state) => {
+    if (state.activeId) getTerminalSession(state.activeId)?.attach(container);
+  });
 });
 
 afterEach(() => {
+  unmountPanel?.();
   __resetTerminalsForTests();
   xtermInstances.length = 0;
   ptyHandlers.length = 0;

@@ -12,14 +12,30 @@ import { setActiveColorTheme, useColorThemeState } from "@/plugins/vscode/color-
 import { installVsixExtension, uninstallVsixExtension } from "@/plugins/vscode/extension-manager";
 import type { InstalledExtension } from "@/plugins/vscode/extension-storage";
 import { summarizeContributions } from "@/plugins/vscode/contributions";
+import { useExtensionHostStore } from "@/plugins/vscode/host/host-store";
+import { extensionHost } from "@/plugins/vscode/host/extension-host-service";
 import { notify } from "@/shared/lib/notify";
 import { ExtensionStore } from "./ExtensionStore";
 
 function ExtensionContributionBadges({ extension }: { extension: InstalledExtension }) {
   const parts = summarizeContributions(extension);
+  const active = useExtensionHostStore((s) => s.activated.includes(extension.id));
+  const failure = useExtensionHostStore((s) => s.failed[extension.id]);
   if (parts.length === 0) return null;
   return (
     <div className="mt-1 flex flex-wrap gap-1" aria-label="Aportes de la extensión">
+      {extension.main && (active || failure) && (
+        <span
+          title={failure}
+          className={
+            failure
+              ? "rounded border border-destructive/40 bg-destructive/10 px-1.5 py-px text-[10px] text-destructive"
+              : "rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-px text-[10px] text-emerald-600 dark:text-emerald-400"
+          }
+        >
+          {failure ? "error al activar" : "activa"}
+        </span>
+      )}
       {parts.map((part) => (
         <span
           key={part}
@@ -29,6 +45,24 @@ function ExtensionContributionBadges({ extension }: { extension: InstalledExtens
         </span>
       ))}
     </div>
+  );
+}
+
+function ExtensionHostButton() {
+  const status = useExtensionHostStore((s) => s.status);
+  const error = useExtensionHostStore((s) => s.error);
+  if (status === "idle" || status === "unavailable") return null;
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      title={error ?? undefined}
+      disabled={status === "starting"}
+      onClick={() => void extensionHost.restart()}
+    >
+      <RotateCcw className="mr-1 size-3.5" />
+      {status === "starting" ? "Iniciando…" : "Reiniciar Extension Host"}
+    </Button>
   );
 }
 
@@ -162,6 +196,7 @@ export default function PluginAdminPage() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold">Extensiones VS Code instaladas</h2>
               <div className="flex gap-2">
+                <ExtensionHostButton />
                 <Button
                   size="sm"
                   variant="outline"

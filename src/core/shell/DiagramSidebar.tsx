@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Files,
@@ -45,10 +45,14 @@ import { NavigationPanel } from "./panels/NavigationPanel";
 import { AIChatPanel } from "@/features/ai-chat/AIChatPanel";
 import { LibraryBrowserPanel } from "@/features/library-browser/LibraryBrowserPanel";
 import { ReferencesPanel } from "./panels/ReferencesPanel";
+import { useSidebarPanelStore, extensionPanelId } from "./sidebar-panel-store";
+import { useViewModel } from "@/plugins/vscode/host/view-containers";
+import { ExtensionIcon } from "@/plugins/vscode/host/extension-assets";
+import { ExtensionViewContainer } from "@/plugins/vscode/host/ExtensionViewContainer";
 
 const COMPACT_THRESHOLD = 100;
 
-type Panel = "explorer" | "plugins" | "navigation" | "ai-chat" | "library" | "references";
+type Panel = string;
 
 interface PanelTab {
   id: Panel;
@@ -58,7 +62,10 @@ interface PanelTab {
 
 const DiagramSidebar = () => {
   const { t } = useTranslation("common");
-  const [activePanel, setActivePanel] = useState<Panel>("explorer");
+  const activePanel = useSidebarPanelStore((s) => s.activePanel);
+  const setActivePanel = useSidebarPanelStore((s) => s.setActivePanel);
+  const { containers } = useViewModel();
+  const extensionContainers = containers.filter((c) => c.location === "sidebar");
   const prevWidthRef = useRef<number | null>(null);
 
   const PANEL_TABS: PanelTab[] = [
@@ -105,7 +112,24 @@ const DiagramSidebar = () => {
     }
   }, [isCompact, sidebarWidth, setSidebarWidth]);
 
-  const visibleTabs = PANEL_TABS.filter((t) => t.id !== "plugins" || pluginSections.length > 0);
+  const extensionTabs: PanelTab[] = extensionContainers.map((container) => ({
+    id: extensionPanelId(container.id),
+    label: container.title,
+    icon: ({ className }: { className?: string }) => (
+      <ExtensionIcon
+        icon={container.icon}
+        className={className}
+        fallback={<Blocks className={className} />}
+      />
+    ),
+  }));
+  const visibleTabs = [
+    ...PANEL_TABS.filter((t) => t.id !== "plugins" || pluginSections.length > 0),
+    ...extensionTabs,
+  ];
+  const activeExtensionContainer = extensionContainers.find(
+    (container) => extensionPanelId(container.id) === activePanel
+  );
 
   const resolvedPanel = visibleTabs.some((t) => t.id === activePanel) ? activePanel : "explorer";
 
@@ -186,6 +210,12 @@ const DiagramSidebar = () => {
             {resolvedPanel === "ai-chat" && <AIChatPanel />}
             {resolvedPanel === "library" && <LibraryBrowserPanel />}
             {resolvedPanel === "references" && <ReferencesPanel />}
+            {activeExtensionContainer && resolvedPanel === activePanel && (
+              <ExtensionViewContainer
+                key={activeExtensionContainer.id}
+                container={activeExtensionContainer}
+              />
+            )}
           </>
         )}
       </SidebarContent>

@@ -16,6 +16,7 @@ import { initializeCoreCommands } from "@/core/keybindings/default-commands";
 import { initTerminal } from "@/features/terminal";
 import { initCodeEditor } from "@/features/code-editor";
 import { initExtensionContributions } from "@/plugins/vscode/contribution-service";
+import { initExtensionHostUi } from "@/plugins/vscode/host";
 import { useLanguageStore } from "@/stores/languageStore";
 import i18n from "@/core/i18n/i18n";
 
@@ -42,6 +43,7 @@ export default function App() {
       await ensureColorThemesInitialized();
       await initThemeCommands();
       await initExtensionContributions();
+      initExtensionHostUi();
       if (import.meta.env.DEV) {
         (window as any).__pluginManager = PluginManager;
       }

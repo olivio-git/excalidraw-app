@@ -80,6 +80,12 @@ body[data-resizing] * {
   [data-code-editor] .cm-editor * {
     font-family: inherit;
   }
+  /* xterm measures glyph width with these elements; they must use the terminal font. */
+  .xterm .xterm-char-measure-element,
+  .xterm .xterm-width-cache-measure-container,
+  .xterm .xterm-width-cache-measure-container * {
+    font-family: var(--qori-terminal-font, var(--font-mono));
+  }
 
   /* High contrast mode */
   .high-contrast {

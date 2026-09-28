@@ -77,6 +77,8 @@ export class TerminalSession {
   private backend: TerminalBackend | null = null;
   private pendingInput: string[] = [];
   private disposed = false;
+  /** xterm is opened on first attach: it measures glyphs, which needs a laid-out element. */
+  private opened = false;
   readonly id: string;
   readonly kind: TerminalInfo["kind"];
 
@@ -85,6 +87,7 @@ export class TerminalSession {
     this.kind = kind;
     this.host = document.createElement("div");
     this.host.className = "qori-terminal-host h-full w-full";
+    this.host.style.setProperty("--qori-terminal-font", currentMonoFont());
     this.term = new Terminal({
       allowProposedApi: true,
       cursorBlink: true,
@@ -100,7 +103,6 @@ export class TerminalSession {
       else this.pendingInput.push(data);
     });
     this.term.onResize(({ cols, rows }) => this.backend?.resize(cols, rows));
-    this.term.open(this.host);
   }
 
   setBackend(backend: TerminalBackend): void {
@@ -124,11 +126,15 @@ export class TerminalSession {
   /** Show this terminal in `container`, replacing whichever terminal was there. */
   attach(container: HTMLElement): void {
     if (this.host.parentElement !== container) container.replaceChildren(this.host);
+    if (!this.opened && this.host.isConnected) {
+      this.opened = true;
+      this.term.open(this.host);
+    }
     this.fit();
   }
 
   fit(): void {
-    if (this.disposed || !this.host.isConnected) return;
+    if (this.disposed || !this.opened || !this.host.isConnected) return;
     const { width, height } = this.host.getBoundingClientRect();
     if (width === 0 || height === 0) return;
     try {
@@ -145,6 +151,7 @@ export class TerminalSession {
   refreshTheme(): void {
     this.term.options.theme = currentXtermTheme(getActiveThemeColors());
     this.term.options.fontFamily = currentMonoFont();
+    this.host.style.setProperty("--qori-terminal-font", currentMonoFont());
   }
 
   dispose(): void {

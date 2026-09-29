@@ -16,8 +16,49 @@ interno (`src/plugins/internal/flow3d`).
 - **Reproducir**: `Espacio` o el botón play. La línea de tiempo permite saltar a
   cualquier instante; la velocidad va de 0.5× a 2×. «Seguir» mueve la cámara al paso
   en ejecución. «Planta» muestra el flujo desde arriba; `F` encuadra.
-- **Atajos**: `Supr` borra, `Ctrl+Z` / `Ctrl+Shift+Z` deshacer/rehacer, `Esc`
-  deselecciona. Doble clic en un paso lo enfoca y abre su archivo vinculado.
+- **Atajos**: `Tab` inserta un paso conectado al seleccionado (buscador), `Ctrl+F`
+  busca un paso por nombre, `Supr` borra, `Ctrl+C` / `Ctrl+V` / `Ctrl+D`
+  copiar/pegar/duplicar, `Ctrl+A` todo, `Ctrl+G` agrupar (`Ctrl+Shift+G` desagrupar),
+  `M` minimapa, `Ctrl+Z` / `Ctrl+Shift+Z` deshacer/rehacer, `Esc` deselecciona. Doble
+  clic en un paso lo enfoca y abre su archivo vinculado.
+- **Selección múltiple**: `Shift` + arrastrar sobre el fondo dibuja una caja;
+  `Ctrl` + clic suma o quita pasos. Arrastrar cualquiera mueve todos.
+- **Grupos (subflujos)**: agrupa la selección, ponle nombre y color, súbelo de
+  nivel (altura) para apilar subflujos en 3D, y pliégalo: se ve como un solo bloque
+  que se ilumina mientras corre cualquiera de sus pasos. Doble clic lo despliega.
+- **Minimapa**: vista en planta de todo el flujo; clic para llevar la cámara ahí.
+- **Exportar**: imagen PNG de la vista, vídeo WebM de la reproducción (se graba del
+  lienzo) o diagrama de Excalidraw.
+
+## Ejecución real
+
+El conmutador **Simular / Ejecutar** de la barra elige entre la animación de siempre
+y correr el flujo de verdad. En la pestaña **Ejecución** del inspector cada paso
+elige qué hace:
+
+| Tipo                | Qué hace                                                | Salida                           |
+| ------------------- | ------------------------------------------------------- | -------------------------------- |
+| Datos iniciales     | JSON con el que arranca el disparador                   | el JSON                          |
+| Petición HTTP       | GET/POST/PUT/PATCH/DELETE a una URL, cabeceras y cuerpo | `{ status, headers, body }`      |
+| Comando de terminal | Ejecuta en el shell (carpeta y límite de tiempo)        | `{ stdout, stderr, code, json }` |
+| Comando de la app   | Lanza cualquier comando registrado                      | la entrada                       |
+| Llamada a IA        | Usa el proveedor de IA activo (Ajustes → IA)            | el texto (o JSON)                |
+| Escribir nota       | Escribe o añade a un archivo (relativo al flujo)        | `{ path, bytes }`                |
+| Plantilla JSON      | Construye datos nuevos                                  | el JSON                          |
+| Condición           | Compara un campo (`==`, `>`, `contiene`, `existe`…)     | sale por «sí» o «no»             |
+
+- **Datos entre pasos**: cada paso recibe la salida del anterior. En cualquier texto
+  se puede escribir `{{input.campo}}` o `{{steps.<id>.output.campo}}` (el id aparece
+  en la pestaña Paso). En JSON, `"{{input}}"` inserta el valor tal cual.
+- **Datos**: la pestaña Datos del inspector muestra entrada, salida, error y tiempo
+  de cada paso de la última ejecución.
+- **Estados reales**: los paquetes y los estados de la escena siguen la ejecución de
+  verdad; un paso que falla se marca en rojo, su rama se detiene y el resto sigue.
+  Después se puede repetir la ejecución grabada con la línea de tiempo.
+- **Confirmación**: antes de ejecutar se listan los pasos con efectos fuera del flujo
+  (red, terminal, archivos, IA; un GET no cuenta). Se puede cancelar en cualquier
+  momento.
+- Los pasos sin tipo solo se simulan (pasan los datos tal cual).
 
 ## Integración
 
@@ -30,6 +71,15 @@ interno (`src/plugins/internal/flow3d`).
   flujo reproducible dentro de la nota (se actualiza al cambiar el archivo).
 - **Enlaces**: cada paso puede vincular una nota, un markdown, un diagrama u otro flujo;
   se abre al lado desde el inspector.
+- **Excalidraw en los dos sentidos**: «Exportar → Diagrama de Excalidraw» escribe el
+  flujo como dibujo (formas enlazadas con las flechas, mismos ids) y lo deja como
+  origen: edita el dibujo y sincroniza para traer los cambios sin perder lo del 3D
+  (configuración de ejecución, grupos, descripciones, alturas).
+- **Enlaces a un paso**: `pedidos.flow3d#validar` (id o nombre del paso) abre el flujo
+  con ese paso enfocado. En una nota, el flujo incrustado tiene «Empezar en» para
+  mostrarlo desde un paso concreto.
+- **Referencias**: el panel Referencias indexa los `.flow3d`: qué notas o flujos
+  apuntan a un flujo (o a uno de sus pasos) y a qué archivos enlazan sus pasos.
 
 ## Formato `.flow3d`
 
@@ -63,6 +113,10 @@ JSON legible, pensado para editarse también a mano:
   ]
 }
 ```
+
+Cada paso puede llevar `config` (ejecución, p. ej. `{ "type": "command", "command":
+"git status" }`) y `group`; los grupos van en `groups: [{ "id", "label", "color",
+"collapsed" }]`.
 
 Tipos: `trigger`, `action`, `condition`, `transform`, `ai`, `output`, `note` (las notas
 no se ejecutan). Un archivo con tipos desconocidos, ids repetidos o conexiones rotas

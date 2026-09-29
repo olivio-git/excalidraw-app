@@ -100,6 +100,8 @@ function activate(api: PluginAPI): void {
   api.registerCommand("flow3d.stop", () => activeFlow()?.store.getState().stop());
   api.registerCommand("flow3d.fit", () => activeFlow()?.store.getState().requestFit());
   api.registerCommand("flow3d.layout", () => activeFlow()?.store.getState().layout());
+  api.registerCommand("flow3d.execute", () => activeFlow()?.execute?.());
+  api.registerCommand("flow3d.exportExcalidraw", () => activeFlow()?.exportExcalidraw?.());
 }
 
 export const flow3dPlugin: Plugin = {
@@ -116,6 +118,8 @@ export const flow3dPlugin: Plugin = {
       { id: "flow3d.stop", name: "Flow 3D: Detener" },
       { id: "flow3d.fit", name: "Flow 3D: Encuadrar" },
       { id: "flow3d.layout", name: "Flow 3D: Organizar automáticamente" },
+      { id: "flow3d.execute", name: "Flow 3D: Ejecutar flujo" },
+      { id: "flow3d.exportExcalidraw", name: "Flow 3D: Exportar a Excalidraw" },
     ],
   },
   activate,

@@ -85,6 +85,8 @@ export function sampleNode(span: TimelineSpan | undefined, time: number): NodeSa
   // At the very start nothing has run yet (a stopped flow shows everything idle).
   if (!span || time < span.start || time === 0) return { phase: "idle", progress: 0 };
   if (time >= span.end) return { phase: "done", progress: 1 };
+  // A step of a real run that hasn't finished yet: loop the pulse every second.
+  if (!Number.isFinite(span.end)) return { phase: "active", progress: (time - span.start) % 1 };
   const length = span.end - span.start;
   return { phase: "active", progress: length > 0 ? (time - span.start) / length : 1 };
 }

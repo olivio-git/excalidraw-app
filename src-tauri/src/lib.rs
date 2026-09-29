@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 mod exthost;
 mod ext_protocol;
+mod flow_exec;
 mod pty;
 
 #[tauri::command]
@@ -635,6 +636,7 @@ pub fn run() {
             exthost::exthost_start,
             exthost::exthost_send,
             exthost::exthost_stop,
+            flow_exec::flow_run_command,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application:review logs for details");

@@ -2,6 +2,7 @@ import { exists, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { createFileReference, resolveFileReference } from "@/core/shell/services/file-navigation";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { excalidrawToFlow } from "./excalidraw-import";
+import { flowToExcalidraw } from "./excalidraw-export";
 import { parseFlow, serializeFlow, type FlowDocument } from "./model";
 
 const baseName = (path: string) => (path.split(/[\\/]/).pop() ?? path).replace(/\.[^.]+$/, "");
@@ -45,6 +46,8 @@ export function mergeImported(current: FlowDocument, imported: FlowDocument): Fl
         link: old.link,
         duration: old.duration,
         branch: old.branch,
+        config: old.config,
+        group: old.group,
         color: old.color ?? node.color,
         position: [node.position[0], old.position[1], node.position[2]],
       };
@@ -83,4 +86,31 @@ export async function convertExcalidrawToFlowFile(excalidrawPath: string): Promi
   }
   await writeTextFile(target, serializeFlow(doc));
   return target;
+}
+
+/** Path of the drawing a flow exports to: its source, or `<flow>.excalidraw` next to it. */
+export async function excalidrawTarget(doc: FlowDocument, flowPath: string): Promise<string> {
+  if (doc.source) {
+    try {
+      return await resolveSource(doc, flowPath);
+    } catch {
+      // Source moved or deleted: export next to the flow instead.
+    }
+  }
+  return flowPath.replace(/\.flow3d$/i, "") + ".excalidraw";
+}
+
+/**
+ * Write the flow as an Excalidraw diagram and return the path plus the
+ * reference to store as the flow's `source` (so both stay in sync).
+ */
+export async function exportFlowToExcalidrawFile(
+  doc: FlowDocument,
+  target: string
+): Promise<{ path: string; source: string }> {
+  await writeTextFile(target, `${JSON.stringify(flowToExcalidraw(doc), null, 2)}\n`);
+  return {
+    path: target,
+    source: createFileReference(target, useWorkspaceStore.getState().workspaceDir),
+  };
 }

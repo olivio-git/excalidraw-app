@@ -22,7 +22,10 @@ export const DiagramEmbedBlock = createReactBlockSpec(
         className="my-2 w-full overflow-hidden rounded-lg border border-border"
         contentEditable={false}
       >
-        <DiagramEmbedRenderer diagramPath={block.props.diagramPath} />
+        <DiagramEmbedRenderer
+          diagramPath={block.props.diagramPath}
+          onChangePath={(diagramPath) => editor.updateBlock(block, { props: { diagramPath } })}
+        />
         <CaptionInput
           value={block.props.caption}
           onChange={(caption) => editor.updateBlock(block, { props: { caption } })}
@@ -62,7 +65,13 @@ function CaptionInput({ value, onChange }: { value: string; onChange: (value: st
 const Flow3DEmbed = lazy(() => import("@/features/flow3d/Flow3DEmbed"));
 
 /** Embedded diagram: an Excalidraw preview image, or a playable 3D flow (`.flow3d`). */
-export function DiagramEmbedRenderer({ diagramPath }: { diagramPath: string }) {
+export function DiagramEmbedRenderer({
+  diagramPath,
+  onChangePath,
+}: {
+  diagramPath: string;
+  onChangePath?: (diagramPath: string) => void;
+}) {
   const host = useContext(DocumentHostContext);
   if (/\.flow3d(#.*)?$/i.test(diagramPath)) {
     return (
@@ -77,6 +86,7 @@ export function DiagramEmbedRenderer({ diagramPath }: { diagramPath: string }) {
           flowPath={diagramPath}
           sourcePath={host?.filePath ?? ""}
           groupId={host?.groupId}
+          onChangePath={onChangePath}
         />
       </Suspense>
     );

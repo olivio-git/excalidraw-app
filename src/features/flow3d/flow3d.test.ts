@@ -308,3 +308,75 @@ describe("editor store", () => {
     expect(merged.edges.find((e) => e.to === "b")).toMatchObject({ id: "keep", label: "viejo" });
   });
 });
+
+describe("integration", () => {
+  it("exports to Excalidraw and converts back to the same steps", async () => {
+    const { flowToExcalidraw } = await import("./excalidraw-export");
+    const doc = sampleFlow("Pedidos");
+    const drawing = flowToExcalidraw(doc) as { elements: Array<Record<string, unknown>> };
+    const arrows = drawing.elements.filter((e) => e.type === "arrow");
+    expect(arrows).toHaveLength(doc.edges.length);
+    expect(arrows[0]).toMatchObject({
+      startBinding: { elementId: "webhook" },
+      endBinding: { elementId: "validate" },
+    });
+    expect(drawing.elements.find((e) => e.id === "validate")?.type).toBe("diamond");
+
+    const back = excalidrawToFlow(drawing, "Pedidos");
+    expect(back.nodes.map((n) => n.id).sort()).toEqual(doc.nodes.map((n) => n.id).sort());
+    const label = (id: string) => back.nodes.find((n) => n.id === id)?.label;
+    expect(label("enrich")).toBe("Clasificar con IA");
+    expect(back.edges.map((e) => [e.from, e.to, e.label ?? ""]).sort()).toEqual(
+      doc.edges.map((e) => [e.from, e.to, e.label ?? ""]).sort()
+    );
+    // Same layout (relative positions) after the round trip.
+    const x = (d: FlowDocument, id: string) => d.nodes.find((n) => n.id === id)!.position[0];
+    expect(x(back, "notify") - x(back, "webhook")).toBeCloseTo(
+      x(doc, "notify") - x(doc, "webhook"),
+      1
+    );
+  });
+
+  it("keeps step configuration and groups when re-syncing from the drawing", async () => {
+    const { mergeImported } = await import("./excalidraw-bridge");
+    const current: FlowDocument = {
+      ...flow([n("a", "action", { config: { type: "command", command: "ls" }, group: "g" })], []),
+      groups: [{ id: "g", label: "Grupo" }],
+    };
+    const merged = mergeImported(current, flow([n("a", "action", { label: "A" })], []));
+    expect(merged.nodes[0]).toMatchObject({ label: "A", config: { type: "command" }, group: "g" });
+    expect(merged.groups).toEqual(current.groups);
+  });
+
+  it("finds the step of a link by id or by name", async () => {
+    const { findStep } = await import("./model");
+    const doc = sampleFlow();
+    expect(findStep(doc, "validate")?.id).toBe("validate");
+    expect(findStep(doc, "pedido-valido")?.id).toBe("validate");
+    expect(findStep(doc, "¿Pedido VÁLIDO?")?.id).toBe("validate");
+    expect(findStep(doc, "nope")).toBeUndefined();
+    expect(findStep(doc, "")).toBeUndefined();
+  });
+
+  it("parses step config and groups, dropping broken ones", () => {
+    const doc = parseFlow(
+      JSON.stringify({
+        nodes: [
+          {
+            id: "a",
+            kind: "action",
+            config: { type: "http", url: "https://x", evil: { a: 1 } },
+            group: "g",
+          },
+          { id: "b", kind: "action", config: { type: "rm -rf" }, group: "missing" },
+        ],
+        groups: [{ id: "g", label: "G", collapsed: true }, { id: "g" }, { label: "sin id" }],
+      })
+    );
+    expect(doc.nodes[0].config).toEqual({ type: "http", url: "https://x" });
+    expect(doc.nodes[0].group).toBe("g");
+    expect(doc.nodes[1].config).toBeUndefined();
+    expect(doc.nodes[1].group).toBeUndefined();
+    expect(doc.groups).toEqual([{ id: "g", label: "G", color: undefined, collapsed: true }]);
+  });
+});

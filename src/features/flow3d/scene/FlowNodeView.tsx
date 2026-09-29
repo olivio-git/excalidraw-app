@@ -33,6 +33,7 @@ const noteGeometry = new RoundedBoxGeometry(
   2,
   0.04
 );
+const ERROR_COLOR = "#ef4444";
 const tileGeometry = new RoundedBoxGeometry(0.7, 0.7, 0.14, 3, 0.12);
 
 function roundedRect(width: number, height: number, radius: number): ShapeGeometry {
@@ -119,6 +120,10 @@ interface FlowNodeViewProps {
   selected: boolean;
   highlighted: boolean;
   editable: boolean;
+  /** The step failed in the last real run. */
+  failed?: boolean;
+  /** Extra line under the label (collapsed groups: step count). */
+  subtitle?: string;
   span: TimelineSpan | undefined;
   clock: PlaybackClock;
   handlers: NodeHandlers;
@@ -135,6 +140,8 @@ export const FlowNodeView = memo(function FlowNodeView({
   selected,
   highlighted,
   editable,
+  failed = false,
+  subtitle,
   span,
   clock,
   handlers,
@@ -144,6 +151,7 @@ export const FlowNodeView = memo(function FlowNodeView({
   const halo = useRef<MeshBasicMaterial>(null);
   const glyph = useRef<Group>(null);
   const badge = useRef<Mesh>(null);
+  const errorBadge = useRef<Mesh>(null);
   const color = nodeColor(node);
   const kindColor = useMemo(() => new Color(color), [color]);
   const isNote = node.kind === "note";
@@ -168,10 +176,22 @@ export const FlowNodeView = memo(function FlowNodeView({
           ? 0.22
           : 0.06;
     }
-    if (halo.current)
-      halo.current.opacity = active ? 0.28 + 0.12 * Math.sin(progress * Math.PI * 6) : 0;
+    const errored = failed && phase === "done";
+    if (halo.current) {
+      halo.current.color.set(
+        errored ? ERROR_COLOR : active || !selected ? kindColor : theme.primary
+      );
+      halo.current.opacity = active
+        ? 0.28 + 0.12 * Math.sin(progress * Math.PI * 6)
+        : errored
+          ? 0.32
+          : selected
+            ? 0.14
+            : 0;
+    }
     if (glyph.current && active) glyph.current.rotation.y += delta * 3;
-    if (badge.current) badge.current.visible = phase === "done";
+    if (badge.current) badge.current.visible = phase === "done" && !failed;
+    if (errorBadge.current) errorBadge.current.visible = errored;
   });
 
   const bodyEvents = {
@@ -193,7 +213,7 @@ export const FlowNodeView = memo(function FlowNodeView({
     },
   };
 
-  const outline = selected ? theme.primary : highlighted ? color : null;
+  const outline = selected ? theme.primary : failed ? ERROR_COLOR : highlighted ? color : null;
 
   return (
     <group position={node.position} userData={{ flowNodeId: node.id }}>
@@ -277,8 +297,9 @@ export const FlowNodeView = memo(function FlowNodeView({
             maxWidth={1.6}
             color={theme.muted}
           >
-            {NODE_KINDS[node.kind].label}
-            {node.link ? " · vinculado" : ""}
+            {subtitle ?? NODE_KINDS[node.kind].label}
+            {!subtitle && node.config ? " · ejecutable" : ""}
+            {!subtitle && node.link ? " · vinculado" : ""}
           </Text>
         )}
 
@@ -292,6 +313,15 @@ export const FlowNodeView = memo(function FlowNodeView({
             >
               <sphereGeometry args={[0.09, 16, 12]} />
               <meshBasicMaterial color="#10b981" toneMapped={false} />
+            </mesh>
+            {/* Error badge (last run failed here). */}
+            <mesh
+              ref={errorBadge}
+              visible={false}
+              position={[size.width / 2 - 0.16, size.height / 2 - 0.16, front + 0.03]}
+            >
+              <sphereGeometry args={[0.11, 16, 12]} />
+              <meshBasicMaterial color={ERROR_COLOR} toneMapped={false} />
             </mesh>
             {/* Input port. */}
             <mesh position={[-PORT_OFFSET, 0, 0]}>

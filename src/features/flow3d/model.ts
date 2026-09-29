@@ -28,6 +28,65 @@ export interface FlowNode {
   link?: string;
   /** Condition nodes: the outgoing edge taken during playback (default: the first). */
   branch?: string;
+  /** What the step does when the flow is executed (not simulated). */
+  config?: StepConfig;
+  /** Group (subflow) the node belongs to. */
+  group?: string;
+}
+
+export type ConditionOperator =
+  | "=="
+  | "!="
+  | ">"
+  | "<"
+  | ">="
+  | "<="
+  | "contains"
+  | "exists"
+  | "truthy";
+
+/**
+ * Executable step. Text fields accept `{{input.x}}` and `{{steps.<id>.output.x}}`
+ * placeholders filled with the data flowing through the run.
+ */
+export type StepConfig =
+  | { type: "manual"; payload?: string }
+  | {
+      type: "http";
+      method?: string;
+      url?: string;
+      /** One `Name: value` per line. */
+      headers?: string;
+      body?: string;
+      allowErrors?: boolean;
+    }
+  | { type: "command"; command?: string; cwd?: string; timeout?: number; allowErrors?: boolean }
+  | { type: "appCommand"; command?: string }
+  | { type: "ai"; prompt?: string; system?: string; json?: boolean }
+  | { type: "writeNote"; path?: string; content?: string; append?: boolean }
+  | { type: "template"; template?: string }
+  | { type: "condition"; field?: string; operator?: ConditionOperator; value?: string };
+
+/** Color of groups that don't set one. */
+export const DEFAULT_GROUP_COLOR = "#6366f1";
+
+export const STEP_CONFIG_TYPES: StepConfig["type"][] = [
+  "manual",
+  "http",
+  "command",
+  "appCommand",
+  "ai",
+  "writeNote",
+  "template",
+  "condition",
+];
+
+/** A collapsible group of steps (subflow). Collapsed groups show as one block. */
+export interface FlowGroup {
+  id: string;
+  label: string;
+  color?: string;
+  collapsed?: boolean;
 }
 
 export interface FlowEdge {
@@ -43,6 +102,7 @@ export interface FlowDocument {
   name?: string;
   nodes: FlowNode[];
   edges: FlowEdge[];
+  groups?: FlowGroup[];
   /** Excalidraw file this flow was converted from, for re-syncing. */
   source?: string;
   settings?: { speed?: number };
@@ -96,6 +156,18 @@ export function emptyFlow(name?: string): FlowDocument {
   return { type: "qori-flow3d", version: 1, name, nodes: [], edges: [] };
 }
 
+function parseConfig(value: unknown): StepConfig | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+  if (!STEP_CONFIG_TYPES.includes(raw.type as StepConfig["type"])) return undefined;
+  const clean: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(raw)) {
+    if (typeof item === "string" || typeof item === "boolean") clean[key] = item;
+    else if (typeof item === "number" && Number.isFinite(item)) clean[key] = item;
+  }
+  return clean as StepConfig;
+}
+
 const isVec3 = (value: unknown): value is Vec3 =>
   Array.isArray(value) &&
   value.length === 3 &&
@@ -140,8 +212,25 @@ export function parseFlow(text: string): FlowDocument {
       duration: typeof node.duration === "number" ? node.duration : undefined,
       link: typeof node.link === "string" && node.link ? node.link : undefined,
       branch: typeof node.branch === "string" ? node.branch : undefined,
+      config: parseConfig(node.config),
+      group: typeof node.group === "string" && node.group ? node.group : undefined,
     });
   }
+  const groups: FlowGroup[] = [];
+  for (const item of Array.isArray(data.groups) ? data.groups : []) {
+    if (!item || typeof item !== "object") continue;
+    const group = item as Record<string, unknown>;
+    if (typeof group.id !== "string" || !group.id || groups.some((g) => g.id === group.id))
+      continue;
+    groups.push({
+      id: group.id,
+      label: typeof group.label === "string" ? group.label : "Grupo",
+      color: typeof group.color === "string" ? group.color : undefined,
+      collapsed: group.collapsed === true ? true : undefined,
+    });
+  }
+  const groupIds = new Set(groups.map((g) => g.id));
+  for (const node of nodes) if (node.group && !groupIds.has(node.group)) node.group = undefined;
   const edges: FlowEdge[] = [];
   const edgeIds = new Set<string>();
   for (const item of Array.isArray(data.edges) ? data.edges : []) {
@@ -169,6 +258,7 @@ export function parseFlow(text: string): FlowDocument {
     name: typeof data.name === "string" ? data.name : undefined,
     nodes,
     edges,
+    groups: groups.length > 0 ? groups : undefined,
     source: typeof data.source === "string" ? data.source : undefined,
     settings,
   };
@@ -222,4 +312,25 @@ export function sampleFlow(name = "Nuevo flujo"): FlowDocument {
       { id: "e5", from: "format", to: "notify" },
     ],
   };
+}
+
+const slug = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+/**
+ * The step a link points to (`pedidos.flow3d#validar`): by id, or by name
+ * ignoring case, accents and punctuation.
+ */
+export function findStep(doc: FlowDocument, anchor: string): FlowNode | undefined {
+  const wanted = anchor.trim();
+  if (!wanted) return undefined;
+  return (
+    doc.nodes.find((n) => n.id === wanted) ??
+    doc.nodes.find((n) => slug(n.label) === slug(wanted) && slug(wanted) !== "")
+  );
 }

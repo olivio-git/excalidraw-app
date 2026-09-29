@@ -4,6 +4,9 @@ import type { FlowEditorStore } from "./editor-store";
 export interface Flow3DEditorHandle {
   store: FlowEditorStore;
   save: () => Promise<boolean>;
+  /** Run the flow for real (with the side-effect confirmation). */
+  execute?: () => void;
+  exportExcalidraw?: () => void;
 }
 
 const editors = new Map<string, Flow3DEditorHandle>();

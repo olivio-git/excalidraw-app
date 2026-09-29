@@ -47,7 +47,14 @@ export default function Shell() {
 
   return (
     <SidebarProvider className="qori-workbench h-full w-full flex flex-col overflow-hidden relative min-h-0">
-      <Toaster position="bottom-right" theme={resolvedTheme} richColors />
+      <Toaster
+        position="bottom-right"
+        theme={resolvedTheme}
+        gap={8}
+        offset={12}
+        visibleToasts={4}
+        expand
+      />
       <ConfirmDialog />
       <PromptDialog />
       <ToolPermissionDialog />

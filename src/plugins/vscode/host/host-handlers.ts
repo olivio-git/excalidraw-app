@@ -1,4 +1,8 @@
-import { toast } from "sonner";
+import {
+  dismissNotification,
+  showNotification,
+  type NotificationAction,
+} from "@/shared/components/notification";
 import { contextKeyService } from "@/core/keybindings/context-key-service";
 import { panelViews } from "@/core/panel/panel-store";
 import { useTabStore } from "@/core/tabs/store/tab-store";
@@ -96,7 +100,7 @@ async function executeWorkbenchCommand(id: string, args: unknown[]): Promise<unk
 
 const progressToasts = new Map<
   string,
-  { toastId: string | number; title?: string; location: string }
+  { toastId: string | number; title?: string; location: string; actions?: NotificationAction[] }
 >();
 
 /** Register every host → app handler. Returns the unsubscribe functions. */
@@ -117,7 +121,19 @@ export function registerHostHandlers(
     on("extension.activated", ({ id }) => hostStore().markActivated(id)),
     on("extension.activationFailed", ({ id, message }) => {
       hostStore().markFailed(id, message);
-      toast.error(`No se pudo activar ${id}`, { description: message });
+      showNotification({
+        level: "error",
+        message: `No se pudo activar ${id}`,
+        detail: message,
+        source: "Extension Host",
+        actions: [
+          {
+            label: "Ver registro",
+            onClick: () =>
+              void PluginManager.executeCommand("workbench.action.showExtensionHostLog"),
+          },
+        ],
+      });
     }),
     on("context.set", ({ key, value }) => contextKeyService.set(key, value)),
 
@@ -180,12 +196,15 @@ export function registerHostHandlers(
         progressToasts.set(id, { toastId: id, title, location });
         return;
       }
-      const toastId = toast.loading(title ?? "Trabajando…", {
-        action: cancellable
-          ? { label: "Cancelar", onClick: () => connection.notify("progress.cancel", { id }) }
-          : undefined,
+      const actions = cancellable
+        ? [{ label: "Cancelar", onClick: () => connection.notify("progress.cancel", { id }) }]
+        : [];
+      const toastId = showNotification({
+        level: "progress",
+        message: title ?? "Trabajando…",
+        actions,
       });
-      progressToasts.set(id, { toastId, title, location });
+      progressToasts.set(id, { toastId, title, location, actions });
     }),
     on("progress.report", ({ id, message }) => {
       const entry = progressToasts.get(id);
@@ -193,14 +212,21 @@ export function registerHostHandlers(
       const text = entry.title ? `${entry.title}: ${message}` : message;
       if (entry.location === "window")
         useStatusBarStore.getState().setMessage(id, `$(sync~spin) ${text}`);
-      else toast.loading(text, { id: entry.toastId });
+      else
+        showNotification({
+          id: entry.toastId,
+          level: "progress",
+          message: entry.title ?? text,
+          detail: entry.title ? message : undefined,
+          actions: entry.actions,
+        });
     }),
     on("progress.end", ({ id }) => {
       const entry = progressToasts.get(id);
       progressToasts.delete(id);
       if (!entry) return;
       if (entry.location === "window") useStatusBarStore.getState().setMessage(id, null);
-      else toast.dismiss(entry.toastId);
+      else dismissNotification(entry.toastId);
     }),
 
     // ── Environment ──────────────────────────────────────────────────────
@@ -309,7 +335,7 @@ export function resetHostUi(): void {
   useDiagnosticsStore.getState().reset();
   useOutputStore.getState().reset();
   for (const [id, entry] of progressToasts) {
-    if (entry.location !== "window") toast.dismiss(entry.toastId);
+    if (entry.location !== "window") dismissNotification(entry.toastId);
     progressToasts.delete(id);
   }
 }

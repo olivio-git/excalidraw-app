@@ -1,11 +1,37 @@
 import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
-import { FileImage, Palette, PlugZap, RotateCcw, Trash2, Upload } from "lucide-react";
+import type React from "react";
+import {
+  ChevronDown,
+  FileImage,
+  Palette,
+  PlugZap,
+  RotateCcw,
+  TerminalSquare,
+  Trash2,
+  Upload,
+} from "lucide-react";
 
-import { Badge } from "@/shared/components/ui/badge";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
+import { Switch } from "@/shared/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/shared/components/ui/dropdown-menu";
+import { TooltipWrapper } from "@/shared/common/TooltipWrapper";
 import { PluginManager } from "@/plugins/plugin-manager";
 import { usePluginsState } from "@/plugins/hooks/usePluginsState";
 import { setActiveIconTheme, useIconThemeState } from "@/plugins/vscode/icon-theme-service";
@@ -18,34 +44,126 @@ import { extensionHost } from "@/plugins/vscode/host/extension-host-service";
 import { notify } from "@/shared/lib/notify";
 import { ExtensionStore } from "./ExtensionStore";
 
-function ExtensionContributionBadges({ extension }: { extension: InstalledExtension }) {
+const NO_THEME = "__none__";
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="mb-1.5 px-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+      {children}
+    </h2>
+  );
+}
+
+/** One muted line: host state and what the extension contributes. */
+function ExtensionSummary({ extension }: { extension: InstalledExtension }) {
   const parts = summarizeContributions(extension);
   const active = useExtensionHostStore((s) => s.activated.includes(extension.id));
   const failure = useExtensionHostStore((s) => s.failed[extension.id]);
-  if (parts.length === 0) return null;
+  const state = extension.main && (failure ? "error al activar" : active ? "activa" : null);
   return (
-    <div className="mt-1 flex flex-wrap gap-1" aria-label="Aportes de la extensión">
-      {extension.main && (active || failure) && (
+    <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" title={failure}>
+      {state && (
         <span
-          title={failure}
-          className={
-            failure
-              ? "rounded border border-destructive/40 bg-destructive/10 px-1.5 py-px text-[10px] text-destructive"
-              : "rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-px text-[10px] text-emerald-600 dark:text-emerald-400"
-          }
-        >
-          {failure ? "error al activar" : "activa"}
-        </span>
+          aria-hidden
+          className={cn(
+            "size-1.5 shrink-0 rounded-full",
+            failure ? "bg-destructive" : "bg-emerald-500"
+          )}
+        />
       )}
-      {parts.map((part) => (
-        <span
-          key={part}
-          className="rounded border border-border/60 bg-muted/50 px-1.5 py-px text-[10px] text-muted-foreground"
-        >
-          {part}
+      <span className="truncate">
+        {[state, ...parts].filter(Boolean).join(" · ") || extension.id}
+      </span>
+    </p>
+  );
+}
+
+interface ThemeOption {
+  key: string;
+  label: string;
+}
+
+/** Pick one of the extension's themes, or none (use the app's). */
+function ThemeSelect({
+  label,
+  icon: Icon,
+  themes,
+  activeKey,
+  onChange,
+}: {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  themes: ThemeOption[];
+  activeKey: string | null;
+  onChange: (key: string | null, label?: string) => void;
+}) {
+  const ownsActive = themes.some((theme) => theme.key === activeKey);
+  const items = [
+    { value: NO_THEME, label: "Sin usar" },
+    ...themes.map((theme) => ({ value: theme.key, label: theme.label })),
+  ];
+  return (
+    <Select
+      items={items}
+      value={ownsActive ? activeKey : NO_THEME}
+      onValueChange={(value) => {
+        if (value === NO_THEME) {
+          if (ownsActive) onChange(null);
+          return;
+        }
+        onChange(value as string, themes.find((theme) => theme.key === value)?.label);
+      }}
+    >
+      <SelectTrigger size="sm" aria-label={label} className="w-44 text-xs" title={label}>
+        <Icon className="size-3.5 text-muted-foreground" />
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent alignItemWithTrigger={false} align="end">
+        {items.map((item) => (
+          <SelectItem key={item.value} value={item.value} className="text-xs">
+            {item.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/** The plugin's commands in one menu; picking one runs it. */
+function CommandSelect({
+  commands,
+  disabled,
+}: {
+  commands: Array<{ id: string; name: string }>;
+  disabled?: boolean;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        disabled={disabled}
+        render={<Button variant="outline" size="sm" className="w-32 justify-between text-xs" />}
+      >
+        <span className="flex items-center gap-1.5">
+          <TerminalSquare className="size-3.5 text-muted-foreground" />
+          {commands.length} {commands.length === 1 ? "comando" : "comandos"}
         </span>
-      ))}
-    </div>
+        <ChevronDown className="size-3.5 text-muted-foreground" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="max-h-72 w-64">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Ejecutar comando</DropdownMenuLabel>
+          {commands.map((command) => (
+            <DropdownMenuItem
+              key={command.id}
+              className="text-xs"
+              onClick={() => void PluginManager.executeCommand(command.id)}
+            >
+              <span className="truncate">{command.name}</span>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -56,13 +174,24 @@ function ExtensionHostButton() {
   return (
     <Button
       size="sm"
-      variant="outline"
-      title={error ?? undefined}
+      variant="ghost"
+      title={error ?? "Reiniciar el Extension Host"}
       disabled={status === "starting"}
+      className="text-xs text-muted-foreground"
       onClick={() => void extensionHost.restart()}
     >
-      <RotateCcw className="mr-1 size-3.5" />
-      {status === "starting" ? "Iniciando…" : "Reiniciar Extension Host"}
+      <span
+        aria-hidden
+        className={cn(
+          "size-1.5 rounded-full",
+          status === "running"
+            ? "bg-emerald-500"
+            : status === "error"
+              ? "bg-destructive"
+              : "bg-amber-500"
+        )}
+      />
+      {status === "starting" ? "Iniciando host…" : "Extension Host"}
     </Button>
   );
 }
@@ -149,228 +278,144 @@ export default function PluginAdminPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-6 max-w-6xl mx-auto space-y-8">
-        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground">
-              <PlugZap className="size-3.5 text-primary" />
-              <span>Plugin Management</span>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Plugin Administration</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Inspect, activate and deactivate internal and external plugins.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">
-              Installed: <span className="ml-1 font-semibold">{plugins.length}</span>
-            </Badge>
-            <Badge variant="secondary">
-              Active: <span className="ml-1 font-semibold">{activeCount}</span>
-            </Badge>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void handleInstallVsix()}
-              disabled={isInstalling}
-              className="gap-2"
-            >
-              <Upload className="size-4" />
-              Instalar VSIX
-            </Button>
+      <div className="mx-auto max-w-5xl space-y-5 px-5 py-4">
+        <header className="flex items-center gap-2">
+          <PlugZap className="size-4 text-muted-foreground" />
+          <h1 className="text-sm font-semibold">Plugins</h1>
+          <span className="text-xs text-muted-foreground">
+            {activeCount}/{plugins.length} activos
+            {iconThemeState.extensions.length > 0 &&
+              ` · ${iconThemeState.extensions.length} extensiones`}
+          </span>
+          <div className="flex-1" />
+          <ExtensionHostButton />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void handleInstallVsix()}
+            disabled={isInstalling}
+          >
+            <Upload />
+            Instalar VSIX
+          </Button>
+          <TooltipWrapper tooltip="Recargar plugins" side="bottom">
             <Button
               variant="ghost"
-              size="icon"
+              size="icon-sm"
               onClick={handleRefresh}
-              title="Refresh plugins"
+              aria-label="Recargar plugins"
               disabled={isRefreshing}
             >
-              <RotateCcw className="size-4" />
+              <RotateCcw className={cn(isRefreshing && "animate-spin")} />
             </Button>
-          </div>
+          </TooltipWrapper>
         </header>
 
         {iconThemeState.extensions.length > 0 && (
-          <section className="rounded-xl border border-border bg-card/70 p-4 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold">Extensiones VS Code instaladas</h2>
-              <div className="flex gap-2">
-                <ExtensionHostButton />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!colorThemeState.activeKey}
-                  onClick={() => void handleActivateColorTheme(null)}
-                >
-                  Desactivar tema de color
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!iconThemeState.activeKey}
-                  onClick={() => void handleActivateIconTheme(null)}
-                >
-                  Desactivar tema de iconos
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              {iconThemeState.extensions.map((extension) => (
-                <div
-                  key={extension.id}
-                  className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 px-3 py-2"
-                >
-                  <div className="mr-auto min-w-0">
-                    <p className="text-sm font-medium leading-tight">
-                      {extension.displayName}
-                      <span className="ml-2 text-[10px] text-muted-foreground">
-                        v{extension.version}
-                      </span>
-                    </p>
-                    <p className="text-[11px] text-muted-foreground truncate">{extension.id}</p>
-                    <ExtensionContributionBadges extension={extension} />
-                  </div>
-                  {colorThemeState.themes
-                    .filter((theme) => theme.extension.id === extension.id)
-                    .map((theme) => {
-                      const isActive = colorThemeState.activeKey === theme.key;
-                      return (
-                        <Button
-                          key={theme.key}
-                          size="sm"
-                          variant={isActive ? "outline" : "ghost"}
-                          disabled={isActive}
-                          title="Tema de color"
-                          className="gap-1.5"
-                          onClick={() => void handleActivateColorTheme(theme.key, theme.label)}
-                        >
-                          <Palette className="size-3.5" />
-                          {theme.label}
-                          {isActive ? " · Activo" : ""}
-                        </Button>
-                      );
-                    })}
-                  {iconThemeState.themes
-                    .filter((theme) => theme.extension.id === extension.id)
-                    .map((theme) => {
-                      const isActive = iconThemeState.activeKey === theme.key;
-                      return (
-                        <Button
-                          key={theme.key}
-                          size="sm"
-                          variant={isActive ? "outline" : "ghost"}
-                          disabled={isActive}
-                          title="Tema de iconos"
-                          className="gap-1.5"
-                          onClick={() => void handleActivateIconTheme(theme.key, theme.label)}
-                        >
-                          <FileImage className="size-3.5" />
-                          {theme.label}
-                          {isActive ? " · Activo" : ""}
-                        </Button>
-                      );
-                    })}
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    title="Desinstalar"
-                    onClick={() =>
-                      void handleUninstallExtension(extension.id, extension.displayName)
-                    }
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
+          <section aria-label="Extensiones VS Code instaladas">
+            <SectionTitle>Extensiones VS Code</SectionTitle>
+            <ul className="divide-y divide-border rounded-lg border border-border">
+              {iconThemeState.extensions.map((extension) => {
+                const colorThemes = colorThemeState.themes.filter(
+                  (theme) => theme.extension.id === extension.id
+                );
+                const iconThemes = iconThemeState.themes.filter(
+                  (theme) => theme.extension.id === extension.id
+                );
+                return (
+                  <li key={extension.id} className="flex items-center gap-3 px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="flex items-baseline gap-1.5 truncate text-sm font-medium">
+                        {extension.displayName}
+                        <span className="text-[11px] font-normal text-muted-foreground">
+                          v{extension.version}
+                        </span>
+                      </p>
+                      <ExtensionSummary extension={extension} />
+                    </div>
+                    {colorThemes.length > 0 && (
+                      <ThemeSelect
+                        label="Tema de color"
+                        icon={Palette}
+                        themes={colorThemes}
+                        activeKey={colorThemeState.activeKey}
+                        onChange={(key, label) => void handleActivateColorTheme(key, label)}
+                      />
+                    )}
+                    {iconThemes.length > 0 && (
+                      <ThemeSelect
+                        label="Tema de iconos"
+                        icon={FileImage}
+                        themes={iconThemes}
+                        activeKey={iconThemeState.activeKey}
+                        onChange={(key, label) => void handleActivateIconTheme(key, label)}
+                      />
+                    )}
+                    <TooltipWrapper tooltip="Desinstalar" side="left">
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={`Desinstalar ${extension.displayName}`}
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() =>
+                          void handleUninstallExtension(extension.id, extension.displayName)
+                        }
+                      >
+                        <Trash2 />
+                      </Button>
+                    </TooltipWrapper>
+                  </li>
+                );
+              })}
+            </ul>
           </section>
         )}
 
         <ExtensionStore />
 
-        {plugins.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-muted/40 px-6 py-10 text-center text-sm text-muted-foreground">
-            <p className="font-medium mb-1">No plugins registered yet.</p>
-            <p className="text-xs">
-              Internal and external plugins will appear here once they are loaded by the
-              application.
+        <section aria-label="Plugins internos">
+          <SectionTitle>Plugins internos</SectionTitle>
+          {plugins.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-xs text-muted-foreground">
+              Todavía no hay plugins registrados.
             </p>
-          </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {plugins.map(({ manifest, isActive }) => (
-              <article
-                key={manifest.id}
-                className="relative flex flex-col gap-3 rounded-xl border border-border bg-card/70 p-4 shadow-sm backdrop-blur-sm transition-shadow hover:shadow-md"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-sm font-semibold leading-tight">{manifest.name}</h2>
-                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          ) : (
+            <ul className="divide-y divide-border rounded-lg border border-border">
+              {plugins.map(({ manifest, isActive }) => (
+                <li
+                  key={manifest.id}
+                  className={cn("flex items-center gap-3 px-3 py-2", !isActive && "opacity-60")}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-baseline gap-1.5 truncate text-sm font-medium">
+                      {manifest.name}
+                      <span className="text-[11px] font-normal text-muted-foreground">
                         v{manifest.version}
                       </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground line-clamp-3">
-                      {manifest.description || "No description provided."}
+                    </p>
+                    <p
+                      className="truncate text-xs text-muted-foreground"
+                      title={[manifest.description, manifest.author && `por ${manifest.author}`]
+                        .filter(Boolean)
+                        .join(" — ")}
+                    >
+                      {manifest.description || manifest.id}
                     </p>
                   </div>
-                  <Badge variant="outline" className="shrink-0 gap-1.5 text-[11px] font-normal">
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "size-1.5 rounded-full",
-                        isActive ? "bg-emerald-500" : "bg-muted-foreground/40"
-                      )}
-                    />
-                    {isActive ? "Active" : "Inactive"}
-                  </Badge>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                  <Badge variant="outline" className="text-[10px]">
-                    ID: {manifest.id}
-                  </Badge>
-                  {manifest.author && (
-                    <Badge variant="outline" className="text-[10px]">
-                      Author: {manifest.author}
-                    </Badge>
+                  {manifest.commands && manifest.commands.length > 0 && (
+                    <CommandSelect commands={manifest.commands} disabled={!isActive} />
                   )}
-                  {manifest.dependencies && manifest.dependencies.length > 0 && (
-                    <span className="truncate">Depends on: {manifest.dependencies.join(", ")}</span>
-                  )}
-                </div>
-
-                {manifest.commands && manifest.commands.length > 0 && (
-                  <div className="mt-1 space-y-1">
-                    <p className="text-[11px] font-medium text-muted-foreground">Commands</p>
-                    <div className="flex flex-wrap gap-1">
-                      {manifest.commands.map((cmd) => (
-                        <Badge key={cmd.id} variant="outline" className="text-[10px] px-1.5 py-0.5">
-                          {cmd.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="mt-2 flex justify-end">
-                  <Button
-                    size="sm"
-                    variant={isActive ? "outline" : "default"}
-                    onClick={() => handleTogglePlugin(manifest.id, !isActive)}
+                  <Switch
+                    aria-label={`${isActive ? "Desactivar" : "Activar"} ${manifest.name}`}
+                    checked={isActive}
                     disabled={isToggling === manifest.id}
-                    className="gap-1.5"
-                  >
-                    {isActive ? "Deactivate" : "Activate"}
-                  </Button>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
+                    onCheckedChange={(checked) => void handleTogglePlugin(manifest.id, checked)}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
     </div>
   );

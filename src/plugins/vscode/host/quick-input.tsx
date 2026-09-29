@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
 import { create } from "zustand";
-import { AlertTriangle, Info, XCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +11,7 @@ import {
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { cn } from "@/shared/lib/utils";
+import { showNotification } from "@/shared/components/notification";
 import { LabelWithIcons } from "./codicons";
 
 /**
@@ -66,6 +65,8 @@ interface MessageRequest {
   level: "info" | "warning" | "error";
   message: string;
   detail?: string;
+  /** Who raised it, shown like VS Code's "Source:" line. */
+  source?: string;
   items: string[];
   resolve: (index: number | undefined) => void;
 }
@@ -123,57 +124,18 @@ export function showMessageToast(
       settled = true;
       resolve(value);
     };
-    const Icon =
-      request.level === "error" ? XCircle : request.level === "warning" ? AlertTriangle : Info;
-    const iconColor =
-      request.level === "error"
-        ? "text-destructive"
-        : request.level === "warning"
-          ? "text-amber-500"
-          : "text-primary";
-    toast.custom(
-      (id) => (
-        <div
-          role={request.level === "error" ? "alert" : "status"}
-          className="w-[356px] rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-lg"
-        >
-          <div className="flex gap-2">
-            <Icon className={cn("mt-0.5 size-4 shrink-0", iconColor)} />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm break-words">
-                <LabelWithIcons text={request.message} />
-              </p>
-              {request.detail && (
-                <p className="mt-1 text-xs text-muted-foreground">{request.detail}</p>
-              )}
-              {request.items.length > 0 && (
-                <div className="mt-2 flex flex-wrap justify-end gap-1.5">
-                  {request.items.map((item, index) => (
-                    <Button
-                      key={index}
-                      size="sm"
-                      variant={index === 0 ? "default" : "secondary"}
-                      className="h-7 px-2 text-xs"
-                      onClick={() => {
-                        settle(index);
-                        toast.dismiss(id);
-                      }}
-                    >
-                      {item}
-                    </Button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      ),
-      {
-        duration: request.items.length > 0 ? 20000 : 6000,
-        onDismiss: () => settle(undefined),
-        onAutoClose: () => settle(undefined),
-      }
-    );
+    showNotification({
+      level: request.level,
+      message: <LabelWithIcons text={request.message} />,
+      detail: request.detail,
+      source: request.source,
+      actions: request.items.map((item, index) => ({
+        label: item,
+        primary: index === 0,
+        onClick: () => settle(index),
+      })),
+      onClose: () => settle(undefined),
+    });
   });
 }
 

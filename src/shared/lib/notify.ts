@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { showNotification } from "@/shared/components/notification";
 
 export type NotifyType = "success" | "error" | "warning" | "info";
 
@@ -8,22 +8,8 @@ export interface NotifyOptions {
   duration?: number;
 }
 
+/** App notification (VS Code style, see shared/components/notification). */
 export function notify(message: string, options: NotifyOptions = {}): void {
   const { type = "info", description, duration } = options;
-  const config = { description, duration };
-
-  switch (type) {
-    case "success":
-      toast.success(message, config);
-      break;
-    case "error":
-      toast.error(message, config);
-      break;
-    case "warning":
-      toast.warning(message, config);
-      break;
-    default:
-      toast.info(message, config);
-      break;
-  }
+  showNotification({ level: type, message, detail: description, duration });
 }

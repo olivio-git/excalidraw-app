@@ -59,7 +59,8 @@ vi.mock("./pty", () => ({
 }));
 
 import * as pty from "./pty";
-import { usePanelStore } from "@/core/panel/panel-store";
+import { defaultLayout, isViewVisible, useLayoutStore } from "@/core/layout/layout-store";
+import { panelRegistry } from "@/core/panel/panel-registry";
 import {
   TERMINAL_VIEW_ID,
   __resetTerminalsForTests,
@@ -73,13 +74,20 @@ import {
 } from "./terminal-service";
 
 let unmountPanel: (() => void) | null = null;
+let unregisterView: (() => void) | null = null;
 
 beforeEach(() => {
   vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
     cb(0);
     return 0;
   });
-  usePanelStore.setState({ open: false, activeViewId: null });
+  useLayoutStore.setState(defaultLayout());
+  unregisterView = panelRegistry.register({
+    id: TERMINAL_VIEW_ID,
+    title: "Terminal",
+    order: 10,
+    component: () => null,
+  });
   // Stand-in for the terminal panel: attach the active session like the view does.
   const container = document.createElement("div");
   document.body.appendChild(container);
@@ -90,6 +98,7 @@ beforeEach(() => {
 
 afterEach(() => {
   unmountPanel?.();
+  unregisterView?.();
   __resetTerminalsForTests();
   xtermInstances.length = 0;
   ptyHandlers.length = 0;
@@ -109,7 +118,10 @@ describe("terminal-service", () => {
       { id: session.id, title: "bash", kind: "shell", exited: false },
     ]);
     expect(useTerminalStore.getState().activeId).toBe(session.id);
-    expect(usePanelStore.getState()).toMatchObject({ open: true, activeViewId: TERMINAL_VIEW_ID });
+    expect(useLayoutStore.getState().parts.panel).toMatchObject({
+      open: true,
+      active: TERMINAL_VIEW_ID,
+    });
   });
 
   it("streams PTY output to xterm and keystrokes to the PTY", async () => {
@@ -171,10 +183,24 @@ describe("terminal-service", () => {
   it("toggle creates a terminal the first time and hides the panel the next", async () => {
     await toggleTerminal();
     expect(useTerminalStore.getState().terminals).toHaveLength(1);
-    expect(usePanelStore.getState().open).toBe(true);
+    expect(isViewVisible(TERMINAL_VIEW_ID)).toBe(true);
 
     await toggleTerminal();
-    expect(usePanelStore.getState().open).toBe(false);
+    expect(useLayoutStore.getState().parts.panel.open).toBe(false);
     expect(useTerminalStore.getState().terminals).toHaveLength(1);
+  });
+
+  it("shows and hides the terminal wherever the user moved it", async () => {
+    useLayoutStore.getState().moveView(TERMINAL_VIEW_ID, "secondary");
+    useLayoutStore.getState().setPartOpen("secondary", false);
+    await toggleTerminal();
+    expect(useLayoutStore.getState().parts.secondary).toMatchObject({
+      open: true,
+      active: TERMINAL_VIEW_ID,
+    });
+    expect(useLayoutStore.getState().parts.panel.open).toBe(false);
+
+    await toggleTerminal();
+    expect(useLayoutStore.getState().parts.secondary.open).toBe(false);
   });
 });

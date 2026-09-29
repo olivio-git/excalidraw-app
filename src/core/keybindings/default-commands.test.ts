@@ -91,7 +91,8 @@ describe("workbench command lifecycle", () => {
     const sidebar = document.createElement("div");
     sidebar.dataset.panel = "sidebar";
     const hiddenExplorer = document.createElement("div");
-    hiddenExplorer.dataset.explorerVisible = "false";
+    hiddenExplorer.dataset.view = "explorer";
+    hiddenExplorer.dataset.viewVisible = "false";
     const hiddenInput = document.createElement("input");
     hiddenInput.dataset.panelSearch = "";
     hiddenExplorer.append(hiddenInput);

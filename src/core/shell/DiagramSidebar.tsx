@@ -1,20 +1,6 @@
 import { useRef, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  Files,
-  Blocks,
-  Compass,
-  ChevronRight,
-  Settings,
-  PlugZap,
-  Palette,
-  Sun,
-  Moon,
-  Monitor,
-  Bot,
-  BookOpen,
-  Link2,
-} from "lucide-react";
+import { ChevronRight, Settings, PlugZap, Palette, Sun, Moon, Monitor } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { TooltipWrapper } from "@/shared/common/TooltipWrapper";
@@ -39,45 +25,24 @@ import {
   useSidebar,
 } from "@/shared/components/ui/sidebar";
 import { PluginManager } from "@/plugins/plugin-manager";
-import { ExplorerPanel } from "./panels/ExplorerPanel";
-import { PluginsPanel } from "./panels/PluginsPanel";
-import { NavigationPanel } from "./panels/NavigationPanel";
-import { AIChatPanel } from "@/features/ai-chat/AIChatPanel";
-import { LibraryBrowserPanel } from "@/features/library-browser/LibraryBrowserPanel";
-import { ReferencesPanel } from "./panels/ReferencesPanel";
-import { useSidebarPanelStore, extensionPanelId } from "./sidebar-panel-store";
-import { useViewModel } from "@/plugins/vscode/host/view-containers";
-import { ExtensionIcon } from "@/plugins/vscode/host/extension-assets";
-import { ExtensionViewContainer } from "@/plugins/vscode/host/ExtensionViewContainer";
+import { viewRegistry } from "@/core/layout/view-registry";
+import { useLayoutStore } from "@/core/layout/layout-store";
+import { ViewPart } from "@/core/layout/ViewPart";
+import { PLUGINS_VIEW } from "./builtin-views";
 
 const COMPACT_THRESHOLD = 100;
 
-type Panel = string;
-
-interface PanelTab {
-  id: Panel;
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
+/** Registers the Plugins view only while plugins contribute sidebar sections. */
+function usePluginsView(hasSections: boolean) {
+  useEffect(() => (hasSections ? viewRegistry.register(PLUGINS_VIEW) : undefined), [hasSections]);
 }
 
 const DiagramSidebar = () => {
   const { t } = useTranslation("common");
-  const activePanel = useSidebarPanelStore((s) => s.activePanel);
-  const setActivePanel = useSidebarPanelStore((s) => s.setActivePanel);
-  const { containers } = useViewModel();
-  const extensionContainers = containers.filter((c) => c.location === "sidebar");
   const prevWidthRef = useRef<number | null>(null);
+  const sidebarSide = useLayoutStore((s) => s.sidebarSide);
 
-  const PANEL_TABS: PanelTab[] = [
-    { id: "explorer", icon: Files, label: t("panels.explorer") },
-    { id: "references", icon: Link2, label: t("connected.references") },
-    { id: "plugins", icon: Blocks, label: t("panels.plugins") },
-    { id: "navigation", icon: Compass, label: t("panels.navigation") },
-    { id: "ai-chat", icon: Bot, label: t("panels.aiChat") },
-    { id: "library", icon: BookOpen, label: t("panels.library") },
-  ];
-
-  const { sidebarWidth, setSidebarWidth, toggleSidebar } = useSidebar();
+  const { sidebarWidth, setSidebarWidth, toggleSidebar, open, setOpen } = useSidebar();
 
   // Core commands are registered before plugins activate; React only handles the UI event.
   const toggleSidebarRef = useRef(toggleSidebar);
@@ -94,6 +59,25 @@ const DiagramSidebar = () => {
   }, []);
   const isCompact = sidebarWidth < COMPACT_THRESHOLD;
 
+  // The sidebar provider owns visibility; mirror it so views know whether they show.
+  useEffect(() => {
+    if (useLayoutStore.getState().parts.primary.open !== open) {
+      useLayoutStore.setState((state) => ({
+        parts: { ...state.parts, primary: { ...state.parts.primary, open } },
+      }));
+    }
+  }, [open]);
+
+  // Revealing a view here (command, drop, extension) opens and expands the side bar.
+  const reveal = useLayoutStore((s) => s.parts.primary.reveal);
+  const lastReveal = useRef(reveal);
+  useEffect(() => {
+    if (reveal === lastReveal.current) return;
+    lastReveal.current = reveal;
+    setOpen(true);
+    if (sidebarWidth < COMPACT_THRESHOLD) setSidebarWidth(prevWidthRef.current ?? 210);
+  }, [reveal, setOpen, sidebarWidth, setSidebarWidth]);
+
   // From the tab store (a boolean), not useLocation(): the URL changes on every
   // tab switch, which re-rendered the whole sidebar and file tree.
   const isOnSettings = useTabStore(
@@ -102,6 +86,7 @@ const DiagramSidebar = () => {
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.setTheme);
   const { pluginSections, pluginFooterActions } = usePluginSidebarResources();
+  usePluginsView(pluginSections.length > 0);
 
   const toggleCompact = useCallback(() => {
     if (isCompact) {
@@ -112,112 +97,47 @@ const DiagramSidebar = () => {
     }
   }, [isCompact, sidebarWidth, setSidebarWidth]);
 
-  const extensionTabs: PanelTab[] = extensionContainers.map((container) => ({
-    id: extensionPanelId(container.id),
-    label: container.title,
-    icon: ({ className }: { className?: string }) => (
-      <ExtensionIcon
-        icon={container.icon}
-        className={className}
-        fallback={<Blocks className={className} />}
-      />
-    ),
-  }));
-  const visibleTabs = [
-    ...PANEL_TABS.filter((t) => t.id !== "plugins" || pluginSections.length > 0),
-    ...extensionTabs,
-  ];
-  const activeExtensionContainer = extensionContainers.find(
-    (container) => extensionPanelId(container.id) === activePanel
-  );
-
-  const resolvedPanel = visibleTabs.some((t) => t.id === activePanel) ? activePanel : "explorer";
-
   return (
     <SidebarPrimitive
       collapsible="offcanvas"
-      className="h-full bg-background border-r border-border/50 outline-none focus-within:ring-1 focus-within:ring-inset focus-within:ring-muted-foreground/40"
+      side={sidebarSide}
+      className={cn(
+        "h-full bg-background border-border/50 outline-none focus-within:ring-1 focus-within:ring-inset focus-within:ring-muted-foreground/40",
+        sidebarSide === "left" ? "border-r" : "border-l"
+      )}
       data-panel="sidebar"
       tabIndex={-1}
     >
-      {/* Header: UN solo flex container, sin anidación de dirección */}
-      <div
-        className={cn(
-          "flex gap-0.5 p-1.5 border-b border-border/50 shrink-0",
-          isCompact ? "flex-col items-center" : "flex-row flex-wrap items-center"
-        )}
-      >
-        <TooltipWrapper
-          tooltip={isCompact ? t("sidebar.expand") : t("sidebar.collapse")}
-          side="right"
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleCompact}
-            className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
-          >
-            <ChevronRight
-              className={cn(
-                "size-3.5 transition-transform duration-200",
-                !isCompact && "rotate-180"
-              )}
-            />
-          </Button>
-        </TooltipWrapper>
-
-        {/* Separador visual entre toggle y tabs — solo en expanded */}
-        {!isCompact && <div className="w-px h-4 bg-border/60 shrink-0" />}
-
-        {visibleTabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = resolvedPanel === tab.id;
-          return (
-            <TooltipWrapper key={tab.id} tooltip={tab.label} side="right">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setActivePanel(tab.id)}
-                aria-label={tab.label}
-                className={cn(
-                  "size-7 shrink-0",
-                  isActive
-                    ? "bg-accent text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Icon className="size-4" />
-              </Button>
-            </TooltipWrapper>
-          );
-        })}
-      </div>
-
-      {/* Content: siempre en DOM con flex-1 para mantener el footer abajo.
-          El contenido interno se oculta en compact. */}
       <SidebarContent className="p-0">
-        {/* Keep the tree and quick-open portal alive when switching or compacting panels. */}
-        <div
-          data-explorer-visible={!isCompact && resolvedPanel === "explorer"}
-          className={cn("h-full min-h-0", (isCompact || resolvedPanel !== "explorer") && "hidden")}
-        >
-          <ExplorerPanel />
-        </div>
-        {!isCompact && (
-          <>
-            {resolvedPanel === "plugins" && <PluginsPanel />}
-            {resolvedPanel === "navigation" && <NavigationPanel />}
-            {resolvedPanel === "ai-chat" && <AIChatPanel />}
-            {resolvedPanel === "library" && <LibraryBrowserPanel />}
-            {resolvedPanel === "references" && <ReferencesPanel />}
-            {activeExtensionContainer && resolvedPanel === activePanel && (
-              <ExtensionViewContainer
-                key={activeExtensionContainer.id}
-                container={activeExtensionContainer}
-              />
-            )}
-          </>
-        )}
+        <ViewPart
+          location="primary"
+          variant="sidebar"
+          compact={isCompact}
+          headerStart={
+            <>
+              <TooltipWrapper
+                tooltip={isCompact ? t("sidebar.expand") : t("sidebar.collapse")}
+                side={sidebarSide === "left" ? "right" : "left"}
+              >
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleCompact}
+                  className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+                >
+                  <ChevronRight
+                    className={cn(
+                      "size-3.5 transition-transform duration-200",
+                      !isCompact === (sidebarSide === "left") && "rotate-180"
+                    )}
+                  />
+                </Button>
+              </TooltipWrapper>
+              {/* Separador visual entre toggle y tabs — solo en expanded */}
+              {!isCompact && <div className="w-px h-4 bg-border/60 shrink-0" />}
+            </>
+          }
+        />
       </SidebarContent>
 
       {/* Footer: siempre al fondo gracias al flex-1 del SidebarContent */}

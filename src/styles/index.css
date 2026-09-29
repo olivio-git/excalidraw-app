@@ -542,3 +542,15 @@ input[type="number"].no-spinners {
   color: hsl(var(--primary));
   text-decoration: underline;
 }
+
+/* Primary side bar on the right: its border faces the editor. */
+[data-side="right"] > [data-sidebar="sidebar"] {
+  border-right: 0;
+  border-left: 1px solid hsl(var(--sidebar-border) / 0.65);
+}
+
+/* Webviews swallow pointer events; let drags and resizes pass over them. */
+.qori-dragging-view iframe,
+.qori-resizing iframe {
+  pointer-events: none;
+}

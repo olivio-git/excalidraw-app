@@ -1,3 +1,4 @@
+import { SquareTerminal } from "lucide-react";
 import { lazy } from "react";
 import { PluginManager } from "@/plugins/plugin-manager";
 import { keybindingRegistry } from "@/core/keybindings/keybinding-registry";
@@ -5,7 +6,7 @@ import { keyNormalizer } from "@/core/keybindings/key-normalizer";
 import { commandsAllowedInTerminal } from "@/core/keybindings/keybinding-service";
 import { KeybindingSource } from "@/core/keybindings/types";
 import { panelRegistry } from "@/core/panel/panel-registry";
-import { usePanelStore } from "@/core/panel/panel-store";
+import { useLayoutStore } from "@/core/layout/layout-store";
 import { isPtyAvailable } from "./pty";
 import {
   TERMINAL_VIEW_ID,
@@ -58,9 +59,12 @@ const COMMANDS = [
     id: "workbench.action.togglePanel",
     name: "Ver: Mostrar/ocultar panel inferior",
     handler: () => {
-      const panel = usePanelStore.getState();
-      if (!panel.open && !panel.activeViewId) panel.showView(TERMINAL_VIEW_ID);
-      else panel.toggle();
+      const layout = useLayoutStore.getState();
+      if (!layout.parts.panel.open && !layout.parts.panel.active) {
+        layout.showView(TERMINAL_VIEW_ID);
+      } else {
+        layout.togglePart("panel");
+      }
     },
     key: "ctrl+j",
   },
@@ -78,6 +82,7 @@ export function initTerminal(): void {
   panelRegistry.register({
     id: TERMINAL_VIEW_ID,
     title: "Terminal",
+    icon: SquareTerminal,
     order: 10,
     component: TerminalPanel,
     actions: TerminalPanelActions,

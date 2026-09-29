@@ -1,9 +1,9 @@
 import { toast } from "sonner";
 import { contextKeyService } from "@/core/keybindings/context-key-service";
-import { usePanelStore } from "@/core/panel/panel-store";
+import { panelViews } from "@/core/panel/panel-store";
 import { useTabStore } from "@/core/tabs/store/tab-store";
 import { openFileInWorkbench } from "@/core/shell/services/file-navigation";
-import { useSidebarPanelStore, extensionPanelId } from "@/core/shell/sidebar-panel-store";
+import { extensionPanelId, revealView } from "@/core/shell/sidebar-panel-store";
 import { PluginManager } from "@/plugins/plugin-manager";
 import { codeEditorRegistry } from "@/features/code-editor/code-editor-registry";
 import type { HostConnection } from "./host-connection";
@@ -58,15 +58,13 @@ function closeWebviewTab(handle: string): void {
 /** Workbench commands requested by extensions (`commands.executeCommand`). */
 async function executeWorkbenchCommand(id: string, args: unknown[]): Promise<unknown> {
   if (id.startsWith("workbench.view.extension.")) {
-    useSidebarPanelStore
-      .getState()
-      .setActivePanel(extensionPanelId(id.slice("workbench.view.extension.".length)));
+    revealView(extensionPanelId(id.slice("workbench.view.extension.".length)));
     return undefined;
   }
   switch (id) {
     case "workbench.action.output.toggleOutput":
     case "workbench.panel.output.focus":
-      usePanelStore.getState().showView(OUTPUT_VIEW_ID);
+      panelViews.show(OUTPUT_VIEW_ID);
       return undefined;
     case "workbench.action.reloadWindow":
       window.location.reload();
@@ -133,7 +131,7 @@ export function registerHostHandlers(
     on("output.dispose", ({ id }) => output().remove(id)),
     on("output.show", ({ id }) => {
       output().setActive(id);
-      usePanelStore.getState().showView(OUTPUT_VIEW_ID);
+      panelViews.show(OUTPUT_VIEW_ID);
     }),
     on("output.hide", () => undefined),
 

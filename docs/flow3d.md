@@ -59,6 +59,44 @@ elige qué hace:
   (red, terminal, archivos, IA; un GET no cuenta). Se puede cancelar en cualquier
   momento.
 - Los pasos sin tipo solo se simulan (pasan los datos tal cual).
+- **Repetir y reintentar**: cualquier paso puede repetirse por cada elemento de una
+  lista (`body.items`, o `input`), con `{{item}}` e `{{index}}`; su salida es la lista
+  de resultados. También puede reintentarse N veces con una espera entre intentos.
+- **Secretos**: el botón de la llave guarda valores para `{{secrets.NOMBRE}}` en la
+  carpeta de datos de la app (no en el `.flow3d`). Se ocultan como `••••` en los datos
+  de cada ejecución y en el historial. No están cifrados. Si un paso escribe un
+  secreto en una nota, la nota sí lo contiene.
+- **Historial**: las últimas 20 ejecuciones de cada flujo (manuales y automáticas) se
+  guardan en los datos de la app. Desde el botón del reloj se puede ver y repetir una
+  ejecución pasada; en la pestaña Datos, «Comparar con otra ejecución» muestra la
+  salida de ese paso entonces y si cambió.
+- **IA**: «Crear o rehacer con IA» (varita) propone el flujo completo a partir de una
+  descripción; en un paso que falló, «Diagnosticar con IA» explica la causa probable y
+  qué cambiar. El chat tiene `flow3d_create`, `flow3d_read` (incluye la última
+  ejecución) y `flow3d_update`.
+
+## Automatización
+
+Un disparador puede ser **Horario** (cada N minutos, o todos los días a una hora) o
+**Cambio de archivo** (un archivo o carpeta relativo al flujo). Para que el flujo se
+ejecute solo hay que activar «Automatización» en la pestaña Ejecución del
+disparador: la app pide confirmación una vez, listando los pasos con efectos, porque
+desde ese momento se ejecutan sin preguntar.
+
+- Funciona mientras la app está abierta con esa carpeta de trabajo. Si el flujo está
+  abierto, se ve ejecutarse en su pestaña; si no, corre en segundo plano.
+- Un disparador de archivos ignora los cambios que hace el propio flujo durante su
+  ejecución y los 2 segundos siguientes (un flujo que escribe en la carpeta que vigila
+  no entra en bucle). No se lanza dos veces a la vez.
+- Comandos: «Flow 3D: Ver automatizaciones activas» y «Pausar / reanudar
+  automatizaciones». Si un flujo automático falla, aparece un aviso.
+
+## Aspecto
+
+El botón de destellos activa los **efectos**: luz de estudio (reflejos suaves, sin
+descargar mapas HDR), una sombra difusa bajo cada tarjeta que se atenúa con la altura
+y brillo (bloom) en los paquetes y en los pasos que se ejecutan. La elección se
+recuerda. Los flujos incrustados en notas van sin efectos para ser ligeros.
 
 ## Integración
 

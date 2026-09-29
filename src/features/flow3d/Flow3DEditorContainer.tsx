@@ -9,6 +9,7 @@ import { createFileReference, openFileReference } from "@/core/shell/services/fi
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { notify } from "@/shared/lib/notify";
 import { confirm } from "@/shared/lib/confirm";
+import { prompt } from "@/shared/lib/prompt";
 import { findStep, parseFlow, serializeFlow, type FlowNode } from "./model";
 import { createFlowEditorStore, type FlowEditorStore } from "./editor-store";
 import { Flow3DEditor } from "./Flow3DEditor";
@@ -25,6 +26,7 @@ import { createRuntimeServices } from "./runtime-services";
 import { recordPlayback, snapshotPng } from "./media-export";
 import { flowSecrets, runHistory } from "./app-stores";
 import { flowSignature, toHistoryEntry } from "./run-history";
+import { diagnoseStep, generateFlow } from "./ai-flow";
 
 const AUTOSAVE_MS = 700;
 
@@ -283,6 +285,63 @@ export default function Flow3DEditorContainer() {
     }
   }, [filePath]);
 
+  const onGenerate = useCallback(async () => {
+    const store = storeRef.current;
+    if (!store) return;
+    const answer = await prompt({
+      title: "Crear el flujo con IA",
+      description:
+        "Describe qué debe hacer. La IA propone los pasos con su configuración; luego puedes editarlos.",
+      fields: [
+        {
+          id: "description",
+          label: "Descripción",
+          placeholder: "Cada mañana revisa mis commits y guarda un resumen en una nota",
+          required: true,
+        },
+      ],
+      confirmLabel: "Crear",
+      cancelLabel: "Cancelar",
+    });
+    const description = answer?.description?.trim();
+    if (!description) return;
+    notify("La IA está diseñando el flujo…", { type: "info" });
+    try {
+      const current = store.getState().doc;
+      const doc = await generateFlow(description, createRuntimeServices(filePath).ai, current.name);
+      if (
+        current.nodes.length > 0 &&
+        !(await confirm({
+          title: "Reemplazar el flujo",
+          description: `La IA propone ${doc.nodes.length} pasos. El flujo actual se sustituye (Ctrl+Z lo recupera).`,
+          confirmLabel: "Reemplazar",
+          cancelLabel: "Cancelar",
+        }))
+      )
+        return;
+      store
+        .getState()
+        .setDoc(
+          { ...doc, name: current.name ?? doc.name, settings: current.settings },
+          { resetPlayback: true }
+        );
+      store.getState().requestFit();
+      notify(`Flujo creado: ${doc.nodes.length} pasos`, { type: "success" });
+    } catch (error) {
+      notify("La IA no pudo crear el flujo", { type: "error", description: String(error) });
+    }
+  }, [filePath]);
+
+  const onDiagnose = useCallback(
+    async (nodeId: string) => {
+      const store = storeRef.current;
+      const run = store?.getState().run;
+      if (!store || !run) throw new Error("No hay ejecución");
+      return diagnoseStep(store.getState().doc, run, nodeId, createRuntimeServices(filePath).ai);
+    },
+    [filePath]
+  );
+
   const baseName = filePath.replace(/\.flow3d$/i, "");
 
   const onExportImage = useCallback(async () => {
@@ -396,6 +455,8 @@ export default function Flow3DEditorContainer() {
       onSyncSource={() => void onSyncSource()}
       onExecute={() => void onExecute()}
       secrets={flowSecrets}
+      onGenerate={() => void onGenerate()}
+      onDiagnose={onDiagnose}
       onClearHistory={() => void runHistory.clear(filePath)}
       recording={recording}
       exports={{

@@ -9,6 +9,7 @@ import {
   Trash2,
   Ungroup,
   UnfoldVertical,
+  WandSparkles,
   X,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
@@ -54,12 +55,13 @@ interface InspectorProps {
   editable: boolean;
   onLinkFile: (node: FlowNode) => void;
   onOpenLink: (node: FlowNode) => void;
+  onDiagnose?: (nodeId: string) => Promise<string>;
 }
 
 type NodeTab = "step" | "run" | "data";
 
 /** Properties of the selection: a step, a connection, a group or several steps. */
-export function Inspector({ store, editable, onLinkFile, onOpenLink }: InspectorProps) {
+export function Inspector({ store, editable, onLinkFile, onOpenLink, onDiagnose }: InspectorProps) {
   const selection = useFlowEditor(store, (s) => s.selection);
   const selectedCount = useFlowEditor(store, (s) => s.selectedNodes.length);
   const doc = useFlowEditor(store, (s) => s.doc);
@@ -122,6 +124,7 @@ export function Inspector({ store, editable, onLinkFile, onOpenLink }: Inspector
       onClose={close}
       onLinkFile={onLinkFile}
       onOpenLink={onOpenLink}
+      onDiagnose={onDiagnose}
     />
   );
 }
@@ -133,6 +136,7 @@ function NodePanel({
   onClose,
   onLinkFile,
   onOpenLink,
+  onDiagnose,
 }: {
   store: FlowEditorStore;
   node: FlowNode;
@@ -140,6 +144,7 @@ function NodePanel({
   onClose: () => void;
   onLinkFile: (node: FlowNode) => void;
   onOpenLink: (node: FlowNode) => void;
+  onDiagnose?: (nodeId: string) => Promise<string>;
 }) {
   const doc = useFlowEditor(store, (s) => s.doc);
   const step = useFlowEditor(store, (s) => s.run?.steps[node.id]);
@@ -186,7 +191,13 @@ function NodePanel({
       )}
 
       {tab === "data" && executes && (
-        <StepData step={step} stale={stale} store={store} nodeId={node.id} />
+        <StepData
+          step={step}
+          stale={stale}
+          store={store}
+          nodeId={node.id}
+          onDiagnose={onDiagnose}
+        />
       )}
 
       {(tab === "step" || !executes) && (
@@ -397,12 +408,17 @@ function StepData({
   stale,
   store,
   nodeId,
+  onDiagnose,
 }: {
   step: StepRecord | undefined;
   stale: boolean;
   store: FlowEditorStore;
   nodeId: string;
+  onDiagnose?: (nodeId: string) => Promise<string>;
 }) {
+  const [diagnosis, setDiagnosis] = useState<{ loading?: boolean; text?: string; error?: string }>(
+    {}
+  );
   const history = useFlowEditor(store, (s) => s.history);
   const shownRunId = useFlowEditor(store, (s) => s.shownRunId);
   const compareRunId = useFlowEditor(store, (s) => s.compareRunId);
@@ -442,6 +458,31 @@ function StepData({
         </p>
       )}
       {step.error && <DataBlock label="Error" value={step.error} tone="error" />}
+      {step.error && onDiagnose && (
+        <div className="space-y-1.5" data-step-diagnosis>
+          <Button
+            size="xs"
+            variant="outline"
+            className="w-full"
+            disabled={diagnosis.loading}
+            onClick={() => {
+              setDiagnosis({ loading: true });
+              onDiagnose(nodeId)
+                .then((text) => setDiagnosis({ text }))
+                .catch((error: unknown) => setDiagnosis({ error: String(error) }));
+            }}
+          >
+            <WandSparkles />
+            {diagnosis.loading ? "Pensando…" : "Diagnosticar con IA"}
+          </Button>
+          {diagnosis.text && (
+            <p className="rounded-md border border-primary/30 bg-primary/5 p-2 text-[11px] leading-snug whitespace-pre-wrap">
+              {diagnosis.text}
+            </p>
+          )}
+          {diagnosis.error && <p className="text-[11px] text-destructive">{diagnosis.error}</p>}
+        </div>
+      )}
       {step.status !== "skipped" && <DataBlock label="Entrada" value={formatData(step.input)} />}
       {step.status === "done" && <DataBlock label="Salida" value={formatData(step.output)} />}
       {others.length > 0 && (

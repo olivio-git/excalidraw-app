@@ -1,3 +1,4 @@
+import { TemplateGallery } from "@/features/templates/TemplateGallery";
 import {
   SidebarInset,
   SidebarProvider,
@@ -57,6 +58,7 @@ export default function Shell() {
       />
       <ConfirmDialog />
       <PromptDialog />
+      <TemplateGallery />
       <ToolPermissionDialog />
       <QuickInputHost />
       {/* Command palette — always mounted, manages its own open/close state */}

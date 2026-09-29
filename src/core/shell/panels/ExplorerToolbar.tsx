@@ -3,6 +3,7 @@ import {
   RefreshCw,
   FoldVertical,
   FolderPlus,
+  LayoutTemplate,
   ArrowUpAZ,
   ArrowDownAZ,
   Layers,
@@ -28,6 +29,7 @@ import { cn } from "@/shared/lib/utils";
 import { useExplorerStore } from "@/stores/explorerStore";
 import { PanelSearch } from "@/shared/common/PanelSearch";
 import type { SortOrder } from "./explorer-types";
+import { useTemplateGallery } from "@/features/templates/gallery-store";
 
 interface ExplorerToolbarProps {
   onNewFile: () => void;
@@ -59,6 +61,11 @@ export const ExplorerToolbar = ({ searchRef, ...props }: ExplorerToolbarProps) =
   const actions = [
     { label: t("toolbar.newFile"), icon: FilePlus2, run: props.onNewFile },
     { label: t("toolbar.newFolder"), icon: FolderPlus, run: props.onNewFolder },
+    {
+      label: t("templates.title", { ns: "common" }),
+      icon: LayoutTemplate,
+      run: () => useTemplateGallery.getState().show(),
+    },
     {
       label: t("toolbar.refresh"),
       icon: RefreshCw,

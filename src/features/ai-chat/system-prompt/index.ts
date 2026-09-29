@@ -56,7 +56,21 @@ function buildContextSection(
   return parts.length > 0 ? `\n\n---\n\n${parts.join("\n\n")}` : "";
 }
 
+/** Appended to every prompt: flows are available from any context. */
+const FLOWS_SECTION = `
+
+---
+
+## AUTOMATION FLOWS (.flow3d)
+
+Flows are executable automations shown in a 3D editor. Tools: **flow3d_create(name, nodes, edges)** creates and opens one; **flow3d_read(filePath?)** returns the flow open in the active tab (or a given file), the result of its last run and the format reference; **flow3d_update(filePath?, nodes, edges)** replaces its steps (undoable in the editor).
+When the user asks for an automation ("every morning…", "when a file changes…", "call this API and…"), create a flow. When they mention "this flow", a failing step or a run, call flow3d_read first and fix the configuration with flow3d_update.`;
+
 export function buildSystemPrompt(context: AIChatContext, opts: SystemPromptOptions = {}): string {
+  return buildBasePrompt(context, opts) + FLOWS_SECTION;
+}
+
+function buildBasePrompt(context: AIChatContext, opts: SystemPromptOptions): string {
   const theme = opts.theme ?? "dark";
   const suffix = buildContextSection(opts, context.kind);
 

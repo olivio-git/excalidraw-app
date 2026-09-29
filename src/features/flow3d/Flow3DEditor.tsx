@@ -17,6 +17,7 @@ import {
   Square,
   Undo2,
   Video,
+  WandSparkles,
   Workflow,
   Zap,
 } from "lucide-react";
@@ -313,6 +314,10 @@ interface Flow3DEditorProps {
   /** Secrets store: shows the Secrets button. */
   secrets?: SecretStore;
   onClearHistory?: () => void;
+  /** Create the flow from a description (AI). */
+  onGenerate?: () => void;
+  /** Ask the AI why a step failed. */
+  onDiagnose?: (nodeId: string) => Promise<string>;
 }
 
 /**
@@ -336,6 +341,8 @@ export function Flow3DEditor({
   recording,
   secrets,
   onClearHistory,
+  onGenerate,
+  onDiagnose,
 }: Flow3DEditorProps) {
   const follow = useFlowEditor(store, (s) => s.follow);
   const view = useFlowEditor(store, (s) => s.view);
@@ -463,6 +470,11 @@ export function Flow3DEditor({
         {editable && (
           <>
             <div className="mx-1 h-4 w-px bg-border" />
+            {onGenerate && (
+              <ToolButton label="Crear o rehacer con IA…" onClick={onGenerate} disabled={!canEdit}>
+                <WandSparkles />
+              </ToolButton>
+            )}
             <ToolButton
               label="Organizar automáticamente"
               onClick={state.layout}
@@ -555,6 +567,7 @@ export function Flow3DEditor({
             editable={editable}
             onLinkFile={(node) => onLinkFile?.(node)}
             onOpenLink={openLink}
+            onDiagnose={onDiagnose}
           />
         </div>
         {search && <FlowSearch store={store} mode={search} onClose={() => setSearch(null)} />}
@@ -577,10 +590,18 @@ export function Flow3DEditor({
         )}
         {empty && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <p className="rounded-lg bg-popover/90 px-4 py-3 text-center text-xs text-muted-foreground shadow-sm">
-              Flujo vacío. Pulsa Tab o usa la paleta de la izquierda para añadir un paso
-              {onImportExcalidraw ? ", o importa un diagrama de Excalidraw." : "."}
-            </p>
+            <div className="pointer-events-auto space-y-2 rounded-lg bg-popover/90 px-4 py-3 text-center text-xs text-muted-foreground shadow-sm">
+              <p>
+                Flujo vacío. Pulsa Tab o usa la paleta de la izquierda para añadir un paso
+                {onImportExcalidraw ? ", o importa un diagrama de Excalidraw." : "."}
+              </p>
+              {onGenerate && editable && (
+                <Button size="xs" onClick={onGenerate}>
+                  <WandSparkles />
+                  Describir y crear con IA
+                </Button>
+              )}
+            </div>
           </div>
         )}
         {editable && (

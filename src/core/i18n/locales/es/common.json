@@ -224,5 +224,18 @@
       "flow": "Flujos",
       "other": "Otros"
     }
+  },
+  "templates": {
+    "title": "Nuevo desde plantilla",
+    "description": "Empieza una nota, un diagrama o un flujo ejecutable con una estructura lista.",
+    "all": "Todas",
+    "note": "Notas",
+    "diagram": "Diagramas",
+    "flow": "Flujos",
+    "name": "Nombre del archivo",
+    "create": "Crear",
+    "noWorkspace": "Abre una carpeta primero.",
+    "created": "Creado {{name}}",
+    "failed": "No se pudo crear el archivo"
   }
 }

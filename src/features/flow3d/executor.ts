@@ -42,7 +42,7 @@ export interface ExecutorServices {
   }) => Promise<HttpResponse>;
   shell: (request: { command: string; cwd?: string; timeoutMs: number }) => Promise<CommandResult>;
   appCommand: (id: string) => Promise<void>;
-  ai: (request: { prompt: string; system?: string; signal: AbortSignal }) => Promise<string>;
+  ai: (request: { prompt: string; system?: string; signal?: AbortSignal }) => Promise<string>;
   writeFile: (request: { path: string; content: string; append: boolean }) => Promise<string>;
 }
 

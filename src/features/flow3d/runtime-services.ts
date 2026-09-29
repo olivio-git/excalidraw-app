@@ -51,7 +51,7 @@ export function createRuntimeServices(flowPath: string): ExecutorServices {
       await PluginManager.executeCommand(id);
     },
 
-    ai: async ({ prompt, system, signal }) => {
+    ai: async ({ prompt, system, signal = new AbortController().signal }) => {
       const { provider, config } = useAISettingsStore.getState().getActiveConfig();
       if (provider !== "openai-codex" && !config.apiKey) {
         throw new Error("No hay clave de IA configurada (Ajustes → IA)");

@@ -200,7 +200,7 @@ describe("automation service", () => {
       true
     );
     const watchers = new Map<string, (paths: string[]) => void>();
-    const run = vi.fn(async () => {});
+    const run = vi.fn(async (..._args: unknown[]) => {});
     const automation = new FlowAutomation({
       listFlows: async () => ["/ws/a.flow3d", "/ws/off.flow3d"],
       readFlow: async (path) =>

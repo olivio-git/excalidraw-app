@@ -32,6 +32,9 @@ export const WRITE_TOOLS: ReadonlySet<string> = new Set([
   "workspace_copy_file",
   "workspace_rename_file",
   "workspace_delete_file",
+  // flows (creates / rewrites a .flow3d)
+  "flow3d_create",
+  "flow3d_update",
   "activate_tab",
   "close_tab",
   "save_all_diagrams",

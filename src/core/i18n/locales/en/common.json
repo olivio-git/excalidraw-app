@@ -224,5 +224,18 @@
       "flow": "Flows",
       "other": "Other"
     }
+  },
+  "templates": {
+    "title": "New from template",
+    "description": "Start a note, a diagram or an executable flow from a ready-made structure.",
+    "all": "All",
+    "note": "Notes",
+    "diagram": "Diagrams",
+    "flow": "Flows",
+    "name": "File name",
+    "create": "Create",
+    "noWorkspace": "Open a folder first.",
+    "created": "Created {{name}}",
+    "failed": "Could not create the file"
   }
 }

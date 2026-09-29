@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { lazy, Suspense, useContext, useEffect, useState } from "react";
 import { createReactBlockSpec } from "@blocknote/react";
 import { useTranslation } from "react-i18next";
 import { watch, type UnwatchFn } from "@tauri-apps/plugin-fs";
@@ -58,7 +58,33 @@ function CaptionInput({ value, onChange }: { value: string; onChange: (value: st
   );
 }
 
+// Three.js loads only for notes that embed a 3D flow.
+const Flow3DEmbed = lazy(() => import("@/features/flow3d/Flow3DEmbed"));
+
+/** Embedded diagram: an Excalidraw preview image, or a playable 3D flow (`.flow3d`). */
 export function DiagramEmbedRenderer({ diagramPath }: { diagramPath: string }) {
+  const host = useContext(DocumentHostContext);
+  if (/\.flow3d(#.*)?$/i.test(diagramPath)) {
+    return (
+      <Suspense
+        fallback={
+          <div role="status" className="flex h-80 items-center justify-center">
+            <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
+          </div>
+        }
+      >
+        <Flow3DEmbed
+          flowPath={diagramPath}
+          sourcePath={host?.filePath ?? ""}
+          groupId={host?.groupId}
+        />
+      </Suspense>
+    );
+  }
+  return <ExcalidrawEmbedRenderer diagramPath={diagramPath} />;
+}
+
+function ExcalidrawEmbedRenderer({ diagramPath }: { diagramPath: string }) {
   const { t } = useTranslation("common");
   const host = useContext(DocumentHostContext);
   const workspace = useWorkspaceStore((state) => state.workspaceDir);

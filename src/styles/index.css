@@ -3,6 +3,10 @@
 @import "tw-animate-css";
 
 @custom-variant dark (&:where(.dark, .dark *));
+/* Base UI marks orientation with data-orientation; the keel kit styles it
+   through these variants (sliders, separators, tabs, scroll areas...). */
+@custom-variant data-horizontal (&[data-orientation="horizontal"]);
+@custom-variant data-vertical (&[data-orientation="vertical"]);
 
 /* Keep workbench resize interactions on the compositor path. */
 body[data-resizing] * {

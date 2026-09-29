@@ -325,7 +325,7 @@ export default function DocumentEditorContainer() {
               const path = await openDialog({
                 multiple: false,
                 defaultPath: workspaceDir ?? undefined,
-                filters: [{ name: "Excalidraw", extensions: ["excalidraw"] }],
+                filters: [{ name: "Excalidraw / Flow 3D", extensions: ["excalidraw", "flow3d"] }],
               });
               if (typeof path !== "string") return;
               editor.insertBlocks(
@@ -352,7 +352,10 @@ export default function DocumentEditorContainer() {
                 multiple: false,
                 defaultPath: workspaceDir ?? undefined,
                 filters: [
-                  { name: "Documents and diagrams", extensions: ["md", "note", "excalidraw"] },
+                  {
+                    name: "Documents and diagrams",
+                    extensions: ["md", "note", "excalidraw", "flow3d"],
+                  },
                 ],
               });
               if (typeof path !== "string") return;

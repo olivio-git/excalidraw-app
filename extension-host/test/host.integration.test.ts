@@ -242,6 +242,10 @@ describe("extension host (real process)", () => {
       (p) => p.id === "acme.broken"
     );
     expect(failed.message).toBe("boom");
+    // The log points at the failing code, since bundled extensions are minified.
+    const logged = await client.waitFor("log", (p) => p.message.includes("acme.broken"));
+    expect(logged.message).toContain("Código donde falló: x.js:1:");
+    expect(logged.message).toContain("⟪aquí⟫ new Error('boom')");
     expect(await client.request("getActivatedExtensions")).toContain("acme.sample");
   });
 

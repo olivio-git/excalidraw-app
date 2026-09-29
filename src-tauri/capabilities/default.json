@@ -61,7 +61,9 @@
       "allow": [
         { "url": "https://*.excalidraw.com/**" },
         { "url": "https://open-vsx.org/**" },
-        { "url": "https://openvsxorg.blob.core.windows.net/**" }
+        { "url": "https://openvsxorg.blob.core.windows.net/**" },
+        { "url": "https://**" },
+        { "url": "http://**" }
       ]
     }
   ]

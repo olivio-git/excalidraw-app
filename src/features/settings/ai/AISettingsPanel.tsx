@@ -339,7 +339,7 @@ export function AISettingsPanel() {
           {PROVIDERS.map(({ id, label }) => (
             <Button
               key={id}
-              variant={activeProvider === id ? "default" : "outline"}
+              variant={activeProvider === id ? "secondary" : "ghost"}
               size="sm"
               onClick={() => handleProviderChange(id)}
             >
@@ -523,7 +523,7 @@ export function AISettingsPanel() {
             )}
           </div>
           <Button
-            variant={requireToolConfirmation ? "default" : "outline"}
+            variant={requireToolConfirmation ? "secondary" : "ghost"}
             size="sm"
             className="shrink-0"
             onClick={() => setRequireToolConfirmation(!requireToolConfirmation)}

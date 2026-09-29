@@ -28,6 +28,9 @@ interface RawReference {
   label: string;
 }
 
+/** Files whose links are indexed (and that links can point to). */
+const REFERENCE_FILES = /\.(md|note|excalidraw|flow3d)$/i;
+
 export const referencePathKey = (path: string) => path.replaceAll("\\", "/");
 export const headingSlug = (value: string) =>
   value
@@ -91,6 +94,14 @@ export async function extractFileReferences(
         label: element.text ?? "",
       }));
   }
+  if (/\.flow3d$/i.test(path)) {
+    // Steps of a 3D flow link notes, diagrams or other flows.
+    const data = JSON.parse(raw) as { nodes?: { id?: string; link?: string; label?: string }[] };
+    if (!Array.isArray(data.nodes)) throw new Error("Invalid flow");
+    return data.nodes
+      .filter((node) => typeof node.link === "string" && isLocalFileReference(node.link))
+      .map((node) => ({ href: node.link!, anchor: node.id ?? "", label: node.label ?? "" }));
+  }
   const doc = snapshot ?? decodeDocument(path, raw);
   if (doc.blocks) return referencesInBlocks(doc.blocks, isRichNote(path));
   const { getDocumentCodec } = await import("@/features/document-editor/note-codec");
@@ -120,7 +131,7 @@ export async function scanWorkspaceReferences(
         if (entry.isSymlink || [".git", "node_modules"].includes(entry.name)) continue;
         const path = await join(directory, entry.name);
         if (entry.isDirectory) queue.push(path);
-        else if (/\.(md|note|excalidraw)$/i.test(entry.name)) {
+        else if (REFERENCE_FILES.test(entry.name)) {
           if (files.length >= maxFiles) {
             result.truncated = true;
             break;
@@ -145,7 +156,7 @@ export async function scanWorkspaceReferences(
             signal.throwIfAborted();
             try {
               const target = await resolveFileReference(ref.href, path, root);
-              if (!/\.(md|note|excalidraw)$/i.test(target.filePath)) continue;
+              if (!REFERENCE_FILES.test(target.filePath)) continue;
               resolved.push({
                 sourcePath: path,
                 sourceAnchor: ref.anchor,

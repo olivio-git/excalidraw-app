@@ -59,7 +59,7 @@ export default function App() {
   return (
     <ErrorBoundary fallback={ErrorFallback} name="RootApp">
       <BrowserRouter>
-        <TooltipProvider delayDuration={300}>
+        <TooltipProvider delay={300}>
           <div className="flex flex-col h-screen w-screen overflow-hidden">
             <Routes>
               <Route

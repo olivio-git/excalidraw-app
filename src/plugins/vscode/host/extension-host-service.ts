@@ -29,6 +29,8 @@ export interface ExtensionHostOptions {
   transport?: () => HostTransport;
   paths?: () => Promise<HostPaths>;
   assetPrefix?: () => Promise<string>;
+  /** Prefix for files loaded by webviews (the app's `qori-ext:` protocol). */
+  webviewAssetPrefix?: () => Promise<string>;
   isAvailable?: () => boolean;
 }
 
@@ -46,6 +48,21 @@ async function defaultPaths(): Promise<HostPaths> {
 async function defaultAssetPrefix(): Promise<string> {
   const { convertFileSrc } = await import("@tauri-apps/api/core");
   return convertFileSrc("");
+}
+
+/**
+ * Webviews are sandboxed iframes with a `null` origin; the asset protocol
+ * only allows the app's origin for CORS requests (module scripts, fonts), so
+ * their files come from `qori-ext:` (src-tauri/src/ext_protocol.rs).
+ */
+async function defaultWebviewAssetPrefix(): Promise<string> {
+  const { convertFileSrc } = await import("@tauri-apps/api/core");
+  return convertFileSrc("", "qori-ext");
+}
+
+/** CSP source for a protocol prefix (`scheme://localhost/` or `http://scheme.localhost/`). */
+function cspSourceFor(prefix: string): string {
+  return prefix.startsWith("http") ? new URL(prefix).origin : `${new URL(prefix).protocol}`;
 }
 
 function codeExtensionsKey(extensions: InstalledExtension[]): string {
@@ -75,6 +92,8 @@ export class ExtensionHostService {
       transport: options.transport ?? createTauriTransport,
       paths: options.paths ?? defaultPaths,
       assetPrefix: options.assetPrefix ?? defaultAssetPrefix,
+      webviewAssetPrefix:
+        options.webviewAssetPrefix ?? options.assetPrefix ?? defaultWebviewAssetPrefix,
       isAvailable:
         options.isAvailable ??
         (() => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window),
@@ -143,9 +162,10 @@ export class ExtensionHostService {
           setTimeout(() => reject(new Error("El Extension Host no respondió")), READY_TIMEOUT_MS)
         ),
       ]);
-      const [paths, assetPrefix, userSettings] = await Promise.all([
+      const [paths, assetPrefix, webviewAssetPrefix, userSettings] = await Promise.all([
         this.options.paths(),
         this.options.assetPrefix(),
+        this.options.webviewAssetPrefix(),
         readUserExtensionSettings().catch(() => ({})),
       ]);
       const workspaceDir = useWorkspaceStore.getState().workspaceDir;
@@ -163,6 +183,8 @@ export class ExtensionHostService {
         cspSource: assetPrefix.startsWith("http")
           ? new URL(assetPrefix).origin
           : "asset: http://asset.localhost",
+        webviewAssetPrefix,
+        webviewCspSource: cspSourceFor(webviewAssetPrefix),
         language: useLanguageStore.getState().language,
         themeKind: useThemeStore.getState().resolvedTheme,
       });

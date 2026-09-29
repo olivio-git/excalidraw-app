@@ -62,6 +62,11 @@ const BUILTIN_KEYBINDINGS = [
     commandId: "workbench.action.openQuickOpen",
   },
   {
+    key: "ctrl+shift+f",
+    commandId: "workbench.action.findInFiles",
+    allowInInput: true,
+  },
+  {
     key: "ctrl+tab",
     commandId: "workbench.action.nextTab",
     allowInInput: true,

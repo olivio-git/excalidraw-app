@@ -1117,6 +1117,61 @@ class NotebookData {
     this.cells = cells;
   }
 }
+class NotebookCellOutputItem {
+  constructor(data, mime) {
+    this.data = data;
+    this.mime = mime;
+  }
+  static text(value, mime = "text/plain") {
+    return new NotebookCellOutputItem(Buffer.from(String(value), "utf8"), mime);
+  }
+  static json(value, mime = "text/x-json") {
+    return NotebookCellOutputItem.text(JSON.stringify(value, undefined, "\t"), mime);
+  }
+  static stdout(value) {
+    return NotebookCellOutputItem.text(value, "application/vnd.code.notebook.stdout");
+  }
+  static stderr(value) {
+    return NotebookCellOutputItem.text(value, "application/vnd.code.notebook.stderr");
+  }
+  static error(value) {
+    const error = { name: value?.name, message: value?.message, stack: value?.stack };
+    return NotebookCellOutputItem.text(
+      JSON.stringify(error),
+      "application/vnd.code.notebook.error"
+    );
+  }
+}
+class NotebookCellOutput {
+  constructor(items, idOrMetadata, metadata) {
+    this.items = items;
+    this.id = typeof idOrMetadata === "string" ? idOrMetadata : undefined;
+    this.metadata = typeof idOrMetadata === "string" ? metadata : idOrMetadata;
+  }
+}
+class NotebookEdit {
+  constructor(range, newCells) {
+    this.range = range;
+    this.newCells = newCells;
+  }
+  static replaceCells(range, newCells) {
+    return new NotebookEdit(range, newCells);
+  }
+  static insertCells(index, newCells) {
+    return new NotebookEdit(new NotebookRange(index, index), newCells);
+  }
+  static deleteCells(range) {
+    return new NotebookEdit(range, []);
+  }
+  static updateCellMetadata(index, newCellMetadata) {
+    return Object.assign(new NotebookEdit(new NotebookRange(index, index), []), {
+      newCellMetadata,
+    });
+  }
+  static updateNotebookMetadata(newNotebookMetadata) {
+    return Object.assign(new NotebookEdit(new NotebookRange(0, 0), []), { newNotebookMetadata });
+  }
+}
 class TestMessage {
   constructor(message) {
     this.message = message;
@@ -1312,6 +1367,9 @@ module.exports = {
   NotebookRange,
   NotebookCellData,
   NotebookData,
+  NotebookCellOutputItem,
+  NotebookCellOutput,
+  NotebookEdit,
   TestMessage,
   TestTag,
   TestRunRequest,

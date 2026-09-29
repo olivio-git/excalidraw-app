@@ -1,4 +1,4 @@
-import { usePanelStore } from "@/core/panel/panel-store";
+import { panelViews } from "@/core/panel/panel-store";
 import { cn } from "@/shared/lib/utils";
 import { getActiveThemeColors } from "../color-theme-service";
 import { Codicon, LabelWithIcons } from "./codicons";
@@ -57,7 +57,7 @@ function HostIndicator() {
 
   const showLog = () => {
     useOutputStore.getState().setActive(HOST_LOG_CHANNEL);
-    usePanelStore.getState().showView(OUTPUT_VIEW_ID);
+    panelViews.show(OUTPUT_VIEW_ID);
   };
   const label =
     status === "starting"

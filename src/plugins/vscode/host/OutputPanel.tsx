@@ -62,9 +62,9 @@ export function OutputPanelActions() {
       <TooltipWrapper tooltip="Limpiar salida" side="top">
         <Button
           variant="ghost"
-          size="icon"
+          size="icon-xs"
           aria-label="Limpiar salida"
-          className="size-6 text-muted-foreground hover:text-foreground"
+          className="text-muted-foreground hover:text-foreground"
           onClick={() => activeId && clear(activeId)}
         >
           <Eraser className="size-3.5" />

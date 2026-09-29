@@ -145,12 +145,14 @@ export function DocumentEditorToolbar({
             </Button>
 
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1">
-                  {t("documentEditor.export")}
-                  <ChevronDown className="size-3" />
-                </Button>
-              </DropdownMenuTrigger>
+              <DropdownMenuTrigger
+                render={
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1">
+                    {t("documentEditor.export")}
+                    <ChevronDown className="size-3" />
+                  </Button>
+                }
+              />
               <DropdownMenuContent align="end" className="border-none">
                 <DropdownMenuItem onClick={onSaveAsNote}>
                   {t("connected.saveAsNote")}

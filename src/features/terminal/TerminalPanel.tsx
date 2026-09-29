@@ -126,8 +126,8 @@ export function TerminalPanelActions() {
       <TooltipWrapper tooltip="Nueva terminal (Ctrl+Shift+`)" side="top">
         <Button
           variant="ghost"
-          size="icon"
-          className="size-6 text-muted-foreground hover:text-foreground"
+          size="icon-xs"
+          className="text-muted-foreground hover:text-foreground"
           onClick={() => void createShellTerminal()}
           aria-label="Nueva terminal"
         >
@@ -135,16 +135,18 @@ export function TerminalPanelActions() {
         </Button>
       </TooltipWrapper>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 w-4 text-muted-foreground hover:text-foreground"
-            aria-label="Elegir shell"
-          >
-            <ChevronDown className="size-3" />
-          </Button>
-        </DropdownMenuTrigger>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="text-muted-foreground hover:text-foreground"
+              aria-label="Elegir shell"
+            >
+              <ChevronDown className="size-3" />
+            </Button>
+          }
+        />
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel className="text-xs">Nueva terminal con…</DropdownMenuLabel>
           <DropdownMenuSeparator />
@@ -171,8 +173,8 @@ export function TerminalPanelActions() {
         <TooltipWrapper tooltip="Cerrar terminal" side="top">
           <Button
             variant="ghost"
-            size="icon"
-            className="size-6 text-muted-foreground hover:text-foreground"
+            size="icon-xs"
+            className="text-muted-foreground hover:text-foreground"
             onClick={killActiveTerminal}
             aria-label="Cerrar terminal"
           >

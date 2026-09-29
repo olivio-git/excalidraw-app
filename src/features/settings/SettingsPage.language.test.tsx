@@ -71,13 +71,13 @@ describe("SettingsPage — Language selector", () => {
   it('renders the "English" button', () => {
     render(<SettingsPage />);
 
-    expect(screen.getByRole("button", { name: "English" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "English" })).toBeInTheDocument();
   });
 
   it('renders the "Español" button', () => {
     render(<SettingsPage />);
 
-    expect(screen.getByRole("button", { name: "Español" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Español" })).toBeInTheDocument();
   });
 
   it('clicking "Español" calls setLanguage("es")', async () => {
@@ -91,7 +91,7 @@ describe("SettingsPage — Language selector", () => {
 
     render(<SettingsPage />);
 
-    await user.click(screen.getByRole("button", { name: "Español" }));
+    await user.click(screen.getByRole("radio", { name: "Español" }));
 
     expect(setLanguageSpy).toHaveBeenCalledWith("es");
   });
@@ -105,7 +105,7 @@ describe("SettingsPage — Language selector", () => {
 
     render(<SettingsPage />);
 
-    await user.click(screen.getByRole("button", { name: "English" }));
+    await user.click(screen.getByRole("radio", { name: "English" }));
 
     expect(setLanguageSpy).toHaveBeenCalledWith("en");
   });
@@ -115,8 +115,8 @@ describe("SettingsPage — Language selector", () => {
 
     render(<SettingsPage />);
 
-    const englishBtn = screen.getByRole("button", { name: "English" });
-    const espanolBtn = screen.getByRole("button", { name: "Español" });
+    const englishBtn = screen.getByRole("radio", { name: "English" });
+    const espanolBtn = screen.getByRole("radio", { name: "Español" });
 
     // The active button should be visually distinct from the inactive one.
     // In shadcn/cva, the variant is expressed via className. We verify the
@@ -129,8 +129,8 @@ describe("SettingsPage — Language selector", () => {
 
     render(<SettingsPage />);
 
-    const englishBtn = screen.getByRole("button", { name: "English" });
-    const espanolBtn = screen.getByRole("button", { name: "Español" });
+    const englishBtn = screen.getByRole("radio", { name: "English" });
+    const espanolBtn = screen.getByRole("radio", { name: "Español" });
 
     expect(espanolBtn.className).not.toBe(englishBtn.className);
   });

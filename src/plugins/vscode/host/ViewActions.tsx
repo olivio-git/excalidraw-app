@@ -65,17 +65,19 @@ export function ViewTitleActions({ viewId, menus }: { viewId: string; menus: Vie
       })}
       {overflow.length > 0 && (
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              aria-label="Más acciones"
-              className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-            >
-              <MoreHorizontal className="size-3.5" />
-            </button>
-          </DropdownMenuTrigger>
+          <DropdownMenuTrigger
+            render={
+              <button
+                aria-label="Más acciones"
+                className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <MoreHorizontal className="size-3.5" />
+              </button>
+            }
+          />
           <DropdownMenuContent align="end">
             {overflow.map((entry) => (
-              <DropdownMenuItem key={entry.command} onSelect={() => run(entry.command)}>
+              <DropdownMenuItem key={entry.command} onClick={() => run(entry.command)}>
                 {menus.commands.get(entry.command)?.title ?? entry.command}
               </DropdownMenuItem>
             ))}

@@ -20,7 +20,12 @@ import { useOutputStore, HOST_LOG_CHANNEL } from "./output-store";
 import { useStatusBarStore, sortStatusBarItems } from "./statusbar-store";
 import { useTreeStore, useWebviewStore, webviewMessages } from "./view-stores";
 import { parseLabelWithIcons } from "./codicons";
-import { buildWebviewDocument, buildWebviewTheme, sandboxFor } from "./webview-document";
+import {
+  allowDataFonts,
+  buildWebviewDocument,
+  buildWebviewTheme,
+  sandboxFor,
+} from "./webview-document";
 import { buildViewContainers, buildViewMenus, SHARED_CONTAINER_ID } from "./view-containers";
 import { emptyContributions } from "../contributions";
 import type { InstalledExtension } from "../extension-storage";
@@ -299,6 +304,20 @@ describe("webview documents", () => {
       enableScripts: true,
     });
     expect(doc).not.toContain("</script><script>alert(1)");
+  });
+
+  it("lets the page CSP load data: fonts without touching other directives", () => {
+    const meta = (policy: string) =>
+      `<meta http-equiv="Content-Security-Policy" content="${policy}">`;
+    expect(
+      allowDataFonts(meta("default-src 'none'; font-src qori-ext:; script-src 'nonce-a'"))
+    ).toBe(meta("default-src 'none'; font-src qori-ext: data:; script-src 'nonce-a'"));
+    expect(allowDataFonts(meta("default-src qori-ext:; img-src data:"))).toBe(
+      meta("default-src qori-ext:; img-src data:; font-src qori-ext: data:")
+    );
+    const already = meta("font-src data: qori-ext:");
+    expect(allowDataFonts(already)).toBe(already);
+    expect(allowDataFonts("<p>no csp</p>")).toBe("<p>no csp</p>");
   });
 
   it("only allows scripts in the sandbox when enabled", () => {

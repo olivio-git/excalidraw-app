@@ -30,6 +30,8 @@
       "title": "Accessibility",
       "highContrast": "High Contrast: {{state}}",
       "reduceAnimations": "Reduce Animations: {{state}}",
+      "highContrastLabel": "High contrast",
+      "reduceAnimationsLabel": "Reduce animations",
       "on": "On",
       "off": "Off"
     },

@@ -226,3 +226,90 @@ describe("helpers", () => {
     ]);
   });
 });
+
+describe("vscode module object", () => {
+  const { createVscodeApi } = require("../src/api/index.cjs");
+  const { ExtensionHost } = require("../src/host.cjs");
+  const rpc = new Proxy(
+    { request: async () => undefined },
+    { get: (target: Record<string, unknown>, prop: string) => target[prop] ?? (() => {}) }
+  );
+
+  function vscodeFor() {
+    const host = new ExtensionHost(rpc);
+    const missing: string[] = [];
+    host.reportMissing = (_ext: unknown, member: string) => missing.push(member);
+    const api = createVscodeApi(host, {
+      id: "acme.test",
+      extensionPath: "/tmp/acme",
+      packageJSON: {},
+      contributes: {},
+    });
+    return { api, missing };
+  }
+
+  // esbuild's __toESM, as emitted in bundled extensions: own props are copied
+  // onto an object whose prototype is the module's.
+  function toESM(mod: object) {
+    const target = Object.create(Object.getPrototypeOf(mod));
+    Object.defineProperty(target, "default", { value: mod, enumerable: true });
+    for (const key of Object.getOwnPropertyNames(mod)) {
+      Object.defineProperty(target, key, {
+        get: () => (mod as Record<string, unknown>)[key],
+        enumerable: true,
+      });
+    }
+    return target;
+  }
+
+  it("builds notebook outputs at load time (Claude Code does)", () => {
+    const vscode = toESM(vscodeFor().api);
+    const item = vscode.NotebookCellOutputItem.error(new Error("x"));
+    expect(item.mime).toBe("application/vnd.code.notebook.error");
+    expect(JSON.parse(Buffer.from(item.data).toString()).message).toBe("x");
+  });
+
+  it("stubs unknown members read through a bundler's namespace copy", () => {
+    const { api, missing } = vscodeFor();
+    const vscode = toESM(api);
+    class Sub extends vscode.FutureClass {}
+    expect(new Sub()).toBeInstanceOf(vscode.FutureClass);
+    expect(vscode.FutureClass.create(1)).toBeInstanceOf(vscode.FutureClass);
+    expect(vscode.FutureClass.Member).toBeUndefined();
+    expect(vscode.futureNamespace.registerThing()).toHaveProperty("dispose");
+    expect(vscode.then).toBeUndefined();
+    expect(String(vscode)).toBe("[object Object]");
+    expect(vscode.futureNamespace).toBe(vscode.futureNamespace);
+    expect([...new Set(missing)]).toEqual([
+      "FutureClass",
+      "futureNamespace",
+      "futureNamespace.registerThing",
+    ]);
+  });
+});
+
+describe("webview asset URLs", () => {
+  const { ExtensionHost } = require("../src/host.cjs");
+  const rpc = new Proxy(
+    {},
+    { get: (target: Record<string, unknown>, prop: string) => target[prop] ?? (() => {}) }
+  );
+
+  it("keeps paths readable under the qori-ext protocol", () => {
+    const host = new ExtensionHost(rpc);
+    host.config = { webviewAssetPrefix: "qori-ext://localhost/", webviewCspSource: "qori-ext:" };
+    expect(host.webviewAssetUrl("/home/ana/ext one/webview/index.js")).toBe(
+      "qori-ext://localhost/home/ana/ext%20one/webview/index.js"
+    );
+    expect(host.webviewAssetUrl("C:\\Users\\ana\\index.js")).toBe(
+      "qori-ext://localhost/C%3A/Users/ana/index.js"
+    );
+    expect(host.webviewCspSource()).toBe("qori-ext:");
+  });
+
+  it("falls back to the asset protocol", () => {
+    const host = new ExtensionHost(rpc);
+    host.config = { assetPrefix: "asset://localhost/" };
+    expect(host.webviewAssetUrl("/a/b.js")).toBe("asset://localhost/%2Fa%2Fb.js");
+  });
+});

@@ -26,6 +26,30 @@ const { EventEmitter, Uri, ExtensionMode, LogLevel, noneEvent } = types;
 const API_VERSION = "1.96.0";
 const DEACTIVATE_TIMEOUT_MS = 5000;
 
+/**
+ * For an error thrown inside an extension, the code around the first stack
+ * frame in the extension's own files (bundled extensions are minified, so the
+ * line alone says nothing). Returns "" when no such frame is found.
+ */
+function sourceExcerpt(error, extensionPath, before = 240, after = 120) {
+  const stack = error && typeof error.stack === "string" ? error.stack : "";
+  for (const match of stack.matchAll(/\(?((?:[A-Za-z]:)?[^\s()]+):(\d+):(\d+)\)?$/gm)) {
+    const [, file, lineText, columnText] = match;
+    if (!path.resolve(file).startsWith(path.resolve(extensionPath) + path.sep)) continue;
+    try {
+      const line = fs.readFileSync(file, "utf8").split("\n")[Number(lineText) - 1];
+      if (line === undefined) continue;
+      const column = Number(columnText) - 1;
+      const start = Math.max(0, column - before);
+      const code = `${line.slice(start, column)} ⟪aquí⟫ ${line.slice(column, column + after)}`;
+      return `${path.relative(extensionPath, file)}:${lineText}:${columnText}\n${start > 0 ? "…" : ""}${code}…`;
+    } catch {
+      return "";
+    }
+  }
+  return "";
+}
+
 function readPackageJson(extensionPath) {
   try {
     return JSON.parse(fs.readFileSync(path.join(extensionPath, "package.json"), "utf8"));
@@ -54,6 +78,7 @@ class ExtensionHost {
     this.apis = new Map();
     this.contexts = new Map();
     this.missingReported = new Set();
+    this.missingByExtension = new Map();
     this.initialized = false;
 
     this.configuration = createConfiguration(this);
@@ -288,6 +313,8 @@ class ExtensionHost {
       this.log("info", `Activada ${desc.id} (${Date.now() - started} ms)`);
       return exports;
     })().catch((error) => {
+      const excerpt = sourceExcerpt(error, desc.extensionPath);
+      const missing = this.missingByExtension.get(desc.id) ?? [];
       this.rpc.notify("extension.activationFailed", {
         id: desc.id,
         message: error && error.message ? error.message : String(error),
@@ -295,7 +322,9 @@ class ExtensionHost {
       });
       this.log(
         "error",
-        `No se pudo activar ${desc.id}: ${error && error.stack ? error.stack : error}`
+        `No se pudo activar ${desc.id}: ${error && error.stack ? error.stack : error}` +
+          (excerpt ? `\nCódigo donde falló: ${excerpt}` : "") +
+          (missing.length ? `\nAPIs no disponibles usadas: ${missing.join(", ")}` : "")
       );
       throw error;
     });
@@ -445,6 +474,9 @@ class ExtensionHost {
     const key = `${extension.id}:${member}`;
     if (this.missingReported.has(key)) return;
     this.missingReported.add(key);
+    const list = this.missingByExtension.get(extension.id) ?? [];
+    list.push(`vscode.${member}`);
+    this.missingByExtension.set(extension.id, list);
     this.log("warn", `[${extension.id}] usa una API no disponible: vscode.${member}`);
   }
 
@@ -454,6 +486,22 @@ class ExtensionHost {
 
   cspSource() {
     return this.config.cspSource ?? "asset: http://asset.localhost";
+  }
+
+  /**
+   * URL for a file loaded by a webview. With `webviewAssetPrefix` (the app's
+   * `qori-ext:` protocol) the path stays readable, so relative URLs inside
+   * the extension's scripts and styles resolve like on disk.
+   */
+  webviewAssetUrl(fsPath) {
+    const prefix = this.config.webviewAssetPrefix;
+    if (!prefix) return this.assetUrl(fsPath);
+    const segments = fsPath.replace(/\\/g, "/").split("/").filter(Boolean);
+    return `${prefix}${segments.map(encodeURIComponent).join("/")}`;
+  }
+
+  webviewCspSource() {
+    return this.config.webviewCspSource ?? this.cspSource();
   }
 
   serializeIcon(icon, extension) {
@@ -519,4 +567,4 @@ class ExtensionHost {
   }
 }
 
-module.exports = { ExtensionHost, API_VERSION };
+module.exports = { ExtensionHost, API_VERSION, sourceExcerpt };

@@ -71,6 +71,36 @@ describe("workspace references", () => {
       ])
     );
   });
+  it("indexes 3D flows: step links out, and notes that point to a flow step", async () => {
+    vi.mocked(readDir).mockResolvedValue([file("a.md"), file("pedidos.flow3d")]);
+    vi.mocked(readTextFile).mockImplementation(async (path) =>
+      String(path).endsWith(".md")
+        ? "[Validar](pedidos.flow3d#validate)"
+        : JSON.stringify({
+            nodes: [
+              { id: "validate", label: "Validar", link: "a.md" },
+              { id: "plain", label: "Sin enlace" },
+            ],
+          })
+    );
+    const index = await scanWorkspaceReferences("/ws", {}, new AbortController().signal);
+    expect(index.references).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sourcePath: "/ws/a.md",
+          targetPath: "/ws/pedidos.flow3d",
+          targetAnchor: "validate",
+        }),
+        expect.objectContaining({
+          sourcePath: "/ws/pedidos.flow3d",
+          sourceAnchor: "validate",
+          targetPath: "/ws/a.md",
+          label: "Validar",
+        }),
+      ])
+    );
+    expect(index.references).toHaveLength(2);
+  });
   it("uses open buffers, reports partial reads and skips symlink directories", async () => {
     vi.mocked(readDir).mockResolvedValue([
       file("a.md"),

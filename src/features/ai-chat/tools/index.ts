@@ -5,12 +5,14 @@ import { DOCUMENT_TOOLS } from "./document-tools";
 import { COMMON_TOOLS } from "./common-tools";
 import { WORKSPACE_TOOLS } from "./workspace-tools";
 import { APP_TOOLS } from "./app-tools";
+import { FLOW3D_TOOLS } from "./flow3d-tools";
 
 export { DIAGRAM_TOOLS } from "./diagram-tools";
 export { DOCUMENT_TOOLS } from "./document-tools";
 export { COMMON_TOOLS } from "./common-tools";
 export { WORKSPACE_TOOLS } from "./workspace-tools";
 export { APP_TOOLS } from "./app-tools";
+export { FLOW3D_TOOLS } from "./flow3d-tools";
 
 export function getToolsForContext(context: AIChatContext): AIToolDefinition[] {
   switch (context.kind) {
@@ -19,6 +21,7 @@ export function getToolsForContext(context: AIChatContext): AIToolDefinition[] {
         ...DIAGRAM_TOOLS,
         ...DOCUMENT_TOOLS,
         ...WORKSPACE_TOOLS,
+        ...FLOW3D_TOOLS,
         ...APP_TOOLS,
         ...COMMON_TOOLS,
       ];
@@ -27,6 +30,7 @@ export function getToolsForContext(context: AIChatContext): AIToolDefinition[] {
         ...DOCUMENT_TOOLS,
         ...DIAGRAM_TOOLS,
         ...WORKSPACE_TOOLS,
+        ...FLOW3D_TOOLS,
         ...APP_TOOLS,
         ...COMMON_TOOLS,
       ];
@@ -36,6 +40,7 @@ export function getToolsForContext(context: AIChatContext): AIToolDefinition[] {
       // the model can satisfy "create a document with diagrams" in one call.
       return [
         ...WORKSPACE_TOOLS,
+        ...FLOW3D_TOOLS,
         ...APP_TOOLS,
         ...DOCUMENT_TOOLS.filter((tool) => tool.name === "document_create_visual_report"),
       ];

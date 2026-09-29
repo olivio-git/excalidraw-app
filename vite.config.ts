@@ -1,7 +1,7 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { viteStaticCopy } from "vite-plugin-static-copy";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [
@@ -44,6 +44,8 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: ["src/test/setup.ts"],
+    // Browser tests (Playwright) live in e2e/ and run with `pnpm test:e2e`.
+    exclude: [...configDefaults.exclude, "e2e/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

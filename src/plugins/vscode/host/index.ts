@@ -1,9 +1,12 @@
 import { createElement, lazy } from "react";
-import { AppWindow } from "lucide-react";
+import { AppWindow, Blocks, ScrollText } from "lucide-react";
 import { RouteRegistry } from "@/core/routing/route-registry";
 import type { RouteConfig } from "@/core/routing/types";
 import { panelRegistry } from "@/core/panel/panel-registry";
-import { usePanelStore } from "@/core/panel/panel-store";
+import { viewRegistry } from "@/core/layout/view-registry";
+import { extensionPanelId } from "@/core/shell/sidebar-panel-store";
+import { ExtensionIcon } from "./extension-assets";
+import { panelViews } from "@/core/panel/panel-store";
 import { PluginManager } from "@/plugins/plugin-manager";
 import { editorContributions } from "@/features/code-editor/editor-contributions";
 import { extensionHost, initExtensionHost } from "./extension-host-service";
@@ -49,31 +52,54 @@ const COMMANDS: Array<{ id: string; name: string; category: string; run: () => u
     run: () => {
       useOutputStore.getState().create(HOST_LOG_CHANNEL, "Extension Host");
       useOutputStore.getState().setActive(HOST_LOG_CHANNEL);
-      usePanelStore.getState().showView(OUTPUT_VIEW_ID);
+      panelViews.show(OUTPUT_VIEW_ID);
     },
   },
   {
     id: "workbench.action.output.toggleOutput",
     name: "Ver: Mostrar salida",
     category: "View",
-    run: () => usePanelStore.getState().showView(OUTPUT_VIEW_ID),
+    run: () => panelViews.show(OUTPUT_VIEW_ID),
   },
 ];
 
-let registeredPanelContainers: Array<() => void> = [];
+/** Registered view containers, by id, with the info they were registered with. */
+const registeredContainers = new Map<string, { key: string; dispose: () => void }>();
 
-function syncPanelContainers(containers: ViewContainerInfo[]): void {
-  registeredPanelContainers.splice(0).forEach((dispose) => dispose());
-  registeredPanelContainers = containers
-    .filter((container) => container.location === "panel")
-    .map((container, index) =>
-      panelRegistry.register({
-        id: `ext:${container.id}`,
-        title: container.title,
-        order: 100 + index,
-        component: () => createElement(ExtensionViewContainer, { container }),
-      })
-    );
+/**
+ * Extension view containers are workbench views: they start in the side bar
+ * or the panel (as contributed) and the user can move them. Re-registered
+ * only when their info changes, so open views are not remounted.
+ */
+function syncContainers(containers: ViewContainerInfo[]): void {
+  const seen = new Set<string>();
+  containers.forEach((container, index) => {
+    const id = extensionPanelId(container.id);
+    const key = JSON.stringify([container, index]);
+    seen.add(id);
+    if (registeredContainers.get(id)?.key === key) return;
+    registeredContainers.get(id)?.dispose();
+    const icon = ({ className }: { className?: string }) =>
+      createElement(ExtensionIcon, {
+        icon: container.icon,
+        className,
+        fallback: createElement(Blocks, { className }),
+      });
+    const dispose = viewRegistry.register({
+      id,
+      title: container.title,
+      icon,
+      order: 100 + index,
+      defaultLocation: container.location === "panel" ? "panel" : "primary",
+      component: () => createElement(ExtensionViewContainer, { container }),
+    });
+    registeredContainers.set(id, { key, dispose });
+  });
+  for (const [id, entry] of registeredContainers) {
+    if (seen.has(id)) continue;
+    entry.dispose();
+    registeredContainers.delete(id);
+  }
 }
 
 let initialized = false;
@@ -87,6 +113,7 @@ export function initExtensionHostUi(): void {
   panelRegistry.register({
     id: OUTPUT_VIEW_ID,
     title: "Salida",
+    icon: ScrollText,
     order: 20,
     component: OutputPanel,
     actions: OutputPanelActions,
@@ -100,7 +127,7 @@ export function initExtensionHostUi(): void {
       }
     );
   }
-  subscribeViewModel((model) => syncPanelContainers(model.containers));
+  subscribeViewModel((model) => syncContainers(model.containers));
 
   // `onLanguage:<id>` activation when a file of that language is opened.
   editorContributions.register({

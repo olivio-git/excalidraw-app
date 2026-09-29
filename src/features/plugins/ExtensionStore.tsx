@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { BadgeCheck, Download, Loader2, Palette, RefreshCw, Search, Store } from "lucide-react";
+import { BadgeCheck, Download, Loader2, Palette, RefreshCw, Search } from "lucide-react";
 
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
+import { SegmentedControl } from "@/shared/components/ui/segmented-control";
 import { notify } from "@/shared/lib/notify";
 import { cn } from "@/shared/lib/utils";
 import { useIconThemeState } from "@/plugins/vscode/icon-theme-service";
@@ -23,8 +24,8 @@ function ExtensionIcon({ src }: { src?: string }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
     return (
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted">
-        <Palette className="size-5 text-muted-foreground" />
+      <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
+        <Palette className="size-3.5 text-muted-foreground" />
       </div>
     );
   }
@@ -33,7 +34,7 @@ function ExtensionIcon({ src }: { src?: string }) {
       src={src}
       alt=""
       aria-hidden
-      className="size-10 shrink-0 rounded-md object-contain"
+      className="size-7 shrink-0 rounded-md object-contain"
       onError={() => setFailed(true)}
     />
   );
@@ -130,49 +131,42 @@ export function ExtensionStore() {
   };
 
   return (
-    <section className="rounded-xl border border-border bg-card/70 p-4 space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Store className="size-4 text-primary" />
-          <h2 className="text-sm font-semibold">Tienda de extensiones</h2>
-          <span className="text-[11px] text-muted-foreground">Open VSX</span>
+    <section aria-label="Tienda de extensiones" className="space-y-1.5">
+      <div className="flex items-center gap-2 px-1">
+        <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          Tienda · Open VSX
+        </h2>
+        <div className="flex-1" />
+        <div className="relative w-64">
+          <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar: dracula, material icon…"
+            aria-label="Buscar extensiones"
+            className="h-7 pl-7 text-xs md:text-xs"
+          />
         </div>
-        <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-          {[
-            { value: true, label: "Temas" },
-            { value: false, label: "Todas" },
-          ].map((option) => (
-            <Button
-              key={option.label}
-              size="sm"
-              variant={onlyThemes === option.value ? "secondary" : "ghost"}
-              className="h-7 px-2.5 text-xs"
-              onClick={() => setOnlyThemes(option.value)}
-            >
-              {option.label}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Buscar temas: dracula, material icon, one dark…"
-          className="pl-8"
+        <SegmentedControl
+          size="sm"
+          ariaLabel="Filtro"
+          value={onlyThemes ? "themes" : "all"}
+          onChange={(value) => setOnlyThemes(value === "themes")}
+          options={[
+            { value: "themes", label: "Temas" },
+            { value: "all", label: "Todas" },
+          ]}
         />
       </div>
 
       {!onlyThemes && (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="px-1 text-[11px] text-muted-foreground">
           Por ahora solo se pueden instalar extensiones que aporten temas de color o de iconos.
         </p>
       )}
 
       {error ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm">
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border px-4 py-4 text-center text-sm">
           <p className="font-medium">No se pudo conectar con Open VSX</p>
           <p className="max-w-xl break-words text-xs text-muted-foreground">{error}</p>
           <Button size="sm" variant="outline" onClick={() => setReloadToken((n) => n + 1)}>
@@ -181,73 +175,76 @@ export function ExtensionStore() {
           </Button>
         </div>
       ) : results.length === 0 && !loading ? (
-        <p className="py-6 text-center text-sm text-muted-foreground">
+        <p className="py-4 text-center text-xs text-muted-foreground">
           No hay resultados para “{debouncedQuery}”.
         </p>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <ul className="max-h-80 divide-y divide-border overflow-y-auto rounded-lg border border-border">
           {results.map((ext) => {
             const id = openVsxExtensionId(ext);
             const installedVersion = installedVersions.get(id);
             const hasUpdate =
               installedVersion !== undefined && compareVersions(ext.version, installedVersion) > 0;
             const isInstalling = installing === id;
+            const label = isInstalling
+              ? "Instalando…"
+              : hasUpdate
+                ? `Actualizar (v${installedVersion} → v${ext.version})`
+                : installedVersion
+                  ? "Instalado"
+                  : "Instalar";
             return (
-              <article
+              <li
                 key={id}
                 className={cn(
-                  "flex gap-3 rounded-lg border border-border/60 p-3",
+                  "flex items-center gap-3 px-3 py-1.5",
                   ext.deprecated && "opacity-60"
                 )}
               >
                 <ExtensionIcon src={ext.files.icon} />
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <div className="flex items-center gap-1">
-                    <p className="truncate text-sm font-medium" title={ext.displayName ?? ext.name}>
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-1 truncate text-sm font-medium">
+                    <span className="truncate" title={ext.displayName ?? ext.name}>
                       {ext.displayName ?? ext.name}
-                    </p>
+                    </span>
                     {ext.verified && (
                       <BadgeCheck
-                        className="size-3.5 shrink-0 text-primary"
+                        className="size-3.5 shrink-0 text-muted-foreground"
                         aria-label="Verificado"
                       />
                     )}
-                  </div>
-                  <p className="truncate text-[11px] text-muted-foreground">
-                    {ext.namespace} · v{ext.version}
-                    {ext.downloadCount !== undefined &&
-                      ` · ${numberFormat.format(ext.downloadCount)} descargas`}
+                    <span className="shrink-0 text-[11px] font-normal text-muted-foreground">
+                      {ext.namespace} · v{ext.version}
+                      {ext.downloadCount !== undefined &&
+                        ` · ${numberFormat.format(ext.downloadCount)}`}
+                    </span>
                   </p>
-                  <p className="line-clamp-2 text-xs text-muted-foreground">
+                  <p className="truncate text-xs text-muted-foreground" title={ext.description}>
                     {ext.description || "Sin descripción."}
                   </p>
-                  <div className="mt-1 flex justify-end">
-                    <Button
-                      size="sm"
-                      variant={installedVersion && !hasUpdate ? "secondary" : "default"}
-                      disabled={isInstalling || (installedVersion !== undefined && !hasUpdate)}
-                      onClick={() => void install(ext)}
-                      className="h-7 gap-1.5 text-xs"
-                    >
-                      {isInstalling ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : (
-                        <Download className="size-3.5" />
-                      )}
-                      {isInstalling
-                        ? "Instalando…"
-                        : hasUpdate
-                          ? `Actualizar (v${installedVersion} → v${ext.version})`
-                          : installedVersion
-                            ? "Instalado"
-                            : "Instalar"}
-                    </Button>
-                  </div>
                 </div>
-              </article>
+                <Button
+                  size="xs"
+                  variant={installedVersion && !hasUpdate ? "ghost" : "outline"}
+                  disabled={isInstalling || (installedVersion !== undefined && !hasUpdate)}
+                  onClick={() => void install(ext)}
+                  aria-label={label}
+                  title={label}
+                  className="shrink-0"
+                >
+                  {isInstalling ? <Loader2 className="animate-spin" /> : <Download />}
+                  {isInstalling
+                    ? "Instalando…"
+                    : hasUpdate
+                      ? "Actualizar"
+                      : installedVersion
+                        ? "Instalado"
+                        : "Instalar"}
+                </Button>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
 
       {loading && (

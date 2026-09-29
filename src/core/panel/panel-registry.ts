@@ -1,9 +1,10 @@
 import type React from "react";
-import { useSyncExternalStore } from "react";
+import { viewRegistry } from "@/core/layout/view-registry";
 
 /**
- * Views shown in the bottom panel (VS Code's "Panel": Terminal, Output, and
- * views contributed by extensions to the `panel` container).
+ * Views that start in the panel (Terminal, Output, extension views of the
+ * `panel` container). The user can move them anywhere: they are regular
+ * workbench views (see core/layout).
  */
 export interface PanelView {
   id: string;
@@ -11,51 +12,16 @@ export interface PanelView {
   /** Lower first. Built-in views use 0–99; extension views start at 100. */
   order: number;
   component: React.ComponentType;
-  /** Toolbar rendered at the right of the tab strip while the view is active. */
+  icon?: React.ComponentType<{ className?: string }>;
+  /** Toolbar shown in the header while the view is active. */
   actions?: React.ComponentType;
 }
 
-type Listener = () => void;
-
-class PanelRegistryClass {
-  private views: PanelView[] = [];
-  private listeners = new Set<Listener>();
-
+export const panelRegistry = {
   register(view: PanelView): () => void {
-    this.views = [...this.views.filter((v) => v.id !== view.id), view].sort(
-      (a, b) => a.order - b.order
-    );
-    this.emit();
-    return () => this.unregister(view.id);
-  }
-
+    return viewRegistry.register({ ...view, defaultLocation: "panel" });
+  },
   unregister(id: string): void {
-    const next = this.views.filter((v) => v.id !== id);
-    if (next.length === this.views.length) return;
-    this.views = next;
-    this.emit();
-  }
-
-  get(id: string): PanelView | undefined {
-    return this.views.find((v) => v.id === id);
-  }
-
-  getAll(): PanelView[] {
-    return this.views;
-  }
-
-  subscribe = (listener: Listener): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
-
-  private emit(): void {
-    this.listeners.forEach((listener) => listener());
-  }
-}
-
-export const panelRegistry = new PanelRegistryClass();
-
-export function usePanelViews(): PanelView[] {
-  return useSyncExternalStore(panelRegistry.subscribe, () => panelRegistry.getAll());
-}
+    viewRegistry.unregister(id);
+  },
+};

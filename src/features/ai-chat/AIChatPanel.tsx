@@ -134,17 +134,19 @@ export function AIChatPanel() {
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 max-w-[160px] text-sm font-medium gap-1"
-              disabled={status === "streaming" || isWaiting}
-            >
-              <span className="truncate">{activeConversationTitle ?? t("panels.aiChat")}</span>
-              <ChevronDown className="size-3 shrink-0 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 max-w-[160px] text-sm font-medium gap-1"
+                disabled={status === "streaming" || isWaiting}
+              >
+                <span className="truncate">{activeConversationTitle ?? t("panels.aiChat")}</span>
+                <ChevronDown className="size-3 shrink-0 opacity-50" />
+              </Button>
+            }
+          />
           <DropdownMenuContent align="start" className="w-56">
             <DropdownMenuItem onClick={handleNewConversation}>
               <Plus className="size-3.5 mr-2" />

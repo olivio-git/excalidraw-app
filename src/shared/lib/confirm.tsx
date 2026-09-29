@@ -79,7 +79,9 @@ export function ConfirmDialog() {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          {description && <DialogDescription>{description}</DialogDescription>}
+          {description && (
+            <DialogDescription className="whitespace-pre-line">{description}</DialogDescription>
+          )}
         </DialogHeader>
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => _settle(false)}>

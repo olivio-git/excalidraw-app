@@ -3,6 +3,7 @@ import {
   RefreshCw,
   FoldVertical,
   FolderPlus,
+  LayoutTemplate,
   ArrowUpAZ,
   ArrowDownAZ,
   Layers,
@@ -28,6 +29,7 @@ import { cn } from "@/shared/lib/utils";
 import { useExplorerStore } from "@/stores/explorerStore";
 import { PanelSearch } from "@/shared/common/PanelSearch";
 import type { SortOrder } from "./explorer-types";
+import { useTemplateGallery } from "@/features/templates/gallery-store";
 
 interface ExplorerToolbarProps {
   onNewFile: () => void;
@@ -60,6 +62,11 @@ export const ExplorerToolbar = ({ searchRef, ...props }: ExplorerToolbarProps) =
     { label: t("toolbar.newFile"), icon: FilePlus2, run: props.onNewFile },
     { label: t("toolbar.newFolder"), icon: FolderPlus, run: props.onNewFolder },
     {
+      label: t("templates.title", { ns: "common" }),
+      icon: LayoutTemplate,
+      run: () => useTemplateGallery.getState().show(),
+    },
+    {
       label: t("toolbar.refresh"),
       icon: RefreshCw,
       run: props.onRefresh,
@@ -85,27 +92,29 @@ export const ExplorerToolbar = ({ searchRef, ...props }: ExplorerToolbarProps) =
             <TooltipWrapper key={label} tooltip={label} side="bottom">
               <Button
                 variant="ghost"
-                size="icon"
+                size="icon-xs"
                 aria-label={label}
                 disabled={disabled}
                 onClick={run}
-                className="size-6 rounded-sm text-muted-foreground hover:text-foreground"
+                className="rounded-sm text-muted-foreground hover:text-foreground"
               >
                 <Icon className={cn("size-3.5", spin && "animate-spin")} />
               </Button>
             </TooltipWrapper>
           ))}
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-6 text-muted-foreground"
-                aria-label={t("toolbar.more")}
-              >
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-muted-foreground"
+                  aria-label={t("toolbar.more")}
+                >
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              }
+            />
             <DropdownMenuContent align="end" className="min-w-52">
               <DropdownMenuItem onClick={props.onQuickOpen}>
                 <Search />

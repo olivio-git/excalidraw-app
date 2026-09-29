@@ -187,5 +187,55 @@
         "generic": { "description": "Ejecutar herramienta \"{{name}}\"" }
       }
     }
+  },
+  "search": {
+    "title": "Buscar",
+    "placeholder": "Buscar en los archivos",
+    "caseSensitive": "Distinguir mayúsculas",
+    "wholeWord": "Palabra completa",
+    "regex": "Usar expresión regular",
+    "noWorkspace": "Abre una carpeta para buscar en sus archivos.",
+    "typeToSearch": "Busca en notas, Markdown, diagramas, flujos y código.",
+    "searching": "Buscando…",
+    "noResults": "Sin resultados.",
+    "summary": "{{count}} resultados en {{files}} archivos",
+    "truncated": "Se muestran los primeros resultados. Afina la búsqueda para ver más.",
+    "invalidRegex": "Expresión regular no válida.",
+    "line": "línea {{line}}",
+    "collapseAll": "Contraer todo",
+    "expandAll": "Expandir todo"
+  },
+  "graph": {
+    "title": "Grafo de conocimiento",
+    "summary": "{{files}} archivos · {{links}} enlaces",
+    "filter": "Resaltar archivos…",
+    "fit": "Encuadrar",
+    "refresh": "Actualizar",
+    "noWorkspace": "Abre una carpeta para ver cómo se conectan sus archivos.",
+    "loading": "Indexando el espacio de trabajo…",
+    "empty": "Todavía no hay enlaces entre archivos. Enlaza notas, diagramas y flujos para verlos aquí.",
+    "links": "{{count}} archivos enlazados",
+    "open": "Abrir archivo",
+    "hint": "Clic: enfocar · Doble clic: abrir · Arrastrar: girar",
+    "kinds": {
+      "note": "Notas",
+      "markdown": "Markdown",
+      "diagram": "Diagramas",
+      "flow": "Flujos",
+      "other": "Otros"
+    }
+  },
+  "templates": {
+    "title": "Nuevo desde plantilla",
+    "description": "Empieza una nota, un diagrama o un flujo ejecutable con una estructura lista.",
+    "all": "Todas",
+    "note": "Notas",
+    "diagram": "Diagramas",
+    "flow": "Flujos",
+    "name": "Nombre del archivo",
+    "create": "Crear",
+    "noWorkspace": "Abre una carpeta primero.",
+    "created": "Creado {{name}}",
+    "failed": "No se pudo crear el archivo"
   }
 }

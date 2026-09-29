@@ -252,10 +252,10 @@ export function ExtensionTreeView({ viewId, menus }: { viewId: string; menus: Vi
       <li key={handle} role="none">
         {contextEntries.length > 0 ? (
           <ContextMenu>
-            <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
+            <ContextMenuTrigger render={row} />
             <ContextMenuContent>
               {contextEntries.map((entry) => (
-                <ContextMenuItem key={entry.command} onSelect={() => runMenu(item, entry.command)}>
+                <ContextMenuItem key={entry.command} onClick={() => runMenu(item, entry.command)}>
                   {menus.commands.get(entry.command)?.title ?? entry.command}
                 </ContextMenuItem>
               ))}

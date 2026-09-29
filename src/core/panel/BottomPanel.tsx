@@ -1,35 +1,27 @@
-import { Suspense, useCallback, useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { TooltipWrapper } from "@/shared/common/TooltipWrapper";
-import { usePanelViews } from "./panel-registry";
-import { PANEL_MIN_HEIGHT, usePanelStore } from "./panel-store";
+import { PANEL_MIN_SIZE, useLayoutStore } from "@/core/layout/layout-store";
+import { ViewPart } from "@/core/layout/ViewPart";
+import { useLocationViews } from "@/core/layout/layout-dnd";
 
-/** Space always left to the editor above the panel. */
-const EDITOR_MIN_HEIGHT = 120;
+/** Space always left to the editor next to the panel. */
+const EDITOR_MIN_SIZE = 120;
 
 /**
- * VS Code-style bottom panel below the editor area. Views (Terminal, Output,
- * extension views) come from the panel registry; every view stays mounted
- * once shown so terminals keep their scrollback while hidden.
+ * VS Code-style panel (Terminal, Output, extension views and whatever the
+ * user drags here), below the editor area or at its right.
  */
 export function BottomPanel() {
-  const views = usePanelViews();
-  const open = usePanelStore((s) => s.open);
-  const height = usePanelStore((s) => s.height);
-  const activeViewId = usePanelStore((s) => s.activeViewId);
-  const setHeight = usePanelStore((s) => s.setHeight);
-  const showView = usePanelStore((s) => s.showView);
-  const setOpen = usePanelStore((s) => s.setOpen);
+  const { views, open } = useLocationViews("panel");
+  const position = useLayoutStore((s) => s.panelPosition);
+  const size = useLayoutStore((s) => (s.panelPosition === "bottom" ? s.panelHeight : s.panelWidth));
+  const setPanelSize = useLayoutStore((s) => s.setPanelSize);
+  const setPartOpen = useLayoutStore((s) => s.setPartOpen);
   const panelRef = useRef<HTMLDivElement>(null);
-  const [mountedViews, setMountedViews] = useState<string[]>([]);
-
-  const activeView = views.find((v) => v.id === activeViewId) ?? views[0];
-  // Mount views on first show and keep them mounted (adjusting state during render).
-  if (open && activeView && !mountedViews.includes(activeView.id)) {
-    setMountedViews([...mountedViews, activeView.id]);
-  }
+  const vertical = position === "bottom";
 
   const startResize = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -37,101 +29,72 @@ export function BottomPanel() {
       const container = panel?.parentElement;
       if (!panel || !container) return;
       event.preventDefault();
-      const startY = event.clientY;
-      const startHeight = panel.getBoundingClientRect().height;
-      const maxHeight = container.getBoundingClientRect().height - EDITOR_MIN_HEIGHT;
+      const start = vertical ? event.clientY : event.clientX;
+      const rect = panel.getBoundingClientRect();
+      const startSize = vertical ? rect.height : rect.width;
+      const containerRect = container.getBoundingClientRect();
+      const max = (vertical ? containerRect.height : containerRect.width) - EDITOR_MIN_SIZE;
       const onMove = (e: PointerEvent) => {
-        const next = startHeight + (startY - e.clientY);
-        setHeight(
-          Math.min(Math.max(next, PANEL_MIN_HEIGHT), Math.max(maxHeight, PANEL_MIN_HEIGHT))
-        );
+        const next = startSize + (start - (vertical ? e.clientY : e.clientX));
+        setPanelSize(Math.min(Math.max(next, PANEL_MIN_SIZE), Math.max(max, PANEL_MIN_SIZE)));
       };
       const onUp = () => {
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
+        document.body.classList.remove("qori-resizing");
         document.body.style.removeProperty("cursor");
       };
-      document.body.style.cursor = "row-resize";
+      document.body.classList.add("qori-resizing");
+      document.body.style.cursor = vertical ? "row-resize" : "col-resize";
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp);
     },
-    [setHeight]
+    [setPanelSize, vertical]
   );
 
-  if (!activeView) return null;
-  const Actions = activeView.actions;
+  if (views.length === 0) return null;
 
   return (
     <div
       ref={panelRef}
       data-panel="bottom"
+      data-panel-position={position}
       className={cn(
-        "relative flex flex-col shrink-0 border-t border-border/60 bg-background min-h-0",
+        "relative flex flex-col shrink-0 bg-background min-h-0 min-w-0",
+        vertical ? "border-t border-border/60" : "border-l border-border/60",
         !open && "hidden"
       )}
-      style={{ height }}
+      style={vertical ? { height: size } : { width: size }}
     >
       <div
         role="separator"
-        aria-orientation="horizontal"
+        aria-orientation={vertical ? "horizontal" : "vertical"}
         aria-label="Redimensionar panel"
         onPointerDown={startResize}
-        className="absolute -top-1 left-0 right-0 h-2 cursor-row-resize z-10 hover:bg-primary/30 transition-colors"
+        className={cn(
+          "absolute z-10 hover:bg-primary/30 transition-colors",
+          vertical
+            ? "-top-1 left-0 right-0 h-2 cursor-row-resize"
+            : "-left-1 top-0 bottom-0 w-2 cursor-col-resize"
+        )}
       />
-      <div className="flex items-center h-8 shrink-0 px-2 gap-1 border-b border-border/40">
-        <div role="tablist" className="flex items-center gap-0.5 min-w-0 overflow-x-auto">
-          {views.map((view) => {
-            const isActive = view.id === activeView.id;
-            return (
-              <button
-                key={view.id}
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => showView(view.id)}
-                className={cn(
-                  "h-7 px-2 text-[11px] uppercase tracking-wide whitespace-nowrap border-b-2 transition-colors",
-                  isActive
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {view.title}
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex-1" />
-        {Actions && <Actions />}
-        <TooltipWrapper tooltip="Cerrar panel" side="top">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 text-muted-foreground hover:text-foreground"
-            onClick={() => setOpen(false)}
-            aria-label="Cerrar panel"
-          >
-            <X className="size-3.5" />
-          </Button>
-        </TooltipWrapper>
-      </div>
-      <div className="relative flex-1 min-h-0">
-        {views
-          .filter((view) => mountedViews.includes(view.id))
-          .map((view) => {
-            const View = view.component;
-            return (
-              <div
-                key={view.id}
-                role="tabpanel"
-                className={cn("absolute inset-0", view.id !== activeView.id && "hidden")}
-              >
-                <Suspense fallback={null}>
-                  <View />
-                </Suspense>
-              </div>
-            );
-          })}
-      </div>
+      <ViewPart
+        location="panel"
+        variant="panel"
+        headerEnd={
+          <TooltipWrapper tooltip="Cerrar panel" side="top">
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => setPartOpen("panel", false)}
+              aria-label="Cerrar panel"
+            >
+              <X className="size-3.5" />
+            </Button>
+          </TooltipWrapper>
+        }
+      />
     </div>
   );
 }

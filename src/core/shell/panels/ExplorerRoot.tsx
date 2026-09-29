@@ -38,31 +38,33 @@ export const ExplorerRoot = (props: ExplorerRootProps) => {
   const { setNodeRef, isOver } = useDroppable({ id: props.path });
   return (
     <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div className="min-h-full pb-8">
-          <button
-            ref={setNodeRef}
-            onClick={props.onToggle}
-            aria-expanded={props.expanded}
-            title={props.path}
-            className={cn(
-              "sticky top-0 z-10 flex h-8 w-full items-center gap-1.5 border-y border-border/30 bg-background px-2 text-left hover:bg-accent",
-              isOver && "bg-primary/15 ring-1 ring-inset ring-primary"
-            )}
-          >
-            {props.expanded ? (
-              <ChevronDown className="size-3.5 shrink-0" />
-            ) : (
-              <ChevronRight className="size-3.5 shrink-0" />
-            )}
-            <FolderOpen className="size-3.5 shrink-0 text-muted-foreground" />
-            <span className="truncate text-[11px] font-semibold uppercase tracking-wide">
-              {props.path.split(/[\\/]/).filter(Boolean).pop() ?? props.path}
-            </span>
-          </button>
-          {props.children}
-        </div>
-      </ContextMenuTrigger>
+      <ContextMenuTrigger
+        render={
+          <div className="min-h-full pb-8">
+            <button
+              ref={setNodeRef}
+              onClick={props.onToggle}
+              aria-expanded={props.expanded}
+              title={props.path}
+              className={cn(
+                "sticky top-0 z-10 flex h-8 w-full items-center gap-1.5 border-y border-border/30 bg-background px-2 text-left hover:bg-accent",
+                isOver && "bg-primary/15 ring-1 ring-inset ring-primary"
+              )}
+            >
+              {props.expanded ? (
+                <ChevronDown className="size-3.5 shrink-0" />
+              ) : (
+                <ChevronRight className="size-3.5 shrink-0" />
+              )}
+              <FolderOpen className="size-3.5 shrink-0 text-muted-foreground" />
+              <span className="truncate text-[11px] font-semibold uppercase tracking-wide">
+                {props.path.split(/[\\/]/).filter(Boolean).pop() ?? props.path}
+              </span>
+            </button>
+            {props.children}
+          </div>
+        }
+      />
       <ContextMenuContent className="min-w-52">
         <ContextMenuItem onClick={props.onNewFile}>
           <FilePlus2 />

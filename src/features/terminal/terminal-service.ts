@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import { usePanelStore } from "@/core/panel/panel-store";
+import { panelViews } from "@/core/panel/panel-store";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useThemeStore } from "@/stores/themeStore";
 import {
@@ -208,7 +208,7 @@ export function getAvailableShells(): Promise<ShellInfo[]> {
 
 export function showTerminalPanel(id?: string): void {
   if (id) useTerminalStore.setState({ activeId: id });
-  usePanelStore.getState().showView(TERMINAL_VIEW_ID);
+  panelViews.show(TERMINAL_VIEW_ID);
   const target = id ?? useTerminalStore.getState().activeId;
   if (target) requestAnimationFrame(() => sessions.get(target)?.focus());
 }
@@ -335,9 +335,8 @@ export function onDidCloseTerminal(listener: (id: string) => void): () => void {
 
 /** Toggle the panel on the terminal view, creating a terminal if there is none. */
 export async function toggleTerminal(): Promise<void> {
-  const panel = usePanelStore.getState();
-  if (panel.open && panel.activeViewId === TERMINAL_VIEW_ID) {
-    panel.setOpen(false);
+  if (panelViews.isVisible(TERMINAL_VIEW_ID)) {
+    panelViews.hide(TERMINAL_VIEW_ID);
     return;
   }
   if (useTerminalStore.getState().terminals.length === 0) {

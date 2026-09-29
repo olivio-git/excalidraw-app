@@ -39,6 +39,7 @@ export default definePlugin({
       { id: "workbench.action.focusSidebar", name: "Focus Sidebar", category: "View" },
       { id: "workbench.action.focusEditor", name: "Focus Editor", category: "View" },
       { id: "workbench.action.focusSidebarSearch", name: "Focus Sidebar Search", category: "View" },
+      { id: "workbench.action.findInFiles", name: "Find in Files", category: "View" },
       { id: "workbench.action.openQuickOpen", name: "Open Quick Open", category: "View" },
 
       // ── Preferences ──────────────────────────────────────────────────────

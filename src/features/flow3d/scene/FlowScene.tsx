@@ -16,6 +16,7 @@ import { useFlowEditor, type FlowEditorStore } from "../editor-store";
 import { FlowNodeView, type NodeHandlers } from "./FlowNodeView";
 import { FlowEdgeView } from "./FlowEdgeView";
 import { GroupFrame } from "./GroupFrame";
+import { GlowEffects, StudioEnvironment } from "./SceneEffects";
 import { Packets } from "./Packets";
 import { edgeCurve, nodeAt, outPort } from "./geometry";
 import { useSceneTheme, type SceneTheme } from "./theme";
@@ -201,6 +202,7 @@ function SceneContent({
   const hovered = useFlowEditor(store, (s) => s.hovered);
   const connectingFrom = useFlowEditor(store, (s) => s.connectingFrom);
   const run = useFlowEditor(store, (s) => (s.runStale ? null : s.run));
+  const effects = useFlowEditor(store, (s) => s.effects);
   const clock = store.getState().clock;
   const controls = useRef<Controls | null>(null);
   const { camera, gl } = useThree();
@@ -524,8 +526,10 @@ function SceneContent({
   return (
     <>
       <color attach="background" args={[theme.background]} />
+      {effects && <StudioEnvironment />}
+      {effects && <GlowEffects dark={theme.dark} />}
       <fog attach="fog" args={[theme.background, 40, 110]} />
-      <ambientLight intensity={theme.dark ? 0.55 : 0.8} />
+      <ambientLight intensity={(theme.dark ? 0.55 : 0.8) * (effects ? 0.7 : 1)} />
       <hemisphereLight
         args={[theme.dark ? "#cbd5e1" : "#ffffff", theme.dark ? "#0f172a" : "#e2e8f0", 0.6]}
       />
@@ -597,6 +601,8 @@ function SceneContent({
           highlighted={hovered === node.id}
           editable={editable}
           failed={failed.has(node.id)}
+          hdr={effects}
+          shadow={effects}
           span={nodeSpans.get(node.id)}
           clock={clock}
           handlers={handlers}
@@ -617,7 +623,14 @@ function SceneContent({
           handlers={handlers}
         />
       ))}
-      <Packets key={edges.length} edges={edges} spans={edgeSpans} clock={clock} dark={theme.dark} />
+      <Packets
+        key={edges.length}
+        edges={edges}
+        spans={edgeSpans}
+        clock={clock}
+        dark={theme.dark}
+        hdr={effects}
+      />
       {connectingNode && <ConnectPreview from={connectingNode.position} end={connectEnd} />}
     </>
   );

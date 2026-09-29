@@ -20,6 +20,8 @@ interface PacketsProps {
   clock: PlaybackClock;
   /** Additive glow washes out on light backgrounds. */
   dark: boolean;
+  /** Bloom is on: push the core above 1 so it glows. */
+  hdr?: boolean;
 }
 
 const hidden = new Matrix4().makeScale(0, 0, 0);
@@ -34,7 +36,7 @@ const scratch = {
  * Data travelling along edges during playback. Two instanced meshes (core +
  * additive glow): one draw call each, however many edges the flow has.
  */
-export function Packets({ edges, spans, clock, dark }: PacketsProps) {
+export function Packets({ edges, spans, clock, dark, hdr = false }: PacketsProps) {
   const core = useRef<InstancedMesh>(null);
   const glow = useRef<InstancedMesh>(null);
   const count = Math.max(1, edges.length);
@@ -45,12 +47,14 @@ export function Packets({ edges, spans, clock, dark }: PacketsProps) {
       if (!mesh) continue;
       for (let i = 0; i < count; i++) {
         mesh.setMatrixAt(i, hidden);
-        mesh.setColorAt(i, colors[i] ?? new Color("#ffffff"));
+        const color = (colors[i] ?? new Color("#ffffff")).clone();
+        if (hdr && mesh === core.current) color.multiplyScalar(2.4);
+        mesh.setColorAt(i, color);
       }
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
-  }, [colors, count]);
+  }, [colors, count, hdr]);
 
   useFrame(() => {
     const coreMesh = core.current;

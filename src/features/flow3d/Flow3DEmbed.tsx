@@ -107,6 +107,8 @@ export default function Flow3DEmbed({
           setState({ store: storeRef.current });
         } else {
           storeRef.current = createFlowEditorStore(doc);
+          // Notes can embed several flows: keep them light.
+          storeRef.current.getState().setEffects(false, { remember: false });
           setState({ store: storeRef.current });
           startAt(storeRef.current, anchor);
         }

@@ -90,6 +90,8 @@ export interface FlowEditorState {
   runStale: boolean;
   capture: SceneCapture | null;
   marquee: Marquee | null;
+  /** Lighting, floor shadows and glow (off for embeds and slow machines). */
+  effects: boolean;
 
   setDoc: (doc: FlowDocument, options?: { history?: boolean; resetPlayback?: boolean }) => void;
   /** Move a node without recording history (while dragging). */
@@ -153,6 +155,16 @@ export interface FlowEditorState {
   clearRun: () => void;
   setCapture: (capture: SceneCapture | null) => void;
   setMarquee: (marquee: Marquee | null) => void;
+  setEffects: (effects: boolean, options?: { remember?: boolean }) => void;
+}
+
+const EFFECTS_KEY = "flow3d.effects";
+function rememberedEffects(): boolean {
+  try {
+    return localStorage.getItem(EFFECTS_KEY) !== "off";
+  } catch {
+    return true;
+  }
 }
 
 const HISTORY_LIMIT = 100;
@@ -219,6 +231,7 @@ export function createFlowEditorStore(initial: FlowDocument): FlowEditorStore {
       runStale: false,
       capture: null,
       marquee: null,
+      effects: rememberedEffects(),
 
       setDoc: (doc, options = {}) => {
         commit(doc, options.history ?? true);
@@ -619,6 +632,15 @@ export function createFlowEditorStore(initial: FlowDocument): FlowEditorStore {
 
       setCapture: (capture) => set({ capture }),
       setMarquee: (marquee) => set({ marquee }),
+      setEffects: (effects, options = {}) => {
+        set({ effects });
+        if (options.remember === false) return;
+        try {
+          localStorage.setItem(EFFECTS_KEY, effects ? "on" : "off");
+        } catch {
+          // Private mode: the choice just isn't remembered.
+        }
+      },
     };
   });
 }

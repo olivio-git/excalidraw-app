@@ -13,6 +13,7 @@ import {
   Redo2,
   RefreshCw,
   Search,
+  Sparkles,
   Square,
   Undo2,
   Video,
@@ -336,6 +337,7 @@ export function Flow3DEditor({
   const empty = useFlowEditor(store, (s) => s.doc.nodes.length === 0);
   const source = useFlowEditor(store, (s) => s.doc.source);
   const running = useFlowEditor(store, (s) => s.run?.status === "running");
+  const effects = useFlowEditor(store, (s) => s.effects);
   const [search, setSearch] = useState<FlowSearchMode | null>(null);
   const [minimap, setMinimap] = useState(initialMinimap);
   const state = store.getState();
@@ -440,6 +442,13 @@ export function Flow3DEditor({
         </ToolButton>
         <ToolButton label="Minimapa (M)" pressed={minimap} onClick={() => setMinimap(!minimap)}>
           <MapIcon />
+        </ToolButton>
+        <ToolButton
+          label="Efectos: luz de estudio, sombras y brillo"
+          pressed={effects}
+          onClick={() => state.setEffects(!effects)}
+        >
+          <Sparkles />
         </ToolButton>
         {editable && (
           <>

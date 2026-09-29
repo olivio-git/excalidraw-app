@@ -2,7 +2,9 @@ import { memo, useMemo, useRef } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Outlines, Text } from "@react-three/drei";
 import {
+  CanvasTexture,
   Color,
+  PlaneGeometry,
   Shape,
   ShapeGeometry,
   type Group,
@@ -34,6 +36,25 @@ const noteGeometry = new RoundedBoxGeometry(
   0.04
 );
 const ERROR_COLOR = "#ef4444";
+const FLOOR_Y = -0.89;
+
+/** One blurred rounded shadow, shared by every card (drawn once on a canvas). */
+let shadowTexture: CanvasTexture | null = null;
+function getShadowTexture(): CanvasTexture {
+  if (shadowTexture) return shadowTexture;
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 128;
+  const context = canvas.getContext("2d")!;
+  context.filter = "blur(14px)";
+  context.fillStyle = "rgba(0,0,0,1)";
+  context.beginPath();
+  context.roundRect(40, 34, 176, 60, 26);
+  context.fill();
+  shadowTexture = new CanvasTexture(canvas);
+  return shadowTexture;
+}
+const shadowGeometry = new PlaneGeometry(NODE_SIZE.width * 1.45, NODE_SIZE.height * 2.6);
 const tileGeometry = new RoundedBoxGeometry(0.7, 0.7, 0.14, 3, 0.12);
 
 function roundedRect(width: number, height: number, radius: number): ShapeGeometry {
@@ -125,6 +146,10 @@ interface FlowNodeViewProps {
   /** Extra line under the label (collapsed groups: step count). */
   subtitle?: string;
   span: TimelineSpan | undefined;
+  /** Bloom is on: running steps glow. */
+  hdr?: boolean;
+  /** Soft shadow on the floor under the card. */
+  shadow?: boolean;
   clock: PlaybackClock;
   handlers: NodeHandlers;
 }
@@ -143,6 +168,8 @@ export const FlowNodeView = memo(function FlowNodeView({
   failed = false,
   subtitle,
   span,
+  hdr = false,
+  shadow = false,
   clock,
   handlers,
 }: FlowNodeViewProps) {
@@ -171,7 +198,7 @@ export const FlowNodeView = memo(function FlowNodeView({
     }
     if (tile.current) {
       tile.current.emissiveIntensity = active
-        ? 0.55 + 0.35 * Math.sin(progress * Math.PI * 4)
+        ? (hdr ? 1.6 : 0.55) + 0.35 * Math.sin(progress * Math.PI * 4)
         : phase === "done"
           ? 0.22
           : 0.06;
@@ -217,6 +244,22 @@ export const FlowNodeView = memo(function FlowNodeView({
 
   return (
     <group position={node.position} userData={{ flowNodeId: node.id }}>
+      {shadow && !isNote && (
+        // Fades as the card rises: height reads at a glance.
+        <mesh
+          geometry={shadowGeometry}
+          position={[0, FLOOR_Y - node.position[1], 0.25]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          raycast={() => null}
+        >
+          <meshBasicMaterial
+            map={getShadowTexture()}
+            transparent
+            depthWrite={false}
+            opacity={Math.max(0.08, (theme.dark ? 0.55 : 0.28) - node.position[1] * 0.06)}
+          />
+        </mesh>
+      )}
       <group ref={lift}>
         {/* Glow behind the card while the step runs. */}
         <mesh geometry={haloGeometry} position={[0, 0, -size.depth / 2 - 0.02]}>
@@ -235,8 +278,9 @@ export const FlowNodeView = memo(function FlowNodeView({
             color={isNote ? color : theme.nodeCard}
             emissive={isNote ? color : theme.nodeCard}
             emissiveIntensity={theme.dark ? 0.12 : 0.35}
-            roughness={0.55}
-            metalness={0.05}
+            roughness={0.42}
+            metalness={0.08}
+            envMapIntensity={0.9}
             transparent={isNote}
             opacity={isNote ? 0.85 : 1}
           />

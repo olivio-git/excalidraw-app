@@ -44,7 +44,11 @@ function stubNamespace(namespace, implemented, reportMissing) {
   });
 }
 
-/** Class used for unknown PascalCase members (so `extends vscode.Foo` works). */
+/**
+ * Class used for unknown PascalCase members, so `extends vscode.Foo` works.
+ * Unknown lowercase statics are factories (`vscode.Foo.create(...)`) that
+ * return an instance; PascalCase statics look like enum members and stay unset.
+ */
 function stubClass(name) {
   const Stub = class {
     constructor(...args) {
@@ -52,7 +56,15 @@ function stubClass(name) {
     }
   };
   Object.defineProperty(Stub, "name", { value: name });
-  return Stub;
+  return new Proxy(Stub, {
+    get(target, prop, receiver) {
+      if (typeof prop === "symbol" || prop in target || prop === "then") {
+        return Reflect.get(target, prop, receiver);
+      }
+      if (/^[a-z]/.test(prop)) return (...args) => new Stub(...args);
+      return undefined;
+    },
+  });
 }
 
 module.exports = { stubNamespace, stubClass, stubFunction };

@@ -108,22 +108,36 @@ function createVscodeApi(host, extension) {
   };
 
   const classes = new Map();
+  const unknownMember = (target, name) => {
+    report(name);
+    if (/^[A-Z]/.test(name)) {
+      if (!classes.has(name)) classes.set(name, stubClass(name));
+      return classes.get(name);
+    }
+    const namespace = ns(name, {});
+    target[name] = namespace;
+    return namespace;
+  };
+  // Bundlers copy the module's own properties into a new object whose
+  // prototype is the module's (esbuild's `__toESM`), so members read later
+  // from that copy only reach this proxy through the prototype chain.
+  const stubPrototype = new Proxy(Object.prototype, {
+    get(proto, prop, receiver) {
+      if (typeof prop === "symbol" || prop in proto) return Reflect.get(proto, prop, receiver);
+      if (prop === "then" || prop === "__esModule" || prop === "default") return undefined;
+      // Namespaces stubbed earlier are cached on `api`.
+      return prop in api ? api[prop] : unknownMember(api, String(prop));
+    },
+  });
   return new Proxy(api, {
     get(target, prop, receiver) {
       if (typeof prop === "symbol" || prop in target) return Reflect.get(target, prop, receiver);
       if (prop === "then" || prop === "__esModule" || prop === "default") {
         return prop === "default" ? receiver : undefined;
       }
-      const name = String(prop);
-      report(name);
-      if (/^[A-Z]/.test(name)) {
-        if (!classes.has(name)) classes.set(name, stubClass(name));
-        return classes.get(name);
-      }
-      const namespace = ns(name, {});
-      target[name] = namespace;
-      return namespace;
+      return unknownMember(target, String(prop));
     },
+    getPrototypeOf: () => stubPrototype,
   });
 }
 

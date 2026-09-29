@@ -4,6 +4,7 @@ import { readFile } from "@tauri-apps/plugin-fs";
 import { FileImage, Palette, PlugZap, RotateCcw, Trash2, Upload } from "lucide-react";
 
 import { Badge } from "@/shared/components/ui/badge";
+import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { PluginManager } from "@/plugins/plugin-manager";
 import { usePluginsState } from "@/plugins/hooks/usePluginsState";
@@ -239,7 +240,7 @@ export default function PluginAdminPage() {
                         <Button
                           key={theme.key}
                           size="sm"
-                          variant={isActive ? "default" : "secondary"}
+                          variant={isActive ? "outline" : "ghost"}
                           disabled={isActive}
                           title="Tema de color"
                           className="gap-1.5"
@@ -259,7 +260,7 @@ export default function PluginAdminPage() {
                         <Button
                           key={theme.key}
                           size="sm"
-                          variant={isActive ? "default" : "secondary"}
+                          variant={isActive ? "outline" : "ghost"}
                           disabled={isActive}
                           title="Tema de iconos"
                           className="gap-1.5"
@@ -316,10 +317,14 @@ export default function PluginAdminPage() {
                       {manifest.description || "No description provided."}
                     </p>
                   </div>
-                  <Badge
-                    variant={isActive ? "default" : "outline"}
-                    className="text-[10px] uppercase tracking-wide"
-                  >
+                  <Badge variant="outline" className="shrink-0 gap-1.5 text-[11px] font-normal">
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "size-1.5 rounded-full",
+                        isActive ? "bg-emerald-500" : "bg-muted-foreground/40"
+                      )}
+                    />
                     {isActive ? "Active" : "Inactive"}
                   </Badge>
                 </div>

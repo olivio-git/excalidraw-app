@@ -75,8 +75,8 @@ export function SecondarySidebar() {
             <TooltipWrapper tooltip="Cerrar barra lateral secundaria" side="bottom">
               <Button
                 variant="ghost"
-                size="icon"
-                className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+                size="icon-sm"
+                className="shrink-0 text-muted-foreground hover:text-foreground"
                 onClick={() => setPartOpen("secondary", false)}
                 aria-label="Cerrar barra lateral secundaria"
               >

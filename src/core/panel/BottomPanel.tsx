@@ -85,8 +85,8 @@ export function BottomPanel() {
           <TooltipWrapper tooltip="Cerrar panel" side="top">
             <Button
               variant="ghost"
-              size="icon"
-              className="size-6 text-muted-foreground hover:text-foreground"
+              size="icon-xs"
+              className="text-muted-foreground hover:text-foreground"
               onClick={() => setPartOpen("panel", false)}
               aria-label="Cerrar panel"
             >

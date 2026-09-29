@@ -9,6 +9,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { Blocks } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
+import { buttonVariants } from "@/shared/components/ui/button";
 import { ErrorBoundary } from "@/shared/components/error/ErrorBoundary";
 import {
   Tooltip,
@@ -62,12 +63,12 @@ function ViewTabMenu({ view, location }: { view: WorkbenchView; location: ViewLo
   return (
     <ContextMenuContent className="w-60">
       {VIEW_LOCATIONS.filter((target) => target !== location).map((target) => (
-        <ContextMenuItem key={target} onSelect={() => moveView(view.id, target)}>
+        <ContextMenuItem key={target} onClick={() => moveView(view.id, target)}>
           Mover a {LOCATION_LABELS[target].toLowerCase()}
         </ContextMenuItem>
       ))}
       <ContextMenuSeparator />
-      <ContextMenuItem onSelect={resetLayout}>Restablecer diseño</ContextMenuItem>
+      <ContextMenuItem onClick={resetLayout}>Restablecer diseño</ContextMenuItem>
     </ContextMenuContent>
   );
 }
@@ -107,10 +108,9 @@ function ViewTab({
         data-view-tab={view.id}
         onClick={onSelect}
         className={cn(
-          "inline-flex size-7 shrink-0 items-center justify-center rounded-md transition-colors touch-none",
-          active
-            ? "bg-accent text-foreground"
-            : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+          buttonVariants({ variant: "ghost", size: "icon-sm" }),
+          "touch-none",
+          active ? "bg-muted text-foreground" : "text-muted-foreground",
           isDragging && "opacity-40"
         )}
       >
@@ -128,10 +128,11 @@ function ViewTab({
         data-view-tab={view.id}
         onClick={onSelect}
         className={cn(
-          "h-7 px-2 text-[11px] uppercase tracking-wide whitespace-nowrap border-b-2 transition-colors touch-none",
+          "relative h-8 px-2 text-[11px] font-medium uppercase tracking-wider whitespace-nowrap transition-colors touch-none outline-none focus-visible:text-foreground",
+          "after:absolute after:inset-x-2 after:bottom-0 after:h-px after:rounded-full after:transition-colors",
           active
-            ? "border-primary text-foreground"
-            : "border-transparent text-muted-foreground hover:text-foreground",
+            ? "text-foreground after:bg-foreground"
+            : "text-muted-foreground hover:text-foreground after:bg-transparent",
           isDragging && "opacity-40"
         )}
       >
@@ -142,16 +143,14 @@ function ViewTab({
   return (
     <ContextMenu>
       {variant === "sidebar" ? (
-        <TooltipProvider delayDuration={300}>
+        <TooltipProvider delay={300}>
           <Tooltip>
-            <TooltipTrigger asChild>
-              <ContextMenuTrigger asChild>{button}</ContextMenuTrigger>
-            </TooltipTrigger>
+            <TooltipTrigger render={<ContextMenuTrigger render={button} />} />
             <TooltipContent side={location === "panel" ? "top" : "bottom"}>{title}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
       ) : (
-        <ContextMenuTrigger asChild>{button}</ContextMenuTrigger>
+        <ContextMenuTrigger render={button} />
       )}
       <ViewTabMenu view={view} location={location} />
     </ContextMenu>

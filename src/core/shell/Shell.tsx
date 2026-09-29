@@ -78,7 +78,7 @@ export default function Shell() {
             tabIndex={-1}
             style={{ order: 2 }}
             className={cn(
-              "relative flex-1 min-w-0 flex min-h-0 overflow-hidden outline-none focus-within:ring-1 focus-within:ring-inset focus-within:ring-muted-foreground/40",
+              "relative flex-1 min-w-0 flex min-h-0 overflow-hidden outline-none",
               panelPosition === "bottom" ? "flex-col" : "flex-row"
             )}
           >

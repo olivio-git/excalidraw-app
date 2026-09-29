@@ -125,8 +125,8 @@ export default function TabBar({
           <Button
             type="button"
             variant="ghost"
-            size="icon"
-            className="size-6 shrink-0"
+            size="icon-xs"
+            className="shrink-0"
             aria-label={t("workbench.closeEmptyGroup")}
             title={t("workbench.closeEmptyGroup")}
             onClick={() => useTabStore.getState().closeEmptyGroup(groupId)}
@@ -163,16 +163,18 @@ export default function TabBar({
           </SortableContext>
         </div>
         <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 shrink-0"
-              aria-label={t("workbench.openTabs")}
-            >
-              <ChevronDown className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="shrink-0"
+                aria-label={t("workbench.openTabs")}
+              >
+                <ChevronDown className="size-4" />
+              </Button>
+            }
+          />
           <DropdownMenuContent align="end" className="max-h-80 min-w-48 overflow-y-auto">
             {tabs.map((tab) => (
               <DropdownMenuItem

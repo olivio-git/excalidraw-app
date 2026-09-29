@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import {
   Tooltip,
   TooltipContent,
@@ -20,9 +20,9 @@ export const TooltipWrapper = ({
   delayDuration = 300,
 }: TooltipWrapperProps) => {
   return (
-    <TooltipProvider delayDuration={delayDuration}>
+    <TooltipProvider delay={delayDuration}>
       <Tooltip>
-        <TooltipTrigger asChild>{children}</TooltipTrigger>
+        <TooltipTrigger render={children as ReactElement} />
         <TooltipContent side={side}>{tooltip}</TooltipContent>
       </Tooltip>
     </TooltipProvider>

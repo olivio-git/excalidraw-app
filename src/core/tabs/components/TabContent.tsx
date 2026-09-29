@@ -115,7 +115,7 @@ export default function TabContent() {
             )}
             className={cn(
               "absolute flex min-h-0 flex-col bg-background",
-              activeGroupId === group && "ring-1 ring-inset ring-primary/30"
+              groups.length > 1 && activeGroupId === group && "ring-1 ring-inset ring-primary/30"
             )}
             style={bounds}
             onPointerDownCapture={() => useTabStore.getState().setActiveGroup(group)}

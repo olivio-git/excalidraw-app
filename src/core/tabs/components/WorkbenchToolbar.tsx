@@ -21,8 +21,7 @@ export function WorkbenchToolbar() {
     <div className="flex h-9 min-w-0 items-center gap-1" data-tauri-drag-region>
       <Button
         variant="ghost"
-        size="icon"
-        className="size-7"
+        size="icon-sm"
         title={t("workbench.back")}
         aria-label={t("workbench.back")}
         disabled={history.index <= 0}
@@ -32,8 +31,7 @@ export function WorkbenchToolbar() {
       </Button>
       <Button
         variant="ghost"
-        size="icon"
-        className="size-7"
+        size="icon-sm"
         title={t("workbench.forward")}
         aria-label={t("workbench.forward")}
         disabled={history.index >= history.entries.length - 1}
@@ -49,8 +47,7 @@ export function WorkbenchToolbar() {
       </span>
       <Button
         variant="ghost"
-        size="icon"
-        className="size-7"
+        size="icon-sm"
         title={t("workbench.splitRight")}
         aria-label={t("workbench.splitRight")}
         aria-pressed={direction === "horizontal"}
@@ -60,8 +57,7 @@ export function WorkbenchToolbar() {
       </Button>
       <Button
         variant="ghost"
-        size="icon"
-        className="size-7"
+        size="icon-sm"
         title={t("workbench.splitDown")}
         aria-label={t("workbench.splitDown")}
         aria-pressed={direction === "vertical"}
@@ -72,8 +68,7 @@ export function WorkbenchToolbar() {
       {direction && (
         <Button
           variant="ghost"
-          size="icon"
-          className="size-7"
+          size="icon-sm"
           title={t("workbench.merge")}
           aria-label={t("workbench.merge")}
           onClick={() => useTabStore.getState().setSplitDirection(null)}

@@ -87,107 +87,116 @@ const Tab = React.memo(
     return (
       <div ref={setNodeRef} style={style}>
         <ContextMenu>
-          <ContextMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              onClick={() => onTabClick(tab)}
-              onDoubleClick={() => useTabStore.getState().keepTab(tab.id)}
-              onMouseDown={handleMiddleClick}
-              {...attributes}
-              {...listeners}
-              role="tab"
-              aria-selected={isActive}
-              data-tab-button={tab.id}
-              tabIndex={isActive ? 0 : -1}
-              onKeyDown={(event) => {
-                if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey)
-                  return;
-                if (isDragging || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
-                  listeners?.onKeyDown?.(event);
-                  return;
-                }
-                event.preventDefault();
-                const siblings = useTabStore
-                  .getState()
-                  .tabs.filter((item) => tabGroup(item) === tabGroup(tab));
-                const current = siblings.findIndex((item) => item.id === tab.id);
-                const next =
-                  event.key === "Home"
-                    ? 0
-                    : event.key === "End"
-                      ? siblings.length - 1
-                      : (current + (event.key === "ArrowLeft" ? -1 : 1) + siblings.length) %
-                        siblings.length;
-                const target = siblings[next];
-                if (!target) return;
-                onTabClick(target);
-                Array.from(document.querySelectorAll<HTMLElement>("[data-tab-button]"))
-                  .find((element) => element.dataset.tabButton === target.id)
-                  ?.focus();
-              }}
-              className={cn(
-                "group relative flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-xs font-medium transition-[background-color,color,opacity] duration-100",
-                "hover:bg-accent/70",
-                "cursor-grab active:cursor-grabbing",
-                isDragging && "opacity-70 ring-1 ring-primary/30",
-                tab.isPinned
-                  ? "min-w-[40px] max-w-[40px] h-7 justify-center"
-                  : "min-w-[120px] max-w-[200px] h-7",
-                isActive ? "bg-accent text-primary" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {tab.isPinned ? (
-                <TooltipWrapper tooltip={displayTitle} side="bottom">
-                  <span className="flex items-center justify-center">
-                    {Icon ? (
-                      <Icon className="size-3 flex-shrink-0" />
-                    ) : (
-                      <Pin className="size-3 flex-shrink-0 rotate-45" />
-                    )}
-                  </span>
-                </TooltipWrapper>
-              ) : (
-                <>
-                  {Icon && <Icon className="size-3 flex-shrink-0" />}
-                  <span
-                    className={cn("truncate flex-1 text-left", tab.isPreview && "italic")}
-                    title={
-                      tab.instanceId && homeDir
-                        ? tildify(tab.instanceId, homeDir)
-                        : (tab.instanceId ?? tab.title)
-                    }
-                  >
-                    {displayTitle || tab.path.split("/").pop() || t("tab.untitled")}
-                  </span>
-                  <span
-                    className={cn(
-                      "size-1.5 shrink-0 rounded-full bg-foreground transition-opacity",
-                      tab.metadata?.isDirty ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  {tab.isClosable && !isLastTab && (
-                    <span
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onCloseTab(e, tab.id);
-                      }}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      className={cn(
-                        "flex-shrink-0 rounded-sm opacity-0 group-hover:opacity-100 hover:bg-border p-0.5 transition-opacity cursor-pointer",
-                        isActive && "opacity-100"
+          <ContextMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                onClick={() => onTabClick(tab)}
+                onDoubleClick={() => useTabStore.getState().keepTab(tab.id)}
+                onMouseDown={handleMiddleClick}
+                {...attributes}
+                {...listeners}
+                role="tab"
+                aria-selected={isActive}
+                data-tab-button={tab.id}
+                tabIndex={isActive ? 0 : -1}
+                onKeyDown={(event) => {
+                  if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey)
+                    return;
+                  if (
+                    isDragging ||
+                    !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
+                  ) {
+                    listeners?.onKeyDown?.(event);
+                    return;
+                  }
+                  event.preventDefault();
+                  const siblings = useTabStore
+                    .getState()
+                    .tabs.filter((item) => tabGroup(item) === tabGroup(tab));
+                  const current = siblings.findIndex((item) => item.id === tab.id);
+                  const next =
+                    event.key === "Home"
+                      ? 0
+                      : event.key === "End"
+                        ? siblings.length - 1
+                        : (current + (event.key === "ArrowLeft" ? -1 : 1) + siblings.length) %
+                          siblings.length;
+                  const target = siblings[next];
+                  if (!target) return;
+                  onTabClick(target);
+                  Array.from(document.querySelectorAll<HTMLElement>("[data-tab-button]"))
+                    .find((element) => element.dataset.tabButton === target.id)
+                    ?.focus();
+                }}
+                className={cn(
+                  "group relative flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium transition-[background-color,color,opacity] duration-100",
+                  "hover:bg-muted",
+                  "cursor-grab active:cursor-grabbing",
+                  isDragging && "opacity-70 ring-1 ring-primary/30",
+                  tab.isPinned
+                    ? "min-w-[40px] max-w-[40px] h-7 justify-center"
+                    : "min-w-[120px] max-w-[200px] h-7",
+                  isActive
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tab.isPinned ? (
+                  <TooltipWrapper tooltip={displayTitle} side="bottom">
+                    <span className="flex items-center justify-center">
+                      {Icon ? (
+                        <Icon className="size-3 flex-shrink-0" />
+                      ) : (
+                        <Pin className="size-3 flex-shrink-0 rotate-45" />
                       )}
-                      aria-label={t("tab.closeTab")}
-                    >
-                      <X className="size-3" />
                     </span>
-                  )}
-                </>
-              )}
-              {isActive && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />}
-            </Button>
-          </ContextMenuTrigger>
+                  </TooltipWrapper>
+                ) : (
+                  <>
+                    {Icon && <Icon className="size-3 flex-shrink-0" />}
+                    <span
+                      className={cn("truncate flex-1 text-left", tab.isPreview && "italic")}
+                      title={
+                        tab.instanceId && homeDir
+                          ? tildify(tab.instanceId, homeDir)
+                          : (tab.instanceId ?? tab.title)
+                      }
+                    >
+                      {displayTitle || tab.path.split("/").pop() || t("tab.untitled")}
+                    </span>
+                    <span
+                      className={cn(
+                        "size-1.5 shrink-0 rounded-full bg-foreground transition-opacity",
+                        tab.metadata?.isDirty ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    {tab.isClosable && !isLastTab && (
+                      <span
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onCloseTab(e, tab.id);
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className={cn(
+                          "flex-shrink-0 rounded-sm opacity-0 group-hover:opacity-100 hover:bg-border p-0.5 transition-opacity cursor-pointer",
+                          isActive && "opacity-100"
+                        )}
+                        aria-label={t("tab.closeTab")}
+                      >
+                        <X className="size-3" />
+                      </span>
+                    )}
+                  </>
+                )}
+                {isActive && (
+                  <div className="absolute inset-x-2 bottom-0 h-px rounded-full bg-foreground/70" />
+                )}
+              </Button>
+            }
+          />
           <ContextMenuContent className="border-none">
             <ContextMenuItem
               onClick={() =>

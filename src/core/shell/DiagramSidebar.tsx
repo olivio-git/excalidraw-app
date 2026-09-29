@@ -102,7 +102,7 @@ const DiagramSidebar = () => {
       collapsible="offcanvas"
       side={sidebarSide}
       className={cn(
-        "h-full bg-background border-border/50 outline-none focus-within:ring-1 focus-within:ring-inset focus-within:ring-muted-foreground/40",
+        "h-full bg-background border-border/50 outline-none",
         sidebarSide === "left" ? "border-r" : "border-l"
       )}
       data-panel="sidebar"
@@ -121,9 +121,9 @@ const DiagramSidebar = () => {
               >
                 <Button
                   variant="ghost"
-                  size="icon"
+                  size="icon-sm"
                   onClick={toggleCompact}
-                  className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
                 >
                   <ChevronRight
                     className={cn(
@@ -148,120 +148,122 @@ const DiagramSidebar = () => {
             isCompact ? "flex-col items-center" : "flex-row items-center"
           )}
         >
-          <TooltipWrapper tooltip={t("panels.settings")} side="right">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "size-7",
-                    isOnSettings
-                      ? "bg-accent text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Settings className="size-4" />
-                </Button>
+          <DropdownMenu>
+            <TooltipWrapper tooltip={t("panels.settings")} side="right">
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t("panels.settings")}
+                    className={cn(
+                      isOnSettings
+                        ? "bg-accent text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  />
+                }
+              >
+                <Settings />
               </DropdownMenuTrigger>
-              <DropdownMenuContent side="right" align="end" className="w-56" sideOffset={8}>
-                <DropdownMenuGroup>
-                  <DropdownMenuItem
-                    onClick={() => PluginManager.executeCommand("workbench.action.openSettings")}
-                  >
-                    <Settings className="mr-2 size-4" />
-                    <span>{t("panels.settings")}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => PluginManager.executeCommand("workbench.action.openPluginAdmin")}
-                  >
-                    <PlugZap className="mr-2 size-4" />
-                    <span>{t("panels.pluginAdmin")}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
-                      <Palette className="mr-2 size-4" />
-                      <span>{t("panels.theme")}</span>
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent>
-                      <DropdownMenuItem
-                        onClick={() => setTheme("light")}
-                        className={cn(theme === "light" && "bg-accent text-accent-foreground")}
-                      >
-                        <Sun className="mr-2 size-4" /> {t("panels.themeLight")}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setTheme("dark")}
-                        className={cn(theme === "dark" && "bg-accent text-accent-foreground")}
-                      >
-                        <Moon className="mr-2 size-4" /> {t("panels.themeDark")}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setTheme("system")}
-                        className={cn(theme === "system" && "bg-accent text-accent-foreground")}
-                      >
-                        <Monitor className="mr-2 size-4" /> {t("panels.themeSystem")}
-                      </DropdownMenuItem>
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                </DropdownMenuGroup>
+            </TooltipWrapper>
+            <DropdownMenuContent side="right" align="end" className="w-56" sideOffset={8}>
+              <DropdownMenuGroup>
+                <DropdownMenuItem
+                  onClick={() => PluginManager.executeCommand("workbench.action.openSettings")}
+                >
+                  <Settings className="mr-2 size-4" />
+                  <span>{t("panels.settings")}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => PluginManager.executeCommand("workbench.action.openPluginAdmin")}
+                >
+                  <PlugZap className="mr-2 size-4" />
+                  <span>{t("panels.pluginAdmin")}</span>
+                </DropdownMenuItem>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <Palette className="mr-2 size-4" />
+                    <span>{t("panels.theme")}</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem
+                      onClick={() => setTheme("light")}
+                      className={cn(theme === "light" && "bg-accent text-accent-foreground")}
+                    >
+                      <Sun className="mr-2 size-4" /> {t("panels.themeLight")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setTheme("dark")}
+                      className={cn(theme === "dark" && "bg-accent text-accent-foreground")}
+                    >
+                      <Moon className="mr-2 size-4" /> {t("panels.themeDark")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setTheme("system")}
+                      className={cn(theme === "system" && "bg-accent text-accent-foreground")}
+                    >
+                      <Monitor className="mr-2 size-4" /> {t("panels.themeSystem")}
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              </DropdownMenuGroup>
 
-                {pluginFooterActions.length > 0 && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuGroup>
-                      {pluginFooterActions.map((action) => {
-                        const Icon = action.icon;
-                        if (action.submenu && action.submenu.length > 0) {
-                          return (
-                            <DropdownMenuSub key={action.id}>
-                              <DropdownMenuSubTrigger
-                                className={cn(
-                                  action.destructive && "text-destructive focus:text-destructive"
-                                )}
-                              >
-                                {Icon && <Icon className="mr-2 size-4" />}
-                                <span>{action.label}</span>
-                              </DropdownMenuSubTrigger>
-                              <DropdownMenuSubContent>
-                                {action.submenu.map((item) => {
-                                  const ItemIcon = item.icon;
-                                  return (
-                                    <DropdownMenuItem
-                                      key={item.id}
-                                      onClick={item.onClick}
-                                      className={cn(
-                                        item.isActive && "bg-accent text-accent-foreground"
-                                      )}
-                                    >
-                                      {ItemIcon && <ItemIcon className="mr-2 size-4" />}
-                                      <span>{item.label}</span>
-                                    </DropdownMenuItem>
-                                  );
-                                })}
-                              </DropdownMenuSubContent>
-                            </DropdownMenuSub>
-                          );
-                        }
+              {pluginFooterActions.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    {pluginFooterActions.map((action) => {
+                      const Icon = action.icon;
+                      if (action.submenu && action.submenu.length > 0) {
                         return (
-                          <DropdownMenuItem
-                            key={action.id}
-                            onClick={action.onClick}
-                            className={cn(
-                              action.destructive && "text-destructive focus:text-destructive"
-                            )}
-                          >
-                            {Icon && <Icon className="mr-2 size-4" />}
-                            <span>{action.label}</span>
-                          </DropdownMenuItem>
+                          <DropdownMenuSub key={action.id}>
+                            <DropdownMenuSubTrigger
+                              className={cn(
+                                action.destructive && "text-destructive focus:text-destructive"
+                              )}
+                            >
+                              {Icon && <Icon className="mr-2 size-4" />}
+                              <span>{action.label}</span>
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent>
+                              {action.submenu.map((item) => {
+                                const ItemIcon = item.icon;
+                                return (
+                                  <DropdownMenuItem
+                                    key={item.id}
+                                    onClick={item.onClick}
+                                    className={cn(
+                                      item.isActive && "bg-accent text-accent-foreground"
+                                    )}
+                                  >
+                                    {ItemIcon && <ItemIcon className="mr-2 size-4" />}
+                                    <span>{item.label}</span>
+                                  </DropdownMenuItem>
+                                );
+                              })}
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
                         );
-                      })}
-                    </DropdownMenuGroup>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </TooltipWrapper>
+                      }
+                      return (
+                        <DropdownMenuItem
+                          key={action.id}
+                          onClick={action.onClick}
+                          className={cn(
+                            action.destructive && "text-destructive focus:text-destructive"
+                          )}
+                        >
+                          {Icon && <Icon className="mr-2 size-4" />}
+                          <span>{action.label}</span>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuGroup>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </SidebarFooter>
     </SidebarPrimitive>

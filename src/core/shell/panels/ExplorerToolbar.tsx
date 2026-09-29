@@ -85,27 +85,29 @@ export const ExplorerToolbar = ({ searchRef, ...props }: ExplorerToolbarProps) =
             <TooltipWrapper key={label} tooltip={label} side="bottom">
               <Button
                 variant="ghost"
-                size="icon"
+                size="icon-xs"
                 aria-label={label}
                 disabled={disabled}
                 onClick={run}
-                className="size-6 rounded-sm text-muted-foreground hover:text-foreground"
+                className="rounded-sm text-muted-foreground hover:text-foreground"
               >
                 <Icon className={cn("size-3.5", spin && "animate-spin")} />
               </Button>
             </TooltipWrapper>
           ))}
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-6 text-muted-foreground"
-                aria-label={t("toolbar.more")}
-              >
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-muted-foreground"
+                  aria-label={t("toolbar.more")}
+                >
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              }
+            />
             <DropdownMenuContent align="end" className="min-w-52">
               <DropdownMenuItem onClick={props.onQuickOpen}>
                 <Search />

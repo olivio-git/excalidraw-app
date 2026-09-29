@@ -49,13 +49,12 @@ export function LayoutControls() {
         <TooltipWrapper key={id} tooltip={label} side="bottom">
           <Button
             variant="ghost"
-            size="icon"
+            size="icon-sm"
             aria-label={label}
             aria-pressed={active}
             data-layout-toggle={id}
             onClick={onClick}
             className={cn(
-              "size-7",
               active ? "text-foreground" : "text-muted-foreground/70 hover:text-foreground"
             )}
           >

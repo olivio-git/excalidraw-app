@@ -179,7 +179,7 @@ export const QuickOpenDialog = ({
         if (!isOpen) onClose();
       }}
     >
-      <DialogContent className="p-0 gap-0 max-w-lg overflow-hidden" showClose={false}>
+      <DialogContent className="p-0 gap-0 max-w-lg overflow-hidden" showCloseButton={false}>
         {/* Accessible title/description (visually hidden) */}
         <DialogTitle className="sr-only">{t("quickOpen.dialogTitle")}</DialogTitle>
         <DialogDescription className="sr-only">

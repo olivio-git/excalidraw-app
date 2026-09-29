@@ -1,5 +1,7 @@
 import * as React from "react";
-import { Slot } from "@radix-ui/react-slot";
+import { Slot as SlotPrimitive } from "radix-ui";
+
+const Slot = SlotPrimitive.Slot;
 import { cva, type VariantProps } from "class-variance-authority";
 import { PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
 
@@ -141,7 +143,7 @@ const SidebarProvider = React.forwardRef<
 
     return (
       <SidebarContext.Provider value={contextValue}>
-        <TooltipProvider delayDuration={0}>
+        <TooltipProvider delay={0}>
           <div
             data-sidebar-wrapper
             style={
@@ -265,22 +267,24 @@ const SidebarTrigger = React.forwardRef<
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          ref={ref}
-          data-sidebar="trigger"
-          variant="ghost"
-          size="icon"
-          className={cn("h-7 w-7", className)}
-          onClick={(event) => {
-            onClick?.(event);
-            toggleSidebar();
-          }}
-          {...props}
-        >
-          {state === "expanded" ? <PanelLeftCloseIcon /> : <PanelLeftOpenIcon />}
-          <span className="sr-only">Toggle Sidebar</span>
-        </Button>
+      <TooltipTrigger
+        render={
+          <Button
+            ref={ref}
+            data-sidebar="trigger"
+            variant="ghost"
+            size="icon-sm"
+            className={cn("size-7", className)}
+            onClick={(event) => {
+              onClick?.(event);
+              toggleSidebar();
+            }}
+            {...props}
+          />
+        }
+      >
+        {state === "expanded" ? <PanelLeftCloseIcon /> : <PanelLeftOpenIcon />}
+        <span className="sr-only">Toggle Sidebar</span>
       </TooltipTrigger>
       <TooltipContent side="right">
         {state === "expanded" ? "Collapse menu" : "Expand menu"}
@@ -575,7 +579,7 @@ const SidebarMenuButton = React.forwardRef<
 
     return (
       <Tooltip>
-        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipTrigger render={button} />
         <TooltipContent
           side="right"
           align="center"

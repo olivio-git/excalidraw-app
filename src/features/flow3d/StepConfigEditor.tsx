@@ -52,6 +52,10 @@ function blankConfig(type: StepConfig["type"], kind: FlowNode["kind"]): StepConf
       return { type, template: '{\n  "valor": "{{input}}"\n}' };
     case "condition":
       return { type, field: "", operator: "==", value: "" };
+    case "schedule":
+      return { type, every: 60 };
+    case "fileWatch":
+      return { type, path: "." };
     default:
       return { type: "manual", payload: "{}" };
   }
@@ -183,6 +187,49 @@ export function StepConfigEditor({
         />
       </Row>
       {config?.type === "manual" && text("payload", "Datos iniciales (JSON)", { code: true })}
+      {config?.type === "schedule" && (
+        <>
+          <div className="grid grid-cols-2 gap-1.5">
+            <Row label="Cada (minutos)">
+              <Input
+                type="number"
+                min={1}
+                className={inputClass}
+                value={config.every ?? ""}
+                placeholder="—"
+                disabled={!editable}
+                onChange={(event) =>
+                  patch({ every: Number(event.target.value) || undefined } as Partial<StepConfig>)
+                }
+              />
+            </Row>
+            <Row label="o cada día a las">
+              <Input
+                type="time"
+                className={inputClass}
+                value={config.at ?? ""}
+                disabled={!editable || Boolean(config.every)}
+                onChange={(event) =>
+                  patch({ at: event.target.value || undefined } as Partial<StepConfig>)
+                }
+              />
+            </Row>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Recibe {"{ trigger, at }"}. Funciona mientras la app está abierta con esta carpeta.
+          </p>
+        </>
+      )}
+      {config?.type === "fileWatch" && (
+        <>
+          {text("path", "Archivo o carpeta (relativo al flujo)", {
+            placeholder: "notas/  ·  datos.csv",
+          })}
+          <p className="text-[10px] text-muted-foreground">
+            Recibe {"{ trigger, path, paths }"}. Ignora los cambios que hace el propio flujo.
+          </p>
+        </>
+      )}
       {config?.type === "http" && (
         <>
           <div className="grid grid-cols-[5.5rem_1fr] gap-1.5">
@@ -293,10 +340,57 @@ export function StepConfigEditor({
           </p>
         </>
       )}
-      {config && config.type !== "condition" && config.type !== "manual" && (
+      {config && !["condition", "manual", "schedule", "fileWatch"].includes(config.type) && (
+        <details className="rounded-md border border-border/70 px-2 py-1.5 text-[11px]">
+          <summary className="cursor-pointer text-muted-foreground select-none">
+            Repetir y reintentar
+            {config.forEach || config.retries ? " · activo" : ""}
+          </summary>
+          <div className="mt-2 space-y-2">
+            {text("forEach", "Repetir por cada elemento de", {
+              placeholder: "body.items  ·  input",
+            })}
+            <div className="grid grid-cols-2 gap-1.5">
+              <Row label="Reintentos si falla">
+                <Input
+                  type="number"
+                  min={0}
+                  max={10}
+                  className={inputClass}
+                  value={config.retries ?? 0}
+                  disabled={!editable}
+                  onChange={(event) =>
+                    patch({
+                      retries: Number(event.target.value) || undefined,
+                    } as Partial<StepConfig>)
+                  }
+                />
+              </Row>
+              <Row label="Espera (s)">
+                <Input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  className={inputClass}
+                  value={config.retryDelay ?? 2}
+                  disabled={!editable || !config.retries}
+                  onChange={(event) =>
+                    patch({ retryDelay: Number(event.target.value) } as Partial<StepConfig>)
+                  }
+                />
+              </Row>
+            </div>
+            <p className="text-[10px] leading-snug text-muted-foreground">
+              Al repetir, usa <code>{"{{item}}"}</code> e <code>{"{{index}}"}</code>; la salida es
+              la lista de resultados.
+            </p>
+          </div>
+        </details>
+      )}
+      {config && !["condition", "manual", "schedule", "fileWatch"].includes(config.type) && (
         <p className="text-[10px] leading-snug text-muted-foreground">
-          Usa <code>{"{{input.campo}}"}</code> o <code>{"{{steps.id.output.campo}}"}</code> para
-          insertar datos.
+          Usa <code>{"{{input.campo}}"}</code>, <code>{"{{steps.id.output.campo}}"}</code> o{" "}
+          <code>{"{{secrets.NOMBRE}}"}</code> para insertar datos.
         </p>
       )}
     </div>

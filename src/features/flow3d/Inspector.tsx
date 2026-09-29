@@ -35,6 +35,8 @@ import {
 import { useFlowEditor, type FlowEditorStore } from "./editor-store";
 import { StepConfigEditor } from "./StepConfigEditor";
 import type { StepRecord } from "./executor";
+import { AutomationToggle, StatusDot } from "./RunTools";
+import { relativeTime } from "./run-history";
 
 const KIND_ITEMS = NODE_KIND_ORDER.map((kind) => ({ value: kind, label: NODE_KINDS[kind].label }));
 
@@ -170,14 +172,22 @@ function NodePanel({
       )}
 
       {tab === "run" && executes && (
-        <StepConfigEditor
-          node={node}
-          editable={editable}
-          onChange={(config) => update({ config })}
-        />
+        <>
+          {node.kind === "trigger" &&
+            (node.config?.type === "schedule" || node.config?.type === "fileWatch") && (
+              <AutomationToggle store={store} editable={editable} />
+            )}
+          <StepConfigEditor
+            node={node}
+            editable={editable}
+            onChange={(config) => update({ config })}
+          />
+        </>
       )}
 
-      {tab === "data" && executes && <StepData step={step} stale={stale} />}
+      {tab === "data" && executes && (
+        <StepData step={step} stale={stale} store={store} nodeId={node.id} />
+      )}
 
       {(tab === "step" || !executes) && (
         <>
@@ -382,7 +392,23 @@ const STATUS_LABEL: Record<StepRecord["status"], string> = {
 };
 
 /** Input and output of the step in the last run. */
-function StepData({ step, stale }: { step: StepRecord | undefined; stale: boolean }) {
+function StepData({
+  step,
+  stale,
+  store,
+  nodeId,
+}: {
+  step: StepRecord | undefined;
+  stale: boolean;
+  store: FlowEditorStore;
+  nodeId: string;
+}) {
+  const history = useFlowEditor(store, (s) => s.history);
+  const shownRunId = useFlowEditor(store, (s) => s.shownRunId);
+  const compareRunId = useFlowEditor(store, (s) => s.compareRunId);
+  const others = history.filter((entry) => entry.id !== shownRunId && entry.run.steps[nodeId]);
+  const compared = others.find((entry) => entry.id === compareRunId);
+  const comparedStep = compared?.run.steps[nodeId];
   if (!step) {
     return (
       <p className="text-xs text-muted-foreground">
@@ -418,9 +444,66 @@ function StepData({ step, stale }: { step: StepRecord | undefined; stale: boolea
       {step.error && <DataBlock label="Error" value={step.error} tone="error" />}
       {step.status !== "skipped" && <DataBlock label="Entrada" value={formatData(step.input)} />}
       {step.status === "done" && <DataBlock label="Salida" value={formatData(step.output)} />}
+      {others.length > 0 && (
+        <div className="space-y-1.5 border-t border-border/60 pt-2">
+          <Select
+            items={[
+              { value: NO_COMPARE, label: "Comparar con otra ejecución…" },
+              ...others.map((entry) => ({ value: entry.id, label: relativeTime(entry.startedAt) })),
+            ]}
+            value={compared ? compared.id : NO_COMPARE}
+            onValueChange={(value) =>
+              store.getState().setCompareRun(value === NO_COMPARE ? null : (value as string))
+            }
+          >
+            <SelectTrigger size="sm" aria-label="Comparar con" className="w-full text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent alignItemWithTrigger={false}>
+              <SelectItem value={NO_COMPARE} className="text-xs">
+                Comparar con otra ejecución…
+              </SelectItem>
+              {others.map((entry) => (
+                <SelectItem key={entry.id} value={entry.id} className="text-xs">
+                  <StatusDot
+                    status={entry.run.steps[nodeId]?.status === "error" ? "error" : entry.status}
+                  />
+                  {relativeTime(entry.startedAt)} · {entry.duration.toFixed(1)}s
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {comparedStep && (
+            <>
+              <p
+                className={cn(
+                  "text-[11px] font-medium",
+                  formatData(comparedStep.output) === formatData(step.output)
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-amber-600 dark:text-amber-400"
+                )}
+              >
+                {comparedStep.status !== step.status
+                  ? `Antes: ${STATUS_LABEL[comparedStep.status].toLowerCase()}`
+                  : formatData(comparedStep.output) === formatData(step.output)
+                    ? "Misma salida que entonces"
+                    : "La salida cambió"}
+              </p>
+              {comparedStep.error && (
+                <DataBlock label="Error de entonces" value={comparedStep.error} tone="error" />
+              )}
+              {comparedStep.status === "done" && (
+                <DataBlock label="Salida de entonces" value={formatData(comparedStep.output)} />
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
+
+const NO_COMPARE = "__none__";
 
 function MultiPanel({
   store,

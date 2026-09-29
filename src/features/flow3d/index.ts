@@ -102,6 +102,35 @@ function activate(api: PluginAPI): void {
   api.registerCommand("flow3d.layout", () => activeFlow()?.store.getState().layout());
   api.registerCommand("flow3d.execute", () => activeFlow()?.execute?.());
   api.registerCommand("flow3d.exportExcalidraw", () => activeFlow()?.exportExcalidraw?.());
+
+  // Automations: loaded apart so the app starts without the flow engine.
+  const automation = () => import("./automation-service");
+  void automation().then(({ startFlowAutomation }) => startFlowAutomation());
+  api.registerCommand("flow3d.toggleAutomations", async () => {
+    const { flowAutomation } = await automation();
+    flowAutomation.paused = !flowAutomation.paused;
+    notify(flowAutomation.paused ? "Automatizaciones en pausa" : "Automatizaciones reanudadas", {
+      type: "info",
+    });
+  });
+  api.registerCommand("flow3d.listAutomations", async () => {
+    const [{ flowAutomation }, { describePlan }] = await Promise.all([
+      automation(),
+      import("./automation"),
+    ]);
+    const active = flowAutomation.list();
+    notify(
+      active.length === 0
+        ? "Ningún flujo se ejecuta solo"
+        : `${active.length} flujo(s) automáticos${flowAutomation.paused ? " (en pausa)" : ""}`,
+      {
+        type: "info",
+        description: active
+          .map((flow) => `${flow.name}: ${flow.plans.map(describePlan).join(", ")}`)
+          .join("\n"),
+      }
+    );
+  });
 }
 
 export const flow3dPlugin: Plugin = {
@@ -120,6 +149,8 @@ export const flow3dPlugin: Plugin = {
       { id: "flow3d.layout", name: "Flow 3D: Organizar automáticamente" },
       { id: "flow3d.execute", name: "Flow 3D: Ejecutar flujo" },
       { id: "flow3d.exportExcalidraw", name: "Flow 3D: Exportar a Excalidraw" },
+      { id: "flow3d.listAutomations", name: "Flow 3D: Ver automatizaciones activas" },
+      { id: "flow3d.toggleAutomations", name: "Flow 3D: Pausar / reanudar automatizaciones" },
     ],
   },
   activate,

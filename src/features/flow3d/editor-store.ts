@@ -21,6 +21,7 @@ import {
   type RunOptions,
   type RunState,
 } from "./executor";
+import { flowSignature, type RunHistoryEntry } from "./run-history";
 
 export type Selection = { type: "node" | "edge" | "group"; id: string } | null;
 export type CameraView = "perspective" | "top";
@@ -149,8 +150,18 @@ export interface FlowEditorState {
       payload?: unknown;
       /** Tests: fake clock and pacing. */
       timing?: Pick<RunOptions, "now" | "sleep" | "edgeDuration" | "minStepDuration">;
-    }
+    } & Pick<RunOptions, "startAt" | "trigger" | "secrets">
   ) => Promise<RunState>;
+  /** Past runs of this flow (newest first). */
+  history: RunHistoryEntry[];
+  setHistory: (history: RunHistoryEntry[]) => void;
+  /** Id of the history entry shown in the scene, if any. */
+  shownRunId: string | null;
+  /** Show a past run: its results, and its playback on the timeline. */
+  showRun: (entry: RunHistoryEntry) => void;
+  /** Run whose data the inspector shows next to the current one. */
+  compareRunId: string | null;
+  setCompareRun: (id: string | null) => void;
   cancelRun: () => void;
   clearRun: () => void;
   setCapture: (capture: SceneCapture | null) => void;
@@ -232,6 +243,9 @@ export function createFlowEditorStore(initial: FlowDocument): FlowEditorStore {
       capture: null,
       marquee: null,
       effects: rememberedEffects(),
+      history: [],
+      shownRunId: null,
+      compareRunId: null,
 
       setDoc: (doc, options = {}) => {
         commit(doc, options.history ?? true);
@@ -582,7 +596,7 @@ export function createFlowEditorStore(initial: FlowDocument): FlowEditorStore {
         const controller = new AbortController();
         abort = controller;
         const now = options.timing?.now ?? (() => performance.now());
-        const started = emptyRun(now());
+        const started = emptyRun(now(), options.trigger);
         state.clock.time = 0;
         set({
           mode: "run",
@@ -591,12 +605,16 @@ export function createFlowEditorStore(initial: FlowDocument): FlowEditorStore {
           timeline: runTimeline(started),
           playing: true,
           displayTime: 0,
+          shownRunId: null,
         });
         // A newer run (or clearing the run) replaces `abort`: this run then stops writing.
         const result = await executeFlow(get().doc, {
           services,
           signal: controller.signal,
           payload: options.payload,
+          startAt: options.startAt,
+          trigger: options.trigger,
+          secrets: options.secrets,
           ...options.timing,
           now,
           onUpdate: (run) => {
@@ -627,9 +645,28 @@ export function createFlowEditorStore(initial: FlowDocument): FlowEditorStore {
           timeline: buildTimeline(doc),
           playing: false,
           displayTime: 0,
+          shownRunId: null,
         });
       },
 
+      setHistory: (history) => set({ history }),
+      showRun: (entry) => {
+        if (get().run?.status === "running") return;
+        abort = null;
+        const stale = entry.signature !== flowSignature(get().doc);
+        const { clock, doc } = get();
+        clock.time = 0;
+        set({
+          mode: "run",
+          run: entry.run,
+          runStale: stale,
+          timeline: stale ? buildTimeline(doc) : runTimeline(entry.run),
+          shownRunId: entry.id,
+          playing: false,
+          displayTime: 0,
+        });
+      },
+      setCompareRun: (compareRunId) => set({ compareRunId }),
       setCapture: (capture) => set({ capture }),
       setMarquee: (marquee) => set({ marquee }),
       setEffects: (effects, options = {}) => {

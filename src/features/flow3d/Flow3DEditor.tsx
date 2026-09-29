@@ -44,6 +44,8 @@ import { FlowScene } from "./scene/FlowScene";
 import { Inspector } from "./Inspector";
 import { FlowSearch, type FlowSearchMode } from "./FlowSearch";
 import { Minimap } from "./Minimap";
+import { AutomationBadge, HistoryMenu, SecretsButton } from "./RunTools";
+import type { SecretStore } from "./secrets";
 
 const SPEEDS = [
   { value: "0.5", label: "0.5×" },
@@ -308,6 +310,9 @@ interface Flow3DEditorProps {
   exports?: Flow3DExportActions;
   /** Recording a video: shows a badge. */
   recording?: boolean;
+  /** Secrets store: shows the Secrets button. */
+  secrets?: SecretStore;
+  onClearHistory?: () => void;
 }
 
 /**
@@ -329,6 +334,8 @@ export function Flow3DEditor({
   onExecute,
   exports,
   recording,
+  secrets,
+  onClearHistory,
 }: Flow3DEditorProps) {
   const follow = useFlowEditor(store, (s) => s.follow);
   const view = useFlowEditor(store, (s) => s.view);
@@ -416,6 +423,9 @@ export function Flow3DEditor({
       <div className="flex h-9 shrink-0 items-center gap-1 overflow-x-auto overflow-y-hidden border-b border-border/60 px-2 [scrollbar-width:none] [&>*]:shrink-0">
         <PlaybackControls store={store} onExecute={onExecute} />
         <RunStatus store={store} />
+        <AutomationBadge store={store} />
+        {onExecute && <HistoryMenu store={store} onClear={onClearHistory} />}
+        {secrets && editable && <SecretsButton secrets={secrets} />}
         <div className="mx-1 h-4 w-px bg-border" />
         <ToolButton label="Buscar paso (Ctrl+F)" onClick={() => setSearch("find")}>
           <Search />

@@ -23,6 +23,8 @@ import { flow3dRegistry } from "./flow3d-registry";
 import { sideEffectSteps, STEP_TYPES } from "./executor";
 import { createRuntimeServices } from "./runtime-services";
 import { recordPlayback, snapshotPng } from "./media-export";
+import { flowSecrets, runHistory } from "./app-stores";
+import { flowSignature, toHistoryEntry } from "./run-history";
 
 const AUTOSAVE_MS = 700;
 
@@ -212,6 +214,22 @@ export default function Flow3DEditorContainer() {
     }
   }, [filePath]);
 
+  // Past runs: loaded once, then kept in sync (automations add runs too).
+  useEffect(() => {
+    if (load.status !== "ready" || !filePath) return;
+    let alive = true;
+    void runHistory.list(filePath).then((entries) => {
+      if (alive) load.store.getState().setHistory(entries);
+    });
+    const unsubscribe = runHistory.subscribe(filePath, (entries) =>
+      load.store.getState().setHistory(entries)
+    );
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
+  }, [load, filePath]);
+
   // Links like `pedidos.flow3d#validar` open the flow on that step.
   useEffect(() => {
     if (!navigationAnchor || load.status !== "ready") return;
@@ -250,7 +268,11 @@ export default function Flow3DEditorContainer() {
       });
       if (!ok) return;
     }
-    const run = await store.getState().execute(createRuntimeServices(filePath));
+    const secrets = await flowSecrets.all();
+    const run = await store
+      .getState()
+      .execute(createRuntimeServices(filePath), { secrets, trigger: "manual" });
+    void runHistory.add(toHistoryEntry(filePath, run, flowSignature(store.getState().doc)));
     if (run.status === "error") {
       const failed = Object.values(run.steps).find((s) => s.status === "error");
       const node = doc.nodes.find((n) => n.id === failed?.nodeId);
@@ -373,6 +395,8 @@ export default function Flow3DEditorContainer() {
       onImportExcalidraw={() => void onImportExcalidraw()}
       onSyncSource={() => void onSyncSource()}
       onExecute={() => void onExecute()}
+      secrets={flowSecrets}
+      onClearHistory={() => void runHistory.clear(filePath)}
       recording={recording}
       exports={{
         image: () => void onExportImage(),

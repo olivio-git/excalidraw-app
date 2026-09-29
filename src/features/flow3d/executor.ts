@@ -59,6 +59,8 @@ export interface StepRecord {
   end?: number;
   /** Edge the output left through (conditions pick one). */
   via?: string[];
+  /** Attempts it took (retries). */
+  attempts?: number;
 }
 
 export type RunStatus = "running" | "done" | "error" | "cancelled";
@@ -70,10 +72,16 @@ export interface RunState {
   edges: TimelineSpan[];
   order: string[];
   error?: string;
-  /** Wall-clock start, `performance.now()` milliseconds. */
+  /** Run clock start, `now()` milliseconds (performance.now() in the app). */
   startedAt: number;
   finishedAt?: number;
+  /** Calendar time the run started (Date.now()), for the history. */
+  startedWall: number;
+  /** What started it. */
+  trigger?: RunTrigger;
 }
+
+export type RunTrigger = "manual" | "schedule" | "file";
 
 export interface RunOptions {
   services: ExecutorServices;
@@ -88,6 +96,11 @@ export interface RunOptions {
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   /** Initial payload for triggers without a configured one. */
   payload?: unknown;
+  /** Start only from these triggers (automations); default: every trigger. */
+  startAt?: string[];
+  /** Values for `{{secrets.NAME}}`; they never appear in the recorded data. */
+  secrets?: Record<string, string>;
+  trigger?: RunTrigger;
 }
 
 export const STEP_TYPES: Record<
@@ -95,6 +108,16 @@ export const STEP_TYPES: Record<
   { label: string; sideEffect: boolean; description: string }
 > = {
   manual: { label: "Datos iniciales", sideEffect: false, description: "JSON con el que arranca" },
+  schedule: {
+    label: "Horario",
+    sideEffect: false,
+    description: "Se ejecuta solo cada cierto tiempo",
+  },
+  fileWatch: {
+    label: "Cambio de archivo",
+    sideEffect: false,
+    description: "Se ejecuta al cambiar un archivo o carpeta",
+  },
   http: { label: "Petición HTTP", sideEffect: true, description: "Llama a una URL" },
   command: { label: "Comando de terminal", sideEffect: true, description: "Ejecuta en el shell" },
   appCommand: {
@@ -167,11 +190,28 @@ export function getPath(value: unknown, path: string): unknown {
 export interface TemplateScope {
   input: unknown;
   steps: Record<string, { output?: unknown }>;
+  /** Current element and position while repeating a step over a list. */
+  item?: unknown;
+  index?: number;
+  secrets?: Record<string, string>;
 }
+
+/** A `{{secrets.X}}` that has no value. */
+export class MissingSecretError extends Error {}
 
 function resolveExpression(expression: string, scope: TemplateScope): unknown {
   const path = expression.trim();
   if (path === "input") return scope.input;
+  if (path === "item") return scope.item;
+  if (path.startsWith("item.")) return getPath(scope.item, path.slice(5));
+  if (path === "index") return scope.index;
+  if (path.startsWith("secrets.")) {
+    const name = path.slice(8);
+    const value = scope.secrets?.[name];
+    if (value === undefined)
+      throw new MissingSecretError(`Falta el secreto «${name}» (botón Secretos)`);
+    return value;
+  }
   if (path.startsWith("input.")) return getPath(scope.input, path.slice(6));
   if (path.startsWith("steps.")) {
     const [, id, ...rest] = path.split(".");
@@ -293,6 +333,10 @@ async function runStep(
   switch (config.type) {
     case "manual":
       return config.payload?.trim() ? looseJson(text(config.payload)) : input;
+    case "schedule":
+    case "fileWatch":
+      // The automation passes what started the run ({ trigger, at | path }).
+      return input;
     case "template":
       return looseJson(renderTemplate(config.template ?? "", scope, "json"));
     case "condition":
@@ -362,8 +406,73 @@ async function runStep(
   }
 }
 
-export function emptyRun(now: number): RunState {
-  return { status: "running", steps: {}, edges: [], order: [], startedAt: now };
+/** Repeat over a list and retry on failure, around one step's work. */
+async function runWithOptions(
+  node: FlowNode,
+  input: unknown,
+  scope: TemplateScope,
+  services: ExecutorServices,
+  signal: AbortSignal,
+  sleep: (ms: number, signal?: AbortSignal) => Promise<void>,
+  onAttempt: (attempt: number) => void
+): Promise<unknown> {
+  const config = node.config;
+  const retries = Math.max(0, Math.min(10, Math.floor(config?.retries ?? 0)));
+  const attempt = async (run: () => Promise<unknown>) => {
+    for (let i = 0; ; i++) {
+      onAttempt(i + 1);
+      try {
+        return await run();
+      } catch (error) {
+        if (i >= retries || signal.aborted || error instanceof MissingSecretError) throw error;
+        await sleep(Math.max(0, config?.retryDelay ?? 2) * 1000, signal);
+      }
+    }
+  };
+  const list = config?.forEach?.trim();
+  if (!list || !config || config.type === "condition") {
+    return attempt(() => runStep(node, input, scope, services, signal));
+  }
+  const items = list === "input" ? input : getPath(input, list);
+  if (!Array.isArray(items)) throw new Error(`«${list}» no es una lista`);
+  const results: unknown[] = [];
+  for (let index = 0; index < items.length; index++) {
+    if (signal.aborted) throw new Cancelled();
+    const item = items[index];
+    results.push(
+      await attempt(() => runStep(node, input, { ...scope, item, index }, services, signal))
+    );
+  }
+  return results;
+}
+
+/** Replace secret values with dots wherever they appear in recorded data. */
+export function redact(value: unknown, secrets: string[]): unknown {
+  if (secrets.length === 0) return value;
+  if (typeof value === "string") {
+    let text = value;
+    for (const secret of secrets) text = text.split(secret).join("••••");
+    return text;
+  }
+  if (Array.isArray(value)) return value.map((item) => redact(item, secrets));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, redact(v, secrets)])
+    );
+  }
+  return value;
+}
+
+export function emptyRun(now: number, trigger: RunTrigger = "manual"): RunState {
+  return {
+    status: "running",
+    steps: {},
+    edges: [],
+    order: [],
+    startedAt: now,
+    startedWall: Date.now(),
+    trigger,
+  };
 }
 
 /**
@@ -381,7 +490,10 @@ export async function executeFlow(doc: FlowDocument, options: RunOptions): Promi
   options.signal?.addEventListener("abort", () => controller.abort(), { once: true });
   if (options.signal?.aborted) controller.abort();
 
-  const run = emptyRun(now());
+  const run = emptyRun(now(), options.trigger);
+  // Secrets shorter than 4 characters would mangle ordinary text when hidden.
+  const hidden = Object.values(options.secrets ?? {}).filter((s) => s.length >= 4);
+  const clean = (value: unknown) => redact(value, hidden);
   const seconds = () => (now() - run.startedAt) / 1000;
   const emit = () =>
     options.onUpdate?.({
@@ -399,10 +511,14 @@ export async function executeFlow(doc: FlowDocument, options: RunOptions): Promi
     outgoing.set(edge.from, [...(outgoing.get(edge.from) ?? []), edge]);
     incoming.add(edge.to);
   }
-  const triggers = [...nodes.values()].filter((n) => n.kind === "trigger");
+  const triggers = [...nodes.values()].filter(
+    (n) => n.kind === "trigger" && (!options.startAt || options.startAt.includes(n.id))
+  );
   const starts =
     triggers.length > 0 ? triggers : [...nodes.values()].filter((n) => !incoming.has(n.id));
-  const scope: TemplateScope = { input: null, steps: run.steps };
+  // Real outputs feed the templates; the records keep redacted copies.
+  const outputs: Record<string, { output?: unknown }> = {};
+  const scope: TemplateScope = { input: null, steps: outputs, secrets: options.secrets };
   const claimed = new Set<string>();
 
   const visit = async (node: FlowNode, input: unknown): Promise<void> => {
@@ -410,13 +526,32 @@ export async function executeFlow(doc: FlowDocument, options: RunOptions): Promi
     claimed.add(node.id);
     if (signal.aborted) throw new Cancelled();
     const started = now();
-    const record: StepRecord = { nodeId: node.id, status: "running", input, start: seconds() };
+    const record: StepRecord = {
+      nodeId: node.id,
+      status: "running",
+      input: clean(input),
+      start: seconds(),
+    };
     run.steps[node.id] = record;
     run.order.push(node.id);
     emit();
     let output: unknown;
     try {
-      output = await runStep(node, input, { ...scope, input }, options.services, signal);
+      output = await runWithOptions(
+        node,
+        input,
+        { ...scope, input },
+        options.services,
+        signal,
+        sleep,
+        (attempt) => {
+          record.attempts = attempt;
+          if (attempt > 1) {
+            run.steps[node.id] = { ...record };
+            emit();
+          }
+        }
+      );
       // Keep instant steps on screen for a moment; configured duration acts as a floor too.
       const floor = node.config ? minStep : Math.max(minStep, nodeDuration(node) * 0.5);
       await sleep(floor * 1000 - (now() - started), signal);
@@ -429,7 +564,7 @@ export async function executeFlow(doc: FlowDocument, options: RunOptions): Promi
       run.steps[node.id] = {
         ...record,
         status: "error",
-        error: error instanceof Error ? error.message : String(error),
+        error: String(clean(error instanceof Error ? error.message : String(error))),
         end: seconds(),
       };
       emit();
@@ -445,7 +580,14 @@ export async function executeFlow(doc: FlowDocument, options: RunOptions): Promi
       }
     }
     const end = seconds();
-    run.steps[node.id] = { ...record, status: "done", output, end, via: next.map((e) => e.id) };
+    outputs[node.id] = { output };
+    run.steps[node.id] = {
+      ...record,
+      status: "done",
+      output: clean(output),
+      end,
+      via: next.map((e) => e.id),
+    };
     for (const edge of next) run.edges.push({ id: edge.id, start: end, end: end + edgeDuration });
     emit();
     await sleep(edgeDuration * 1000, signal);

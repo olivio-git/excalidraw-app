@@ -49,29 +49,47 @@ export type ConditionOperator =
  * Executable step. Text fields accept `{{input.x}}` and `{{steps.<id>.output.x}}`
  * placeholders filled with the data flowing through the run.
  */
-export type StepConfig =
-  | { type: "manual"; payload?: string }
-  | {
-      type: "http";
-      method?: string;
-      url?: string;
-      /** One `Name: value` per line. */
-      headers?: string;
-      body?: string;
-      allowErrors?: boolean;
-    }
-  | { type: "command"; command?: string; cwd?: string; timeout?: number; allowErrors?: boolean }
-  | { type: "appCommand"; command?: string }
-  | { type: "ai"; prompt?: string; system?: string; json?: boolean }
-  | { type: "writeNote"; path?: string; content?: string; append?: boolean }
-  | { type: "template"; template?: string }
-  | { type: "condition"; field?: string; operator?: ConditionOperator; value?: string };
+/** Options every executable step accepts. */
+export interface StepCommon {
+  /** Run the step once per element of this list (path in the input, e.g. `body.items`). */
+  forEach?: string;
+  /** Extra attempts when the step fails. */
+  retries?: number;
+  /** Seconds between attempts. */
+  retryDelay?: number;
+}
+
+export type StepConfig = StepCommon &
+  (
+    | { type: "manual"; payload?: string }
+    /** Trigger: runs by itself every `every` minutes, or daily at `at` (HH:MM). */
+    | { type: "schedule"; every?: number; at?: string }
+    /** Trigger: runs when a file or folder (relative to the flow) changes. */
+    | { type: "fileWatch"; path?: string }
+    | {
+        type: "http";
+        method?: string;
+        url?: string;
+        /** One `Name: value` per line. */
+        headers?: string;
+        body?: string;
+        allowErrors?: boolean;
+      }
+    | { type: "command"; command?: string; cwd?: string; timeout?: number; allowErrors?: boolean }
+    | { type: "appCommand"; command?: string }
+    | { type: "ai"; prompt?: string; system?: string; json?: boolean }
+    | { type: "writeNote"; path?: string; content?: string; append?: boolean }
+    | { type: "template"; template?: string }
+    | { type: "condition"; field?: string; operator?: ConditionOperator; value?: string }
+  );
 
 /** Color of groups that don't set one. */
 export const DEFAULT_GROUP_COLOR = "#6366f1";
 
 export const STEP_CONFIG_TYPES: StepConfig["type"][] = [
   "manual",
+  "schedule",
+  "fileWatch",
   "http",
   "command",
   "appCommand",
@@ -105,7 +123,11 @@ export interface FlowDocument {
   groups?: FlowGroup[];
   /** Excalidraw file this flow was converted from, for re-syncing. */
   source?: string;
-  settings?: { speed?: number };
+  settings?: {
+    speed?: number;
+    /** Scheduled and file triggers run the flow by themselves (the user opted in). */
+    automation?: boolean;
+  };
 }
 
 export interface NodeKindInfo {
@@ -165,7 +187,7 @@ function parseConfig(value: unknown): StepConfig | undefined {
     if (typeof item === "string" || typeof item === "boolean") clean[key] = item;
     else if (typeof item === "number" && Number.isFinite(item)) clean[key] = item;
   }
-  return clean as StepConfig;
+  return clean as unknown as StepConfig;
 }
 
 const isVec3 = (value: unknown): value is Vec3 =>
@@ -250,7 +272,10 @@ export function parseFlow(text: string): FlowDocument {
   }
   const settings =
     data.settings && typeof data.settings === "object"
-      ? { speed: Number((data.settings as Record<string, unknown>).speed) || undefined }
+      ? {
+          speed: Number((data.settings as Record<string, unknown>).speed) || undefined,
+          automation: (data.settings as Record<string, unknown>).automation === true || undefined,
+        }
       : undefined;
   return {
     type: "qori-flow3d",

@@ -488,6 +488,22 @@ class ExtensionHost {
     return this.config.cspSource ?? "asset: http://asset.localhost";
   }
 
+  /**
+   * URL for a file loaded by a webview. With `webviewAssetPrefix` (the app's
+   * `qori-ext:` protocol) the path stays readable, so relative URLs inside
+   * the extension's scripts and styles resolve like on disk.
+   */
+  webviewAssetUrl(fsPath) {
+    const prefix = this.config.webviewAssetPrefix;
+    if (!prefix) return this.assetUrl(fsPath);
+    const segments = fsPath.replace(/\\/g, "/").split("/").filter(Boolean);
+    return `${prefix}${segments.map(encodeURIComponent).join("/")}`;
+  }
+
+  webviewCspSource() {
+    return this.config.webviewCspSource ?? this.cspSource();
+  }
+
   serializeIcon(icon, extension) {
     if (!icon) return undefined;
     const resolve = (value) => {

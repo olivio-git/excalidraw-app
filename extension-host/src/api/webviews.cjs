@@ -32,12 +32,12 @@ function createWebviews(host) {
         host.rpc.notify("webview.options", { handle, options: webviewOptions(currentOptions) });
       },
       get cspSource() {
-        return host.cspSource();
+        return host.webviewCspSource();
       },
       asWebviewUri(uri) {
-        const url = host.assetUrl(uri.fsPath);
+        const url = host.webviewAssetUrl(uri.fsPath);
         const result = Uri.parse(url);
-        // Keep the exact URL the asset protocol expects.
+        // Keep the exact URL the protocol expects.
         result.toString = () => url;
         return result;
       },

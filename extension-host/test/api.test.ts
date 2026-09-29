@@ -287,3 +287,29 @@ describe("vscode module object", () => {
     ]);
   });
 });
+
+describe("webview asset URLs", () => {
+  const { ExtensionHost } = require("../src/host.cjs");
+  const rpc = new Proxy(
+    {},
+    { get: (target: Record<string, unknown>, prop: string) => target[prop] ?? (() => {}) }
+  );
+
+  it("keeps paths readable under the qori-ext protocol", () => {
+    const host = new ExtensionHost(rpc);
+    host.config = { webviewAssetPrefix: "qori-ext://localhost/", webviewCspSource: "qori-ext:" };
+    expect(host.webviewAssetUrl("/home/ana/ext one/webview/index.js")).toBe(
+      "qori-ext://localhost/home/ana/ext%20one/webview/index.js"
+    );
+    expect(host.webviewAssetUrl("C:\\Users\\ana\\index.js")).toBe(
+      "qori-ext://localhost/C%3A/Users/ana/index.js"
+    );
+    expect(host.webviewCspSource()).toBe("qori-ext:");
+  });
+
+  it("falls back to the asset protocol", () => {
+    const host = new ExtensionHost(rpc);
+    host.config = { assetPrefix: "asset://localhost/" };
+    expect(host.webviewAssetUrl("/a/b.js")).toBe("asset://localhost/%2Fa%2Fb.js");
+  });
+});

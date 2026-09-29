@@ -10,6 +10,7 @@ use axum::{Router, routing::post, extract::State, Json, http::StatusCode};
 use uuid::Uuid;
 
 mod exthost;
+mod ext_protocol;
 mod pty;
 
 #[tauri::command]
@@ -571,6 +572,7 @@ pub fn run() {
     let pending = mcp_state.pending.clone();
 
     tauri::Builder::default()
+        .register_asynchronous_uri_scheme_protocol(ext_protocol::SCHEME, ext_protocol::handle)
         .manage(mcp_state)
         .manage(pty::PtyState::default())
         .manage(exthost::ExtHostState::default())

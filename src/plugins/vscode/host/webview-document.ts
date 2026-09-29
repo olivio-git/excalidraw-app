@@ -138,6 +138,30 @@ function rootStyle(theme: WebviewTheme): string {
 }
 
 /**
+ * Lets the page's own CSP load `data:` fonts. Extensions ship icon fonts
+ * inlined in their CSS (codicons) and VS Code renders them; fonts can't run
+ * code, so this doesn't widen what the page can execute.
+ */
+export function allowDataFonts(html: string): string {
+  return html.replace(
+    /(<meta\b[^>]*http-equiv\s*=\s*["']?content-security-policy["']?[^>]*content\s*=\s*)(["'])([\s\S]*?)\2/gi,
+    (match, prefix: string, quote: string, policy: string) => {
+      const directives = policy.split(";").map((d) => d.trim());
+      const font = directives.findIndex((d) => /^font-src\b/i.test(d));
+      if (font >= 0) {
+        if (/(^|\s)data:/i.test(directives[font])) return match;
+        directives[font] += " data:";
+      } else {
+        const fallback = directives.find((d) => /^default-src\b/i.test(d));
+        if (!fallback || /(^|\s)data:/i.test(fallback)) return match;
+        directives.push(`font-src${fallback.slice("default-src".length)} data:`);
+      }
+      return `${prefix}${quote}${directives.filter(Boolean).join("; ")}${quote}`;
+    }
+  );
+}
+
+/**
  * Inject our bootstrap right after `<head>` so it runs before the page's own
  * Content-Security-Policy meta takes effect (VS Code injects it outside the
  * page; a meta CSP only applies to what follows it).
@@ -146,6 +170,7 @@ export function buildWebviewDocument(
   html: string,
   options: { handle: string; state: unknown; theme: WebviewTheme; enableScripts: boolean }
 ): string {
+  html = allowDataFonts(html);
   const injected =
     `<style id="_defaultStyles">${rootStyle(options.theme)}${DEFAULT_STYLES}</style>` +
     (options.enableScripts

@@ -187,5 +187,42 @@
         "generic": { "description": "Execute tool \"{{name}}\"" }
       }
     }
+  },
+  "search": {
+    "title": "Search",
+    "placeholder": "Search in files",
+    "caseSensitive": "Match case",
+    "wholeWord": "Match whole word",
+    "regex": "Use regular expression",
+    "noWorkspace": "Open a folder to search its files.",
+    "typeToSearch": "Search notes, Markdown, diagrams, flows and code.",
+    "searching": "Searching…",
+    "noResults": "No results.",
+    "summary": "{{count}} results in {{files}} files",
+    "truncated": "Showing the first results. Refine the search to see more.",
+    "invalidRegex": "Invalid regular expression.",
+    "line": "line {{line}}",
+    "collapseAll": "Collapse all",
+    "expandAll": "Expand all"
+  },
+  "graph": {
+    "title": "Knowledge graph",
+    "summary": "{{files}} files · {{links}} links",
+    "filter": "Highlight files…",
+    "fit": "Fit",
+    "refresh": "Refresh",
+    "noWorkspace": "Open a folder to see how its files connect.",
+    "loading": "Indexing workspace…",
+    "empty": "No links between files yet. Link notes, diagrams and flows to see them here.",
+    "links": "{{count}} linked files",
+    "open": "Open file",
+    "hint": "Click: focus · Double click: open · Drag: orbit",
+    "kinds": {
+      "note": "Notes",
+      "markdown": "Markdown",
+      "diagram": "Diagrams",
+      "flow": "Flows",
+      "other": "Other"
+    }
   }
 }

@@ -1,10 +1,11 @@
-import { Files, Blocks, Compass, Bot, BookOpen, Link2 } from "lucide-react";
+import { Files, Blocks, Compass, Bot, BookOpen, Link2, Search } from "lucide-react";
 import i18n from "@/core/i18n/i18n";
 import { viewRegistry, type WorkbenchView } from "@/core/layout/view-registry";
 import { ExplorerPanel } from "./panels/ExplorerPanel";
 import { PluginsPanel } from "./panels/PluginsPanel";
 import { NavigationPanel } from "./panels/NavigationPanel";
 import { ReferencesPanel } from "./panels/ReferencesPanel";
+import { SearchPanel } from "./panels/SearchPanel";
 import { AIChatPanel } from "@/features/ai-chat/AIChatPanel";
 import { LibraryBrowserPanel } from "@/features/library-browser/LibraryBrowserPanel";
 
@@ -19,6 +20,14 @@ export const BUILTIN_VIEWS: WorkbenchView[] = [
     component: ExplorerPanel,
     defaultLocation: "primary",
     order: 0,
+  },
+  {
+    id: "search",
+    title: t("search.title"),
+    icon: Search,
+    component: SearchPanel,
+    defaultLocation: "primary",
+    order: 0.5,
   },
   {
     id: "references",

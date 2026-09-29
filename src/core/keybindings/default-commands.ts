@@ -163,6 +163,14 @@ function focusSidebarSearchHandler(): void {
   }
 }
 
+/** Ctrl+Shift+F: show the Search view and focus its box. */
+async function findInFilesHandler(): Promise<void> {
+  const { useLayoutStore } = await import("@/core/layout/layout-store");
+  useLayoutStore.getState().showView("search");
+  // The view mounts on show: focus once it's there.
+  setTimeout(() => window.dispatchEvent(new Event("workbench:focus-search")), 60);
+}
+
 function openPluginAdminHandler(): void {
   const { tabs, addTab, setActiveTab } = useTabStore.getState();
 
@@ -240,4 +248,5 @@ export function initializeCoreCommands(): void {
   );
 
   PluginManager.registerCommandHandler("workbench.action.changeLanguage", changeLanguageHandler);
+  PluginManager.registerCommandHandler("workbench.action.findInFiles", findInFilesHandler);
 }

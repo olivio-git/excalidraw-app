@@ -52,7 +52,8 @@ export interface CloseTabResult {
 async function resourceWasDeletedExternally(
   tab: ReturnType<typeof useTabStore.getState>["tabs"][number]
 ): Promise<boolean> {
-  if (!tab.instanceId || !["document-editor", "diagram"].includes(tab.routeId)) return false;
+  if (!tab.instanceId || !["document-editor", "markdown-editor", "diagram"].includes(tab.routeId))
+    return false;
   try {
     // Never let a filesystem probe block the close lifecycle (for example while
     // the Tauri FS plugin is reconnecting). A short timeout falls back to the

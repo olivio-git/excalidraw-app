@@ -2,7 +2,7 @@ import * as React from "react";
 import vscodeIcons from "@iconify-json/vscode-icons/icons.json";
 import { FileText, FileCode, FileImage, FileJson, NotebookPen } from "lucide-react";
 import { ExcalidrawFileIcon } from "@/shared/icons/ExcalidrawFileIcon";
-import { getVsixIconForFile } from "@/plugins/vsix-icon-themes";
+import { getFileIconUrl } from "@/plugins/vscode/icon-theme-service";
 
 type IconComponent = React.ComponentType<{ className?: string }>;
 
@@ -27,6 +27,18 @@ const VscodeIcon = (name: VscodeIconName): IconComponent => {
       : React.createElement(FileText, { className });
 };
 
+/** One stable component per image URL, so React doesn't remount the <img> on every render. */
+const imageIcons = new Map<string, IconComponent>();
+const ImageIcon = (src: string): IconComponent => {
+  let icon = imageIcons.get(src);
+  if (!icon) {
+    icon = ({ className }) =>
+      React.createElement("img", { src, className, alt: "", "aria-hidden": true });
+    imageIcons.set(src, icon);
+  }
+  return icon;
+};
+
 class FileIconRegistryClass {
   private readonly icons = new Map<string, IconEntry>();
   private readonly filenames = new Map<string, IconEntry>();
@@ -40,17 +52,8 @@ class FileIconRegistryClass {
   }
 
   resolve(filename: string): IconEntry {
-    const installedIcon = getVsixIconForFile(filename);
-    if (installedIcon) {
-      const Icon: IconComponent = ({ className }) =>
-        React.createElement("img", {
-          src: installedIcon,
-          className,
-          alt: "",
-          "aria-hidden": true,
-        });
-      return { icon: Icon, colorClass: "" };
-    }
+    const themedIcon = getFileIconUrl(filename);
+    if (themedIcon) return { icon: ImageIcon(themedIcon), colorClass: "" };
     const exact = this.filenames.get(filename.toLowerCase());
     if (exact) return exact;
     const ext = filename.split(".").pop()?.toLowerCase() ?? "";
@@ -88,7 +91,6 @@ const vscodeFileIcons: Record<string, VscodeIconName> = {
   py: "file-type-python",
   go: "file-type-go",
   sql: "file-type-sql",
-  lock: "file-type-lock",
 };
 for (const [extension, iconName] of Object.entries(vscodeFileIcons)) {
   fileIconRegistry.register(extension, VscodeIcon(iconName), "");

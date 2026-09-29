@@ -1,6 +1,7 @@
 // DiagramController.ts
 // Singleton imperative API registry for Excalidraw canvas instances
 import { exportToSvg } from "@excalidraw/excalidraw";
+import { requestTabMount } from "@/core/tabs/tab-mount";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { useTabStore } from "@/core/tabs/store/tab-store";
 import type {
@@ -60,6 +61,8 @@ export class DiagramControllerClass implements DiagramControllerAPI {
   }
 
   waitForInstance(instanceId: string, timeoutMs = 5000): Promise<ExcalidrawImperativeAPI> {
+    // Its tab may never have been shown (tabs mount on first view): mount it.
+    if (!this.instances.has(instanceId)) requestTabMount(instanceId);
     const existing = this.instances.get(instanceId);
     if (existing) {
       return Promise.resolve(existing);

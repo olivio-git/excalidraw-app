@@ -1,5 +1,7 @@
 import * as React from "react";
-import { Slot } from "@radix-ui/react-slot";
+import { Slot as SlotPrimitive } from "radix-ui";
+
+const Slot = SlotPrimitive.Slot;
 import { cva, type VariantProps } from "class-variance-authority";
 import { PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
 
@@ -141,7 +143,7 @@ const SidebarProvider = React.forwardRef<
 
     return (
       <SidebarContext.Provider value={contextValue}>
-        <TooltipProvider delayDuration={0}>
+        <TooltipProvider delay={0}>
           <div
             data-sidebar-wrapper
             style={
@@ -265,22 +267,24 @@ const SidebarTrigger = React.forwardRef<
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          ref={ref}
-          data-sidebar="trigger"
-          variant="ghost"
-          size="icon"
-          className={cn("h-7 w-7", className)}
-          onClick={(event) => {
-            onClick?.(event);
-            toggleSidebar();
-          }}
-          {...props}
-        >
-          {state === "expanded" ? <PanelLeftCloseIcon /> : <PanelLeftOpenIcon />}
-          <span className="sr-only">Toggle Sidebar</span>
-        </Button>
+      <TooltipTrigger
+        render={
+          <Button
+            ref={ref}
+            data-sidebar="trigger"
+            variant="ghost"
+            size="icon-sm"
+            className={cn("size-7", className)}
+            onClick={(event) => {
+              onClick?.(event);
+              toggleSidebar();
+            }}
+            {...props}
+          />
+        }
+      >
+        {state === "expanded" ? <PanelLeftCloseIcon /> : <PanelLeftOpenIcon />}
+        <span className="sr-only">Toggle Sidebar</span>
       </TooltipTrigger>
       <TooltipContent side="right">
         {state === "expanded" ? "Collapse menu" : "Expand menu"}
@@ -575,7 +579,7 @@ const SidebarMenuButton = React.forwardRef<
 
     return (
       <Tooltip>
-        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipTrigger render={button} />
         <TooltipContent
           side="right"
           align="center"
@@ -716,64 +720,68 @@ const SidebarMenuSubButton = React.forwardRef<
 });
 SidebarMenuSubButton.displayName = "SidebarMenuSubButton";
 
-const SidebarResizeHandle = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(
-  ({ className, ...props }, ref) => {
-    const { sidebarWidth, setSidebarWidth, isResizing, setIsResizing, state } = useSidebar();
-    const resize = useResizePreview();
+const SidebarResizeHandle = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div"> & { side?: "left" | "right" }
+>(({ className, side = "left", ...props }, ref) => {
+  const { sidebarWidth, setSidebarWidth, isResizing, setIsResizing, state } = useSidebar();
+  const resize = useResizePreview();
 
-    if (state !== "expanded") return null;
+  if (state !== "expanded") return null;
 
-    return (
-      <div
-        ref={ref}
-        data-sidebar-resize
-        onPointerDown={(event) => {
-          const element = event.currentTarget.closest<HTMLElement>("[data-sidebar-wrapper]");
-          if (!element) return;
-          const startX = event.clientX;
-          const startWidth = sidebarWidth;
-          const cursor = document.body.style.cursor;
-          const userSelect = document.body.style.userSelect;
-          if (
-            resize.start(event, {
-              element,
-              property: "--sidebar-width",
-              initial: startWidth,
-              measure: (pointer) =>
-                Math.min(
-                  SIDEBAR_WIDTH_MAX,
-                  Math.max(SIDEBAR_WIDTH_MIN, startWidth + pointer.clientX - startX)
-                ),
-              format: (value) => `${value}px`,
-              onCommit: setSidebarWidth,
-              onFinish: () => {
-                setIsResizing(false);
-                document.body.style.cursor = cursor;
-                document.body.style.userSelect = userSelect;
-              },
-            })
-          ) {
-            setIsResizing(true);
-            document.body.style.cursor = "col-resize";
-            document.body.style.userSelect = "none";
-          }
-        }}
-        onPointerMove={resize.onPointerMove}
-        onPointerUp={resize.onPointerUp}
-        onPointerCancel={resize.onPointerCancel}
-        onLostPointerCapture={resize.onLostPointerCapture}
-        className={cn(
-          "w-px flex-shrink-0 cursor-col-resize group/resize z-10 touch-none",
-          "bg-border/70 hover:bg-primary/50 active:bg-primary transition-colors duration-100",
-          isResizing && "bg-primary",
-          className
-        )}
-        title="Arrastra para cambiar el ancho del panel"
-        {...props}
-      />
-    );
-  }
-);
+  return (
+    <div
+      ref={ref}
+      data-sidebar-resize
+      onPointerDown={(event) => {
+        const element = event.currentTarget.closest<HTMLElement>("[data-sidebar-wrapper]");
+        if (!element) return;
+        const startX = event.clientX;
+        const startWidth = sidebarWidth;
+        const cursor = document.body.style.cursor;
+        const userSelect = document.body.style.userSelect;
+        if (
+          resize.start(event, {
+            element,
+            property: "--sidebar-width",
+            initial: startWidth,
+            measure: (pointer) =>
+              Math.min(
+                SIDEBAR_WIDTH_MAX,
+                Math.max(
+                  SIDEBAR_WIDTH_MIN,
+                  startWidth + (pointer.clientX - startX) * (side === "right" ? -1 : 1)
+                )
+              ),
+            format: (value) => `${value}px`,
+            onCommit: setSidebarWidth,
+            onFinish: () => {
+              setIsResizing(false);
+              document.body.style.cursor = cursor;
+              document.body.style.userSelect = userSelect;
+            },
+          })
+        ) {
+          setIsResizing(true);
+          document.body.style.cursor = "col-resize";
+          document.body.style.userSelect = "none";
+        }
+      }}
+      onPointerMove={resize.onPointerMove}
+      onPointerUp={resize.onPointerUp}
+      onPointerCancel={resize.onPointerCancel}
+      onLostPointerCapture={resize.onLostPointerCapture}
+      className={cn(
+        "w-px flex-shrink-0 cursor-col-resize group/resize z-10 touch-none",
+        "bg-border/70 hover:bg-primary/50 active:bg-primary transition-colors duration-100",
+        isResizing && "bg-primary",
+        className
+      )}
+      title="Arrastra para cambiar el ancho del panel"
+      {...props}
+    />
+  );
+});
 SidebarResizeHandle.displayName = "SidebarResizeHandle";
 
 export {

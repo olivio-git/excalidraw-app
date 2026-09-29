@@ -8,11 +8,44 @@ import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useTabsSettingsStore } from "@/stores/tabsSettingsStore";
 import { useLanguageStore } from "@/stores/languageStore";
 import { useSettingsStore, type SettingsTab } from "@/stores/settingsStore";
+import { useEditorPreferencesStore } from "@/stores/editorPreferencesStore";
 import KeybindingsPanel from "./keybindings/KeybindingsPanel";
 import { AISettingsPanel } from "./ai/AISettingsPanel";
 import { Button } from "@/shared/components/ui/button";
 import { Separator } from "@/shared/components/ui/separator";
+import { SegmentedControl } from "@/shared/components/ui/segmented-control";
+import { Switch } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
+
+/** A labeled on/off row (keel Switch). */
+function SettingSwitch({
+  label,
+  description,
+  checked,
+  onCheckedChange,
+  bordered = false,
+}: {
+  label: string;
+  description?: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  bordered?: boolean;
+}) {
+  return (
+    <label
+      className={cn(
+        "flex cursor-pointer items-center justify-between gap-4 px-3 py-2.5",
+        bordered && "rounded-lg border border-border"
+      )}
+    >
+      <span className="space-y-0.5">
+        <span className="block text-sm font-medium">{label}</span>
+        {description && <span className="block text-xs text-muted-foreground">{description}</span>}
+      </span>
+      <Switch checked={checked} onCheckedChange={(value) => onCheckedChange(value)} />
+    </label>
+  );
+}
 
 export default function SettingsPage() {
   const { t } = useTranslation("settings");
@@ -44,6 +77,8 @@ export default function SettingsPage() {
   const setLanguage = useLanguageStore((s) => s.setLanguage);
 
   const allowCloseLastTab = useTabsSettingsStore((s) => s.allowCloseLastTab);
+  const enablePreview = useTabsSettingsStore((s) => s.enablePreview);
+  const setEnablePreview = useTabsSettingsStore((s) => s.setEnablePreview);
   const setAllowCloseLastTab = useTabsSettingsStore((s) => s.setAllowCloseLastTab);
 
   const fontFamily = useAppearanceStore((s) => s.fontFamily);
@@ -57,6 +92,8 @@ export default function SettingsPage() {
   const setHighContrast = useAppearanceStore((s) => s.setHighContrast);
   const setReduceAnimations = useAppearanceStore((s) => s.setReduceAnimations);
   const resetToDefaults = useAppearanceStore((s) => s.resetToDefaults);
+  const markdownEditor = useEditorPreferencesStore((s) => s.markdownEditor);
+  const setMarkdownEditor = useEditorPreferencesStore((s) => s.setMarkdownEditor);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -137,6 +174,35 @@ export default function SettingsPage() {
                 )}
               </div>
             </section>
+
+            <section className="space-y-3">
+              <h2 className="text-base font-semibold">{t("markdownEditor.title")}</h2>
+              <p className="text-sm text-muted-foreground">{t("markdownEditor.description")}</p>
+              <div className="grid gap-2 sm:grid-cols-2" role="radiogroup">
+                {(["markdown", "classic"] as const).map((choice) => (
+                  <button
+                    key={choice}
+                    type="button"
+                    role="radio"
+                    aria-checked={markdownEditor === choice}
+                    onClick={() => setMarkdownEditor(choice)}
+                    className={cn(
+                      "rounded-md border px-3 py-2.5 text-left transition-colors",
+                      markdownEditor === choice
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:bg-accent"
+                    )}
+                  >
+                    <span className="block text-sm font-medium">
+                      {t(`markdownEditor.${choice}`)}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {t(`markdownEditor.${choice}Hint`)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
           </div>
         )}
 
@@ -145,22 +211,20 @@ export default function SettingsPage() {
           <div className="space-y-8">
             <section className="space-y-4">
               <h2 className="text-base font-semibold">{t("tabsBehavior.title")}</h2>
-              <div className="flex items-start justify-between gap-4 rounded-md border border-border px-4 py-3">
-                <div className="space-y-0.5">
-                  <p className="text-sm font-medium">{t("tabsBehavior.allowCloseLastTab")}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {t("tabsBehavior.allowCloseLastTabDescription")}
-                  </p>
-                </div>
-                <Button
-                  variant={allowCloseLastTab ? "default" : "outline"}
-                  size="sm"
-                  className="shrink-0"
-                  onClick={() => setAllowCloseLastTab(!allowCloseLastTab)}
-                >
-                  {allowCloseLastTab ? t("tabsBehavior.on") : t("tabsBehavior.off")}
-                </Button>
-              </div>
+              <SettingSwitch
+                label={t("tabsBehavior.allowCloseLastTab")}
+                description={t("tabsBehavior.allowCloseLastTabDescription")}
+                checked={allowCloseLastTab}
+                onCheckedChange={setAllowCloseLastTab}
+                bordered
+              />
+              <SettingSwitch
+                label={t("tabsBehavior.enablePreview")}
+                description={t("tabsBehavior.enablePreviewDescription")}
+                checked={enablePreview}
+                onCheckedChange={setEnablePreview}
+                bordered
+              />
             </section>
           </div>
         )}
@@ -182,129 +246,97 @@ export default function SettingsPage() {
             {/* Language */}
             <section className="space-y-3">
               <h2 className="text-base font-semibold">{t("appearance.language")}</h2>
-              <div className="flex gap-2">
-                <Button
-                  variant={language === "en" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setLanguage("en")}
-                >
-                  English
-                </Button>
-                <Button
-                  variant={language === "es" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setLanguage("es")}
-                >
-                  Español
-                </Button>
-              </div>
+              <SegmentedControl
+                ariaLabel={t("appearance.language")}
+                value={language}
+                onChange={setLanguage}
+                options={[
+                  { value: "en", label: "English" },
+                  { value: "es", label: "Español" },
+                ]}
+              />
             </section>
 
             {/* Theme */}
             <section className="space-y-3">
               <h2 className="text-base font-semibold">{t("appearance.theme.title")}</h2>
-              <div className="flex gap-2">
-                {[
-                  { value: "light" as const, icon: Sun, label: t("appearance.theme.light") },
-                  { value: "dark" as const, icon: Moon, label: t("appearance.theme.dark") },
-                  { value: "system" as const, icon: Monitor, label: t("appearance.theme.system") },
-                ].map(({ value, icon: Icon, label }) => (
-                  <Button
-                    key={value}
-                    variant={theme === value ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setTheme(value)}
-                  >
-                    <Icon className="size-4" />
-                    {label}
-                  </Button>
-                ))}
-              </div>
+              <SegmentedControl
+                ariaLabel={t("appearance.theme.title")}
+                value={theme}
+                onChange={setTheme}
+                options={[
+                  { value: "light", icon: Sun, label: t("appearance.theme.light") },
+                  { value: "dark", icon: Moon, label: t("appearance.theme.dark") },
+                  { value: "system", icon: Monitor, label: t("appearance.theme.system") },
+                ]}
+              />
             </section>
 
             {/* Typography */}
             <section className="space-y-4">
               <h2 className="text-base font-semibold">{t("appearance.typography.title")}</h2>
               <div className="space-y-2">
-                <label className="text-sm font-medium">
+                <label className="block text-sm font-medium">
                   {t("appearance.typography.fontFamily")}
                 </label>
-                <div className="flex gap-2">
-                  {(["sans", "mono", "serif"] as const).map((ff) => (
-                    <Button
-                      key={ff}
-                      variant={fontFamily === ff ? "default" : "outline"}
-                      size="sm"
-                      className="capitalize"
-                      onClick={() => setFontFamily(ff)}
-                    >
-                      {ff}
-                    </Button>
-                  ))}
-                </div>
+                <SegmentedControl
+                  ariaLabel={t("appearance.typography.fontFamily")}
+                  value={fontFamily}
+                  onChange={setFontFamily}
+                  options={[
+                    { value: "sans", label: "Sans" },
+                    { value: "mono", label: "Mono" },
+                    { value: "serif", label: "Serif" },
+                  ]}
+                />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">{t("appearance.typography.fontSize")}</label>
-                <div className="flex gap-2">
-                  {(["small", "medium", "large"] as const).map((fs) => (
-                    <Button
-                      key={fs}
-                      variant={fontSize === fs ? "default" : "outline"}
-                      size="sm"
-                      className="capitalize"
-                      onClick={() => setFontSize(fs)}
-                    >
-                      {fs}
-                    </Button>
-                  ))}
-                </div>
+                <label className="block text-sm font-medium">
+                  {t("appearance.typography.fontSize")}
+                </label>
+                <SegmentedControl
+                  ariaLabel={t("appearance.typography.fontSize")}
+                  value={fontSize}
+                  onChange={setFontSize}
+                  options={[
+                    { value: "small", label: "Small" },
+                    { value: "medium", label: "Medium" },
+                    { value: "large", label: "Large" },
+                  ]}
+                />
               </div>
             </section>
 
             {/* Border Radius */}
             <section className="space-y-3">
               <h2 className="text-base font-semibold">{t("appearance.borderRadius.title")}</h2>
-              <div className="flex gap-2">
-                {(["none", "sm", "md", "lg"] as const).map((br) => (
-                  <Button
-                    key={br}
-                    variant={borderRadius === br ? "default" : "outline"}
-                    size="sm"
-                    className="uppercase"
-                    onClick={() => setBorderRadius(br)}
-                  >
-                    {br}
-                  </Button>
-                ))}
-              </div>
+              <SegmentedControl
+                ariaLabel={t("appearance.borderRadius.title")}
+                value={borderRadius}
+                onChange={setBorderRadius}
+                options={[
+                  { value: "none", label: "NONE" },
+                  { value: "sm", label: "SM" },
+                  { value: "md", label: "MD" },
+                  { value: "lg", label: "LG" },
+                ]}
+              />
             </section>
 
             {/* Accessibility */}
             <section className="space-y-3">
               <h2 className="text-base font-semibold">{t("appearance.accessibility.title")}</h2>
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  variant={highContrast ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setHighContrast(!highContrast)}
-                >
-                  {t("appearance.accessibility.highContrast", {
-                    state: highContrast
-                      ? t("appearance.accessibility.on")
-                      : t("appearance.accessibility.off"),
-                  })}
-                </Button>
-                <Button
-                  variant={reduceAnimations ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setReduceAnimations(!reduceAnimations)}
-                >
-                  {t("appearance.accessibility.reduceAnimations", {
-                    state: reduceAnimations
-                      ? t("appearance.accessibility.on")
-                      : t("appearance.accessibility.off"),
-                  })}
-                </Button>
+              <div className="divide-y divide-border rounded-lg border border-border">
+                <SettingSwitch
+                  label={t("appearance.accessibility.highContrastLabel")}
+                  checked={highContrast}
+                  onCheckedChange={setHighContrast}
+                />
+                <SettingSwitch
+                  label={t("appearance.accessibility.reduceAnimationsLabel")}
+                  checked={reduceAnimations}
+                  onCheckedChange={setReduceAnimations}
+                />
               </div>
             </section>
 

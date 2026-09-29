@@ -72,6 +72,10 @@ export class KeyNormalizerClass {
       raw = this._codeToKeyName(event.code);
     }
 
+    // The key left of "1" is a dead key on many layouts (and "~" with Shift);
+    // bind it by its physical position like VS Code does (Ctrl+`).
+    if (event.code === "Backquote") raw = "`";
+
     if (!raw) return null;
 
     // Lone modifier keys are not standalone bindings

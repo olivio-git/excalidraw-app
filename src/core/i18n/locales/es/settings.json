@@ -30,6 +30,8 @@
       "title": "Accesibilidad",
       "highContrast": "Alto contraste: {{state}}",
       "reduceAnimations": "Reducir animaciones: {{state}}",
+      "highContrastLabel": "Alto contraste",
+      "reduceAnimationsLabel": "Reducir animaciones",
       "on": "Activado",
       "off": "Desactivado"
     },
@@ -72,7 +74,9 @@
     "allowCloseLastTab": "Permitir cerrar la última pestaña",
     "allowCloseLastTabDescription": "Cuando está activado, cerrar la última pestaña abierta muestra la pantalla de bienvenida en lugar de mantener la pestaña abierta.",
     "on": "Activado",
-    "off": "Desactivado"
+    "off": "Desactivado",
+    "enablePreview": "Pestañas de vista previa",
+    "enablePreviewDescription": "Un clic en el explorador abre el archivo en una pestaña temporal (título en cursiva) que el siguiente archivo reemplaza. Haz doble clic, edítala o fíjala para conservarla."
   },
   "ai": {
     "title": "Configuración de IA",
@@ -143,5 +147,13 @@
   "aiChat": {
     "on": "Activado",
     "off": "Desactivado"
+  },
+  "markdownEditor": {
+    "title": "Editor de Markdown",
+    "description": "Editor con el que se abren los archivos .md. Las notas enriquecidas (.note) siempre usan el editor de bloques. Se aplica a los archivos que abras a partir de ahora.",
+    "classic": "Clásico (bloques)",
+    "classicHint": "Editor por bloques. La conversión a Markdown puede perder formato.",
+    "markdown": "Markdown (beta)",
+    "markdownHint": "Markdown puro con vista previa en vivo, comandos /, enlaces [[, diagramas y fórmulas. Guarda exactamente lo que escribes."
   }
 }

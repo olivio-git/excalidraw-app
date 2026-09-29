@@ -129,8 +129,9 @@ function previousTabHandler(): void {
 
 function focusSidebarHandler(): void {
   const sidebar = document.querySelector<HTMLElement>("[data-panel='sidebar']");
-  const explorerContainer = sidebar?.querySelector<HTMLElement>(
-    "[data-explorer-visible='true'] [role='tree']"
+  // The Explorer can be in any side bar or the panel (see core/layout).
+  const explorerContainer = document.querySelector<HTMLElement>(
+    "[data-view='explorer'][data-view-visible='true'] [role='tree']"
   );
   (explorerContainer ?? sidebar)?.focus();
 }
@@ -151,14 +152,23 @@ function focusEditorHandler(): void {
 }
 
 function focusSidebarSearchHandler(): void {
-  const sidebar = document.querySelector<HTMLElement>("[data-panel='sidebar']");
   const search = Array.from(
-    sidebar?.querySelectorAll<HTMLInputElement>("[data-panel-search]") ?? []
-  ).find((input) => !input.closest("[data-explorer-visible='false']"));
+    document.querySelectorAll<HTMLInputElement>(
+      "[data-panel='sidebar'] [data-panel-search], [data-panel='secondary'] [data-panel-search]"
+    )
+  ).find((input) => !input.closest("[data-view-visible='false']"));
   if (search) {
     search.focus();
     search.select();
   }
+}
+
+/** Ctrl+Shift+F: show the Search view and focus its box. */
+async function findInFilesHandler(): Promise<void> {
+  const { useLayoutStore } = await import("@/core/layout/layout-store");
+  useLayoutStore.getState().showView("search");
+  // The view mounts on show: focus once it's there.
+  setTimeout(() => window.dispatchEvent(new Event("workbench:focus-search")), 60);
 }
 
 function openPluginAdminHandler(): void {
@@ -238,4 +248,5 @@ export function initializeCoreCommands(): void {
   );
 
   PluginManager.registerCommandHandler("workbench.action.changeLanguage", changeLanguageHandler);
+  PluginManager.registerCommandHandler("workbench.action.findInFiles", findInFilesHandler);
 }

@@ -34,6 +34,7 @@
     "fs:allow-read-text-file",
     "fs:allow-read-file",
     "fs:allow-write-text-file",
+    "fs:allow-write-file",
     "fs:allow-read-dir",
     "fs:allow-create",
     "fs:allow-mkdir",
@@ -45,13 +46,25 @@
     "fs:allow-exists",
     "fs:allow-watch",
     "fs:allow-unwatch",
-    { "identifier": "fs:scope", "allow": [{ "path": "$HOME/**" }, { "path": "$HOME" }] },
+    {
+      "identifier": "fs:scope",
+      "allow": [{ "path": "$HOME/**" }, { "path": "$HOME" }, { "path": "$APPDATA/**" }]
+    },
     "dialog:default",
     "dialog:allow-open",
     "dialog:allow-save",
     "opener:allow-open-url",
     "opener:allow-reveal-item-in-dir",
     "http:default",
-    { "identifier": "http:allow-fetch", "allow": [{ "url": "https://*.excalidraw.com/**" }] }
+    {
+      "identifier": "http:allow-fetch",
+      "allow": [
+        { "url": "https://*.excalidraw.com/**" },
+        { "url": "https://open-vsx.org/**" },
+        { "url": "https://openvsxorg.blob.core.windows.net/**" },
+        { "url": "https://**" },
+        { "url": "http://**" }
+      ]
+    }
   ]
 }

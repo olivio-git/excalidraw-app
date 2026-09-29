@@ -332,7 +332,7 @@ export default function CommandPalette() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent
-        showClose={false}
+        showCloseButton={false}
         className="p-0 gap-0 overflow-hidden max-w-xl top-[10%] translate-y-0 rounded-lg border border-border bg-background shadow-2xl"
         aria-describedby={undefined}
       >

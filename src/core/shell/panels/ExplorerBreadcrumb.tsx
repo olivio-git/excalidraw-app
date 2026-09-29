@@ -1,6 +1,8 @@
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { isSameOrDescendant } from "./explorer-file-operations";
+import { useTabStore } from "@/core/tabs/store/tab-store";
+import { selectActiveFilePath } from "./active-file";
 
 // ---------------------------------------------------------------------------
 // ExplorerBreadcrumb — Task 3.4
@@ -10,7 +12,6 @@ import { isSameOrDescendant } from "./explorer-file-operations";
 // ---------------------------------------------------------------------------
 
 interface ExplorerBreadcrumbProps {
-  activeFilePath: string | undefined;
   workspaceDir: string;
   /** Called with all ancestor paths that should be added to expandedPaths */
   onExpandPaths: (paths: string[]) => void;
@@ -24,15 +25,19 @@ function getSegments(filePath: string, workspaceDir: string): string[] {
   return relative.split(/[\\/]/).filter(Boolean);
 }
 
-export const ExplorerBreadcrumb = ({
-  activeFilePath,
-  workspaceDir,
-  onExpandPaths,
-}: ExplorerBreadcrumbProps) => {
-  if (!activeFilePath || !isSameOrDescendant(activeFilePath, workspaceDir)) return null;
+const BAR_CLASS =
+  "flex h-5 items-center min-w-0 px-2 border-b border-border/50 shrink-0 bg-muted/30";
 
-  const segments = getSegments(activeFilePath, workspaceDir);
-  if (segments.length === 0) return null;
+export const ExplorerBreadcrumb = ({ workspaceDir, onExpandPaths }: ExplorerBreadcrumbProps) => {
+  // Subscribes on its own so the explorer doesn't re-render on tab switches.
+  const activeFilePath = useTabStore(selectActiveFilePath);
+  const segments =
+    activeFilePath && isSameOrDescendant(activeFilePath, workspaceDir)
+      ? getSegments(activeFilePath, workspaceDir)
+      : [];
+  // Always reserve the row: if it appeared only once a file was open, the tree
+  // below would jump down by one row between the two clicks of a double-click.
+  if (segments.length === 0) return <div className={BAR_CLASS} aria-hidden />;
 
   const handleSegmentClick = (segmentIndex: number) => {
     // Expand all ancestors up to (and including) the clicked folder segment
@@ -48,13 +53,7 @@ export const ExplorerBreadcrumb = ({
   };
 
   return (
-    <div
-      className={cn(
-        "flex items-center min-w-0 px-2 py-0.5 border-b border-border/50 shrink-0",
-        "bg-muted/30"
-      )}
-      title={activeFilePath}
-    >
+    <div className={BAR_CLASS} title={activeFilePath}>
       {/* Overflow strategy: truncate from the left by reversing + hiding overflow */}
       <div className="flex items-center min-w-0 overflow-hidden flex-row-reverse">
         {[...segments].reverse().map((segment, reversedIndex) => {
@@ -65,10 +64,8 @@ export const ExplorerBreadcrumb = ({
 
           return (
             <div key={originalIndex} className="flex items-center flex-row-reverse shrink-0">
-              {/* Separator (not after the last/leftmost item in reversed order, which is the first segment) */}
-              {!isFirst && (
-                <ChevronRight className="size-3 text-muted-foreground/40 shrink-0 mx-0.5" />
-              )}
+              {/* In a row-reverse container the button must come first in the DOM
+                  so the separator is drawn before the name: "notes › nota.md". */}
               <button
                 onClick={isClickable ? () => handleSegmentClick(originalIndex) : undefined}
                 disabled={!isClickable}
@@ -81,6 +78,9 @@ export const ExplorerBreadcrumb = ({
               >
                 {segment}
               </button>
+              {!isFirst && (
+                <ChevronRight className="size-3 text-muted-foreground/40 shrink-0 mx-0.5" />
+              )}
             </div>
           );
         })}

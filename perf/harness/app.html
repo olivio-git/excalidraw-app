@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>perf harness</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- The Tauri mock must be installed before the app imports any Tauri API. -->
+    <script type="module">
+      await import("./tauri-mock.ts");
+      await import("../../src/main.tsx");
+    </script>
+  </body>
+</html>

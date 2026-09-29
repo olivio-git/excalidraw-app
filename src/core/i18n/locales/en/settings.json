@@ -30,6 +30,8 @@
       "title": "Accessibility",
       "highContrast": "High Contrast: {{state}}",
       "reduceAnimations": "Reduce Animations: {{state}}",
+      "highContrastLabel": "High contrast",
+      "reduceAnimationsLabel": "Reduce animations",
       "on": "On",
       "off": "Off"
     },
@@ -72,7 +74,9 @@
     "allowCloseLastTab": "Allow closing the last tab",
     "allowCloseLastTabDescription": "When enabled, closing the last open tab shows the welcome screen instead of keeping the tab open.",
     "on": "On",
-    "off": "Off"
+    "off": "Off",
+    "enablePreview": "Preview tabs",
+    "enablePreviewDescription": "A single click in the explorer opens the file in a temporary tab (italic title) that the next file replaces. Double-click, edit or pin it to keep it."
   },
   "ai": {
     "title": "AI Configuration",
@@ -143,5 +147,13 @@
   "aiChat": {
     "on": "On",
     "off": "Off"
+  },
+  "markdownEditor": {
+    "title": "Markdown editor",
+    "description": "Editor used to open .md files. Rich notes (.note) always use the rich editor. Applies to files opened from now on.",
+    "classic": "Classic (blocks)",
+    "classicHint": "Block editor. Converting to Markdown can lose formatting.",
+    "markdown": "Markdown (beta)",
+    "markdownHint": "Plain Markdown with live preview, / commands, [[ links, diagrams and formulas. Saves exactly what you write."
   }
 }

@@ -1,4 +1,5 @@
 import { convertToExcalidrawElements } from "@excalidraw/excalidraw";
+import { FLOW3D_TOOL_NAMES } from "../tools/flow3d-tools";
 import { DiagramController } from "@/core/diagram/DiagramController";
 import { getDocumentController } from "@/features/document-editor/documentController.singleton";
 import { getDocumentCodec } from "@/features/document-editor/note-codec";
@@ -1014,6 +1015,11 @@ export async function executeAITool(
 
   if (WORKSPACE_TOOL_NAMES.has(toolName)) {
     return executeWorkspaceTool(toolName, toolInput);
+  }
+
+  if (FLOW3D_TOOL_NAMES.has(toolName)) {
+    const { executeFlow3DTool } = await import("./flow3d-tool-executor");
+    return executeFlow3DTool(toolName, toolInput);
   }
 
   if (DOCUMENT_TOOL_NAMES.has(toolName)) {

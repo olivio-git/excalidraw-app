@@ -75,7 +75,7 @@ export function PageSetupDialog({ open, onOpenChange }: PageSetupDialogProps) {
               ).map(([key, size]) => (
                 <Button
                   key={key}
-                  variant={pageSize === key ? "default" : "outline"}
+                  variant={pageSize === key ? "secondary" : "ghost"}
                   size="sm"
                   className="h-8 text-xs"
                   onClick={() => setPageSize(key)}
@@ -93,7 +93,7 @@ export function PageSetupDialog({ open, onOpenChange }: PageSetupDialogProps) {
             <label className="text-sm font-medium">{t("documentEditor.orientation")}</label>
             <div className="flex gap-1.5">
               <Button
-                variant={orientation === "portrait" ? "default" : "outline"}
+                variant={orientation === "portrait" ? "secondary" : "ghost"}
                 size="sm"
                 className="h-8 text-xs flex-1"
                 onClick={() => setOrientation("portrait")}
@@ -101,7 +101,7 @@ export function PageSetupDialog({ open, onOpenChange }: PageSetupDialogProps) {
                 {t("documentEditor.portrait")}
               </Button>
               <Button
-                variant={orientation === "landscape" ? "default" : "outline"}
+                variant={orientation === "landscape" ? "secondary" : "ghost"}
                 size="sm"
                 className="h-8 text-xs flex-1"
                 onClick={() => setOrientation("landscape")}
@@ -120,7 +120,7 @@ export function PageSetupDialog({ open, onOpenChange }: PageSetupDialogProps) {
               {MARGIN_PRESETS.map((preset) => (
                 <Button
                   key={preset.value}
-                  variant={margin === preset.value ? "default" : "outline"}
+                  variant={margin === preset.value ? "secondary" : "ghost"}
                   size="sm"
                   className={cn("h-8 text-xs flex-1", margin === preset.value && "font-medium")}
                   onClick={() => setMargin(preset.value)}
@@ -171,7 +171,7 @@ export function PageSetupDialog({ open, onOpenChange }: PageSetupDialogProps) {
                 75%
               </Button>
               <Button
-                variant={zoom === 1 ? "default" : "outline"}
+                variant={zoom === 1 ? "secondary" : "ghost"}
                 size="sm"
                 className="h-8 text-xs"
                 onClick={() => setZoom(1)}

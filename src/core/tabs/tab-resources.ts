@@ -53,9 +53,17 @@ export async function saveTabResource(tab: TabInstance): Promise<boolean> {
     await controller.waitForSaves(path);
     return !useDocumentStore.getState().documents[path]?.isDirty;
   }
+  if (tab.routeId === "markdown-editor") {
+    const { markdownEditorRegistry } = await import("@/features/markdown-editor/editor-registry");
+    const editor = markdownEditorRegistry.get(path);
+    if (!editor) return !tab.metadata?.isDirty;
+    return (await editor.save()) && !editor.isDirty();
+  }
   if (tab.routeId === "diagram") {
     const { DiagramController } = await import("@/core/diagram/DiagramController");
     const api = DiagramController.getApi(path);
+    // A tab that was never shown has no canvas yet, and nothing unsaved either.
+    if (!api && !tabIsDirty(tab)) return true;
     if (!api) throw new Error("Diagram canvas is not ready. Open the file and retry.");
     const store = useDiagramStore.getState();
     if (!store.getDiagram(path)) await store.loadDiagram(path, path);
@@ -74,6 +82,11 @@ export async function waitForResourceSaves(tab: TabInstance, ignoreErrors = fals
     await getDocumentController().waitForSaves(tab.instanceId, ignoreErrors);
   } else if (tab.routeId === "diagram")
     await useDiagramStore.getState().waitForSaves(tab.instanceId, ignoreErrors);
+  else if (tab.routeId === "markdown-editor") {
+    const { markdownEditorRegistry } = await import("@/features/markdown-editor/editor-registry");
+    const saved = await markdownEditorRegistry.get(tab.instanceId)?.save();
+    if (saved === false && !ignoreErrors) throw new Error("Markdown note could not be saved.");
+  }
 }
 
 export function discardResourceBuffer(tab: TabInstance): void {

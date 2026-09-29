@@ -44,7 +44,7 @@ export function ToolPermissionDialog() {
         if (!v) _settle({ decision: "deny" });
       }}
     >
-      <DialogContent className="sm:max-w-md" showClose={false}>
+      <DialogContent className="sm:max-w-md" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>

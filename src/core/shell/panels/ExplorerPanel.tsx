@@ -46,6 +46,9 @@ import { isSameOrDescendant, topLevelPaths } from "./explorer-file-operations";
 import { useDragAndDrop } from "@/core/shell/hooks/useDragAndDrop";
 import { useMultiSelect } from "@/core/shell/hooks/useMultiSelect";
 import { useExplorerSelectionStore } from "@/stores/explorerStore";
+import { useTabsSettingsStore } from "@/stores/tabsSettingsStore";
+import { selectActiveFilePath, withPaths } from "./active-file";
+import { useStableHandlers } from "@/shared/hooks/useStableHandlers";
 import { useKeyboardNav } from "@/core/shell/hooks/useKeyboardNav";
 import { useFileClipboard } from "@/core/shell/hooks/useFileClipboard";
 import type { FileEntry, CreatingState, DragData } from "./explorer-types";
@@ -123,8 +126,13 @@ const ExplorerWorkspacePanel = () => {
   // --- Store subscriptions ---
   const workspaceDir = useWorkspaceStore((s) => s.workspaceDir);
   const setWorkspaceDir = useWorkspaceStore((s) => s.setWorkspaceDir);
-  const tabs = useTabStore((s) => s.tabs);
-  const activeTabId = useTabStore((s) => s.activeTabId);
+  // The explorer does not subscribe to the active file: that re-rendered the
+  // panel (and, through the drag-and-drop context, every tree node) on each tab
+  // switch. Nodes, the breadcrumb and the effects below read it on their own.
+  const canRevealActive = useTabStore((state) => {
+    const path = selectActiveFilePath(state);
+    return !!path && !!workspaceDir && isSameOrDescendant(path, workspaceDir);
+  });
   const sortOrder = useExplorerStore((s) => s.sortOrder);
   const showDotfiles = useExplorerStore((s) => s.showDotfiles);
 
@@ -201,11 +209,6 @@ const ExplorerWorkspacePanel = () => {
     return flattenVisible(displayTree, effectiveExpanded, 1, workspaceDir);
   }, [displayTree, expandedPaths, filterExpandedPaths, workspaceDir]);
 
-  const activeFilePath = useMemo(() => {
-    const tab = tabs.find((t) => t.id === activeTabId);
-    return tab?.metadata?.filePath as string | undefined;
-  }, [tabs, activeTabId]);
-
   // -------------------------------------------------------------------------
   // Tree loading
   // -------------------------------------------------------------------------
@@ -245,18 +248,22 @@ const ExplorerWorkspacePanel = () => {
   // -------------------------------------------------------------------------
 
   useEffect(() => {
-    if (!activeFilePath || !workspaceDir) return;
-    const ancestors = getAncestorPaths(activeFilePath, workspaceDir);
-    if (!isSameOrDescendant(activeFilePath, workspaceDir)) return;
-    startTransition(() => {
-      setExpandedPaths((prev) => {
-        const next = new Set(prev);
-        next.add(workspaceDir);
-        ancestors.forEach((p) => next.add(p));
-        return next;
+    if (!workspaceDir) return;
+    const reveal = (activeFilePath: string | undefined) => {
+      if (!activeFilePath || !isSameOrDescendant(activeFilePath, workspaceDir)) return;
+      const ancestors = getAncestorPaths(activeFilePath, workspaceDir);
+      startTransition(() => {
+        // Returns the same Set when already expanded, so this usually renders nothing.
+        setExpandedPaths((prev) => withPaths(prev, [workspaceDir, ...ancestors]));
       });
+    };
+    reveal(selectActiveFilePath(useTabStore.getState()));
+    // Subscribe without re-rendering the explorer on every tab switch.
+    return useTabStore.subscribe((state, previous) => {
+      const next = selectActiveFilePath(state);
+      if (next !== selectActiveFilePath(previous)) reveal(next);
     });
-  }, [activeFilePath, workspaceDir]);
+  }, [workspaceDir]);
 
   // -------------------------------------------------------------------------
   // Workspace
@@ -312,11 +319,7 @@ const ExplorerWorkspacePanel = () => {
   // Task 3.4: Breadcrumb — expand given paths in the tree
   const handleExpandPaths = useCallback((paths: string[]) => {
     startTransition(() => {
-      setExpandedPaths((prev) => {
-        const next = new Set(prev);
-        paths.forEach((p) => next.add(p));
-        return next;
-      });
+      setExpandedPaths((prev) => withPaths(prev, paths));
     });
   }, []);
 
@@ -324,9 +327,14 @@ const ExplorerWorkspacePanel = () => {
   // Open file
   // -------------------------------------------------------------------------
 
-  const handleOpenFile = useCallback((filePath: string, _name: string, beside = false) => {
-    openFileInWorkbench(filePath, { beside });
-  }, []);
+  const handleOpenFile = useCallback(
+    (filePath: string, _name: string, beside = false, keep = false) => {
+      // A single click previews (VS Code-style); double-click or "open" keeps the tab.
+      const preview = !keep && !beside && useTabsSettingsStore.getState().enablePreview;
+      openFileInWorkbench(filePath, { beside, preview });
+    },
+    []
+  );
 
   // -------------------------------------------------------------------------
   // Create new file / folder
@@ -833,6 +841,53 @@ const ExplorerWorkspacePanel = () => {
   // Render: no workspace
   // -------------------------------------------------------------------------
 
+  // Hooks must run before the early return below.
+  // When filter is active, merge filter-expanded paths so matched nodes are visible
+  const effectiveExpandedPaths = useMemo(
+    () =>
+      filterExpandedPaths ? new Set([...expandedPaths, ...filterExpandedPaths]) : expandedPaths,
+    [expandedPaths, filterExpandedPaths]
+  );
+
+  const handleContextSelect = useCallback(
+    (path: string) => {
+      if (!selectedPaths.has(path)) setSelectedPaths(new Set([path]));
+      setFocusedPath(path);
+    },
+    [selectedPaths, setSelectedPaths]
+  );
+
+  const handleReveal = async (path: string) => {
+    try {
+      await revealItemInDir(path);
+    } catch (error) {
+      notify(t("panel.operationError", { message: String(error) }), { type: "error" });
+    }
+  };
+
+  // Stable identities for the tree's callbacks, so memoized FileTreeNodes don't
+  // all re-render whenever the explorer does (e.g. on every tab switch).
+  const nodeHandlers = useStableHandlers({
+    onToggle: handleToggle,
+    onOpen: handleOpenFile,
+    onDelete: handleDelete,
+    onStartRename: setRenamingPath,
+    onCommitRename: handleCommitRename,
+    onCancelAction: handleCancelAction,
+    onCopyPath: handleCopyPath,
+    onCopyRelativePath: handleCopyRelativePath,
+    onReveal: handleReveal,
+    onContextSelect: handleContextSelect,
+    onNewFile: handleNewFile,
+    onNewFolder: handleNewFolder,
+    onCommitCreate: handleCommitCreate,
+    onCut: handleCut,
+    onCopy: handleCopy,
+    onPaste: handlePaste,
+    onClick: handleClick,
+    onBatchDelete: handleBatchDelete,
+  });
+
   if (!workspaceDir) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 px-4 text-center">
@@ -846,20 +901,9 @@ const ExplorerWorkspacePanel = () => {
     );
   }
 
-  // When filter is active, merge filter-expanded paths so matched nodes are visible
-  const effectiveExpandedPaths = filterExpandedPaths
-    ? new Set([...expandedPaths, ...filterExpandedPaths])
-    : expandedPaths;
-
   const isRootExpanded = effectiveExpandedPaths.has(workspaceDir);
-  const handleReveal = async (path: string) => {
-    try {
-      await revealItemInDir(path);
-    } catch (error) {
-      notify(t("panel.operationError", { message: String(error) }), { type: "error" });
-    }
-  };
   const handleRevealActive = () => {
+    const activeFilePath = selectActiveFilePath(useTabStore.getState());
     if (!activeFilePath) return;
     if (
       activeFilePath
@@ -878,7 +922,6 @@ const ExplorerWorkspacePanel = () => {
 
   const sharedNodeProps = {
     expandedPaths: effectiveExpandedPaths,
-    activeFilePath,
     renamingPath,
     creating,
     workspaceDir,
@@ -888,27 +931,7 @@ const ExplorerWorkspacePanel = () => {
     clipboardState,
     draggingPath: dnd.draggingPath,
     overFolderPath: dnd.overFolderPath,
-    onToggle: handleToggle,
-    onOpen: handleOpenFile,
-    onDelete: handleDelete,
-    onStartRename: setRenamingPath,
-    onCommitRename: handleCommitRename,
-    onCancelAction: handleCancelAction,
-    onCopyPath: handleCopyPath,
-    onCopyRelativePath: handleCopyRelativePath,
-    onReveal: handleReveal,
-    onContextSelect: (path: string) => {
-      if (!selectedPaths.has(path)) setSelectedPaths(new Set([path]));
-      setFocusedPath(path);
-    },
-    onNewFile: handleNewFile,
-    onNewFolder: handleNewFolder,
-    onCommitCreate: handleCommitCreate,
-    onCut: handleCut,
-    onCopy: handleCopy,
-    onPaste: handlePaste,
-    onClick: handleClick,
-    onBatchDelete: handleBatchDelete,
+    ...nodeHandlers,
   };
 
   // -------------------------------------------------------------------------
@@ -939,7 +962,7 @@ const ExplorerWorkspacePanel = () => {
           onRevealActive={handleRevealActive}
           onOpenWorkspace={handleOpenWorkspace}
           onQuickOpen={() => setQuickOpenOpen(true)}
-          canRevealActive={!!activeFilePath && isSameOrDescendant(activeFilePath, workspaceDir)}
+          canRevealActive={canRevealActive}
           loading={loading}
           filterQuery={filterQuery}
           onFilterChange={(query) => {
@@ -951,11 +974,7 @@ const ExplorerWorkspacePanel = () => {
           searchRef={searchRef}
         />
 
-        <ExplorerBreadcrumb
-          activeFilePath={activeFilePath}
-          workspaceDir={workspaceDir}
-          onExpandPaths={handleExpandPaths}
-        />
+        <ExplorerBreadcrumb workspaceDir={workspaceDir} onExpandPaths={handleExpandPaths} />
 
         <ScrollArea className="min-h-0 flex-1">
           <ExplorerRoot

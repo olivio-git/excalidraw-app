@@ -1,4 +1,5 @@
-import { ArrowDownLeft, ArrowUpRight, RefreshCw, Link2 } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, RefreshCw, Link2, Share2 } from "lucide-react";
+import { openKnowledgeGraph } from "@/features/knowledge-graph";
 import { useTranslation } from "react-i18next";
 import { useTabStore } from "@/core/tabs/store/tab-store";
 import { createFileReference, openFileReference } from "../services/file-navigation";
@@ -25,6 +26,9 @@ export function ReferencesPanel() {
       <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3 text-xs font-medium">
         <Link2 className="size-4" />
         <span className="flex-1">{t("connected.references")}</span>
+        <button onClick={openKnowledgeGraph} aria-label={t("graph.title")} title={t("graph.title")}>
+          <Share2 className="size-3.5" />
+        </button>
         <button onClick={refresh} aria-label={t("connected.refresh")}>
           <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
         </button>

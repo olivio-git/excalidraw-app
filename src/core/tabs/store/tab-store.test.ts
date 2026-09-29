@@ -3,6 +3,7 @@ import { useTabStore } from "./tab-store";
 import { RouteRegistry } from "@/core/routing/route-registry";
 import type { RouteConfig } from "@/core/routing/types";
 import { TABS_CONFIG } from "../config";
+import { initialEditorLayout } from "./editor-layout";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -34,7 +35,14 @@ const addTabParams = (overrides: {
 
 beforeEach(() => {
   RouteRegistry.clear();
-  useTabStore.setState({ tabs: [], activeTabId: null });
+  // Reset the editor layout too, so a test that moves tabs between groups
+  // doesn't leak its active group into the next one.
+  useTabStore.setState({
+    ...initialEditorLayout(),
+    tabs: [],
+    activeTabId: null,
+    lastActivatedAt: {},
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -468,20 +476,21 @@ describe("TabStore", () => {
       expect(useTabStore.getState().activeTabId).toBe(firstTabId);
     });
 
-    it("updates openedAt for LRU tracking when activating a different tab", () => {
+    it("tracks activation time for LRU without replacing the tabs array", () => {
       vi.useFakeTimers();
       vi.setSystemTime(1000);
 
       useTabStore.getState().addTab({ routeId: "r1", path: "/a", title: "A" });
       const tabId = useTabStore.getState().tabs[0].id;
-      const originalOpenedAt = useTabStore.getState().tabs[0].openedAt;
       useTabStore.getState().addTab({ routeId: "r2", path: "/b", title: "B" });
+      const tabsBefore = useTabStore.getState().tabs;
 
       vi.setSystemTime(5000);
       useTabStore.getState().setActiveTab(tabId);
 
-      const updatedOpenedAt = useTabStore.getState().tabs[0].openedAt;
-      expect(updatedOpenedAt).toBeGreaterThan(originalOpenedAt);
+      expect(useTabStore.getState().lastActivatedAt[tabId]).toBe(5000);
+      // Same array: `tabs` subscribers (explorer, toolbars) don't re-render on a switch.
+      expect(useTabStore.getState().tabs).toBe(tabsBefore);
 
       vi.useRealTimers();
     });
@@ -804,6 +813,86 @@ describe("TabStore", () => {
       expect(tabs[0].path).toBe("/b");
       expect(tabs[1].path).toBe("/c");
       expect(tabs[2].path).toBe("/a");
+    });
+  });
+
+  describe("preview tabs", () => {
+    const open = (file: string, preview = true) =>
+      useTabStore.getState().addTab({
+        routeId: "doc",
+        path: "/doc",
+        title: file,
+        instanceId: `/ws/${file}`,
+        metadata: { filePath: `/ws/${file}` },
+        preview,
+      });
+    const titles = () =>
+      useTabStore.getState().tabs.map((tab) => `${tab.title}${tab.isPreview ? "*" : ""}`);
+
+    it("replaces the current preview tab in place instead of piling tabs up", () => {
+      open("kept.md", false);
+      open("a.md");
+      open("last.md", false);
+      expect(titles()).toEqual(["kept.md", "a.md*", "last.md"]);
+
+      const b = open("b.md");
+      expect(titles()).toEqual(["kept.md", "b.md*", "last.md"]);
+      expect(useTabStore.getState().activeTabId).toBe(b);
+    });
+
+    it("keeps a preview tab once it is edited, pinned, moved or reordered", () => {
+      const edited = open("edited.md");
+      useTabStore.getState().updateTab(edited, { metadata: { isDirty: true } });
+      expect(useTabStore.getState().getTab(edited)?.isPreview).toBeUndefined();
+
+      const pinned = open("pinned.md");
+      useTabStore.getState().pinTab(pinned);
+      const moved = open("moved.md");
+      useTabStore.getState().moveTabToGroup(moved, "secondary");
+      const reordered = open("reordered.md");
+      useTabStore.getState().reorderTabs(
+        useTabStore.getState().tabs.findIndex((tab) => tab.id === reordered),
+        0
+      );
+
+      expect(useTabStore.getState().tabs.every((tab) => !tab.isPreview)).toBe(true);
+      expect(titles()).toHaveLength(4);
+    });
+
+    it("never replaces a preview tab with unsaved changes", () => {
+      const dirty = open("dirty.md");
+      // Metadata set directly (not through updateTab) to model a stale flag.
+      useTabStore.setState({
+        tabs: useTabStore
+          .getState()
+          .tabs.map((tab) => (tab.id === dirty ? { ...tab, metadata: { isDirty: true } } : tab)),
+      });
+      open("next.md");
+      expect(titles()).toEqual(["dirty.md*", "next.md*"]);
+    });
+
+    it("turns a preview into a normal tab when the file is opened for real", () => {
+      const tab = open("doc.md");
+      expect(open("doc.md", false)).toBe(tab);
+      expect(useTabStore.getState().getTab(tab)?.isPreview).toBeUndefined();
+
+      const other = open("other.md");
+      useTabStore.getState().keepTab(other);
+      open("third.md");
+      expect(titles()).toEqual(["doc.md", "other.md", "third.md*"]);
+    });
+
+    it("only replaces previews within the same editor group", () => {
+      open("left.md");
+      useTabStore.getState().addTab({
+        routeId: "doc",
+        path: "/doc",
+        title: "right.md",
+        instanceId: "/ws/right.md",
+        groupId: "secondary",
+        preview: true,
+      });
+      expect(titles()).toEqual(["left.md*", "right.md*"]);
     });
   });
 });

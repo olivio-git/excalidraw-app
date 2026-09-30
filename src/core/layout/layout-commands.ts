@@ -27,7 +27,21 @@ async function pickView(placeHolder: string) {
   return index === undefined ? undefined : views[index];
 }
 
-const COMMANDS: Array<{ id: string; name: string; run: () => unknown; key?: string }> = [
+const COMMANDS: Array<{
+  id: string;
+  name: string;
+  run: () => unknown;
+  key?: string;
+  /** The shortcut also works while typing (editors, inputs). */
+  allowInInput?: boolean;
+}> = [
+  {
+    id: "workbench.action.toggleAgent",
+    name: "IA: Abrir/cerrar el agente",
+    run: async () => (await import("@/features/ai-chat/open-agent")).toggleAgent(),
+    key: "ctrl+alt+i",
+    allowInInput: true,
+  },
   {
     id: "workbench.action.toggleAuxiliaryBar",
     name: "Ver: Mostrar/ocultar barra lateral secundaria",
@@ -99,6 +113,7 @@ export function initLayoutCommands(): void {
         commandId: command.id,
         chord: keyNormalizer.normalizeChord(command.key),
         source: KeybindingSource.Builtin,
+        ...(command.allowInInput && { allowInInput: true }),
       });
     }
   }

@@ -35,6 +35,8 @@ export const WRITE_TOOLS: ReadonlySet<string> = new Set([
   // flows (creates / rewrites a .flow3d)
   "flow3d_create",
   "flow3d_update",
+  // runs the flow for real (commands, HTTP, notes)
+  "flow3d_run",
   "activate_tab",
   "close_tab",
   "save_all_diagrams",

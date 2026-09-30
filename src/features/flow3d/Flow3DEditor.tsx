@@ -471,7 +471,11 @@ export function Flow3DEditor({
           <>
             <div className="mx-1 h-4 w-px bg-border" />
             {onGenerate && (
-              <ToolButton label="Crear o rehacer con IA…" onClick={onGenerate} disabled={!canEdit}>
+              <ToolButton
+                label="Crear o cambiar con el agente (Ctrl+Alt+I)"
+                onClick={onGenerate}
+                disabled={!canEdit}
+              >
                 <WandSparkles />
               </ToolButton>
             )}
@@ -598,7 +602,7 @@ export function Flow3DEditor({
               {onGenerate && editable && (
                 <Button size="xs" onClick={onGenerate}>
                   <WandSparkles />
-                  Describir y crear con IA
+                  Crear con el agente
                 </Button>
               )}
             </div>

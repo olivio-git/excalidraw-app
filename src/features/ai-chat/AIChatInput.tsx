@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Send, Square, X, ImagePlus } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -16,6 +16,8 @@ interface AIChatInputProps {
   isStreaming: boolean;
   isWaitingForUser?: boolean;
   disabled?: boolean;
+  /** Text put in the input from outside (a new `id` replaces it again). */
+  draft?: { text: string; id: number } | null;
 }
 
 export function AIChatInput({
@@ -25,12 +27,26 @@ export function AIChatInput({
   isStreaming,
   isWaitingForUser,
   disabled,
+  draft,
 }: AIChatInputProps) {
   const { t } = useTranslation("common");
   const [value, setValue] = useState("");
   const [images, setImages] = useState<AIImageAttachment[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // A new draft replaces the text once; the user edits it freely afterwards.
+  const [draftId, setDraftId] = useState<number | null>(null);
+  if (draft && draft.id !== draftId) {
+    setDraftId(draft.id);
+    setValue(draft.text);
+  }
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!draft || !textarea) return;
+    textarea.focus();
+    textarea.setSelectionRange(draft.text.length, draft.text.length);
+  }, [draft]);
 
   const activeProvider = useAISettingsStore((s) => s.activeProvider);
   const providerModel = useAISettingsStore((s) => s.providers[s.activeProvider].model);
@@ -147,6 +163,7 @@ export function AIChatInput({
         )}
         <textarea
           ref={textareaRef}
+          data-ai-chat-input
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}

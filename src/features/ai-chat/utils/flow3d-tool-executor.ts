@@ -48,6 +48,7 @@ export async function executeFlow3DTool(
     filePath?: string;
     nodes?: unknown[];
     edges?: unknown[];
+    payload?: unknown;
   };
   const [
     { flowFromAI, summarizeRun, FLOW_FORMAT_GUIDE },
@@ -117,6 +118,33 @@ export async function executeFlow3DTool(
           steps: doc.nodes.length,
           undo: open ? "Ctrl+Z in the editor" : undefined,
         });
+      }
+      case "flow3d_run": {
+        const path = await resolvePath(input.filePath);
+        if (!path) return fail("No flow is open. Pass filePath.");
+        const [{ executeFlow }, { createRuntimeServices }, { flowSecrets }, history] =
+          await Promise.all([
+            import("@/features/flow3d/executor"),
+            import("@/features/flow3d/runtime-services"),
+            import("@/features/flow3d/app-stores"),
+            import("@/features/flow3d/run-history"),
+          ]);
+        const open = flow3dRegistry.get(path);
+        const doc = open ? open.store.getState().doc : parseFlow(await readTextFile(path));
+        if (doc.nodes.length === 0) return fail("The flow has no steps yet.");
+        const services = createRuntimeServices(path);
+        const options = {
+          secrets: await flowSecrets.all(),
+          trigger: "manual" as const,
+          ...(input.payload !== undefined && { payload: input.payload }),
+        };
+        // Open flows run in their tab, so the user watches it happen.
+        const run =
+          open && open.store.getState().run?.status !== "running"
+            ? await open.store.getState().execute(services, options)
+            : await executeFlow(doc, { services, ...options, edgeDuration: 0, minStepDuration: 0 });
+        await runHistory.add(history.toHistoryEntry(path, run, history.flowSignature(doc)));
+        return ok({ filePath: path, status: run.status, steps: summarizeRun(doc, run) });
       }
       default:
         return fail(`Unknown tool: ${toolName}`);

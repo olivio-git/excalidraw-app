@@ -107,6 +107,23 @@ The index is a **snapshot**. Refresh after edits for a new one. `running` with a
 
 File/block/reference actions require normalized absolute paths within the selected workspace; sibling-prefix paths and parent traversal are rejected. Internal links remain path-based, so renaming a target does not automatically rewrite authored links.
 
+## 3D flows, search and notes
+
+These are the same tools the app's own agent uses (one implementation in the frontend), so an external agent can build and test automations like the built-in one.
+
+| Tool               | Purpose                                                                                         |
+| ------------------ | ----------------------------------------------------------------------------------------------- |
+| `flow3d_create`    | Create a `.flow3d` from `nodes`/`edges` (laid out automatically) and open it                    |
+| `flow3d_read`      | Steps, connections, last run per step and the **format reference** — call it before writing one |
+| `flow3d_update`    | Replace steps/connections, keeping name and settings; undoable (Ctrl+Z) in an open editor       |
+| `flow3d_run`       | Run the flow for real (commands, HTTP, AI steps, notes) and return each step's status/output    |
+| `workspace_search` | Text search over note blocks, Markdown, diagram texts, flow steps and code, with anchors        |
+| `notes_list`       | The Notes view as data: title, snippet, notebook, tags, status, last change; filters            |
+
+`filePath` may be absolute or workspace-relative, and must stay inside the workspace. Without it, the flow tools act on the flow open in the active tab. `flow3d_run`, `workspace_search` and `notes_list` may take up to 300 s (the other tools keep the 5 s bridge limit). `flow3d_run` executes shell commands and HTTP calls configured in the flow: in the app's chat it asks for permission first; through MCP the client's own tool approval applies.
+
+Typical loop: `flow3d_read` → `flow3d_update` → `flow3d_run` → read the failing step's `error` → `flow3d_update` → `flow3d_run`.
+
 ## Plugin SDK equivalents
 
 ```ts

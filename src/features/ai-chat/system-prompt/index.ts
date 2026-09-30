@@ -17,11 +17,20 @@ export interface DocumentContextInfo {
   charCount: number;
 }
 
+export interface FlowContextInfo {
+  filePath: string;
+  name: string;
+  stepCount: number;
+  /** Status of the last run, when there is one. */
+  lastRun?: string;
+}
+
 export interface SystemPromptOptions {
   theme?: Theme;
   customInstructions?: string;
   diagramContext?: DiagramContextInfo;
   documentContext?: DocumentContextInfo;
+  flowContext?: FlowContextInfo;
 }
 
 function buildContextSection(
@@ -49,6 +58,13 @@ function buildContextSection(
     );
   }
 
+  if (contextKind === "flow" && opts.flowContext) {
+    const { filePath, name, stepCount, lastRun } = opts.flowContext;
+    parts.push(
+      `## ACTIVE FLOW\nFile: ${filePath}\nName: "${name}" · ${stepCount === 0 ? "empty (no steps yet)" : `${stepCount} steps`}${lastRun ? ` · last run: ${lastRun}` : ""}`
+    );
+  }
+
   if (opts.customInstructions?.trim()) {
     parts.push(`## USER INSTRUCTIONS\n${opts.customInstructions.trim()}`);
   }
@@ -63,12 +79,27 @@ const FLOWS_SECTION = `
 
 ## AUTOMATION FLOWS (.flow3d)
 
-Flows are executable automations shown in a 3D editor. Tools: **flow3d_create(name, nodes, edges)** creates and opens one; **flow3d_read(filePath?)** returns the flow open in the active tab (or a given file), the result of its last run and the format reference; **flow3d_update(filePath?, nodes, edges)** replaces its steps (undoable in the editor).
+Flows are executable automations shown in a 3D editor. Tools: **flow3d_create(name, nodes, edges)** creates and opens one; **flow3d_read(filePath?)** returns the flow open in the active tab (or a given file), the result of its last run and the format reference; **flow3d_update(filePath?, nodes, edges)** replaces its steps (undoable in the editor); **flow3d_run(filePath?, payload?)** runs it for real and returns how each step went.
 When the user asks for an automation ("every morning…", "when a file changes…", "call this API and…"), create a flow. When they mention "this flow", a failing step or a run, call flow3d_read first and fix the configuration with flow3d_update.`;
 
 export function buildSystemPrompt(context: AIChatContext, opts: SystemPromptOptions = {}): string {
   return buildBasePrompt(context, opts) + FLOWS_SECTION;
 }
+
+const FLOW_AGENT_PROMPT = `You are the flow agent of QoriApp. The user is looking at an automation flow (.flow3d) in the 3D editor; "this flow" means the active one.
+
+## HOW TO WORK
+
+1. Call **flow3d_read** (no filePath) before changing anything: it returns the steps, the connections, the last run and the full format reference.
+2. Change the flow with **flow3d_update** (no filePath): send the complete list of nodes and edges, keeping the ids of steps you don't change. The editor shows it at once and Ctrl+Z undoes it.
+3. When the user asks to try it, or to fix a failure, call **flow3d_run** and read its result; if a step fails, fix its configuration and run again (at most 3 times).
+4. Use the workspace tools to look at files the flow reads or writes, and **workspace_search** to find notes, diagrams or code it should use.
+
+## STYLE
+
+- If the request is unclear (what triggers it, where data comes from), ask one short question first; otherwise act.
+- Answer in the user's language, briefly: what you built or changed and why, step by step names in bold.
+- Never paste the flow JSON in the chat: the editor already shows it.`;
 
 function buildBasePrompt(context: AIChatContext, opts: SystemPromptOptions): string {
   const theme = opts.theme ?? "dark";
@@ -79,6 +110,8 @@ function buildBasePrompt(context: AIChatContext, opts: SystemPromptOptions): str
       return buildExcalidrawSystemPrompt(theme) + suffix;
     case "document":
       return buildDocumentSystemPrompt() + suffix;
+    case "flow":
+      return FLOW_AGENT_PROMPT + suffix;
     case "none":
       return `You are a helpful assistant integrated into an Excalidraw workspace. No diagram or document tab is currently active.
 
@@ -92,6 +125,8 @@ You have workspace tools to create and open files:
 - **workspace_create_diagram(name)** — create a new diagram and open it
 - **workspace_create_document(title)** — create a new markdown document and open it
 - **workspace_open_file(filePath)** — open an existing file
+- **workspace_search(query)** — find text in notes, diagrams, flows and code
+- **notes_list(tag?, status?, notebook?, query?)** — the notes with title, tags, status and date
 - **document_create_visual_report(title, markdown, diagrams)** — create a complete markdown document and generated editable Excalidraw diagrams without opening diagram tabs
 
 ## WORKFLOW

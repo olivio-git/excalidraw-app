@@ -4,6 +4,7 @@ import { DiagramController } from "@/core/diagram/DiagramController";
 export type AIChatContext =
   | { kind: "diagram"; instanceId: string }
   | { kind: "document"; filePath: string }
+  | { kind: "flow"; filePath: string }
   | { kind: "none" };
 
 export function resolveAIChatContext(): AIChatContext {
@@ -16,6 +17,11 @@ export function resolveAIChatContext(): AIChatContext {
   if (activeTab.routeId === "document-editor") {
     const filePath = (activeTab.instanceId ?? activeTab.metadata?.filePath ?? "") as string;
     if (filePath) return { kind: "document", filePath };
+  }
+
+  if (activeTab.routeId === "flow3d") {
+    const filePath = (activeTab.instanceId ?? activeTab.metadata?.filePath ?? "") as string;
+    if (filePath) return { kind: "flow", filePath };
   }
 
   // Secondary: check DiagramController

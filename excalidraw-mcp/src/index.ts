@@ -7,6 +7,8 @@ import { registerAutomationTools } from "./automation-tools.js";
 
 const PORT = process.env.MCP_PORT ?? "7888";
 const BRIDGE_URL = `http://127.0.0.1:${PORT}/api/tool`;
+/** Tools that may run for minutes (the app allows them 300 s). */
+const LONG_TOOLS = new Set(["flow3d_run", "workspace_search", "notes_list"]);
 
 interface BridgeResponse {
   result: unknown;
@@ -19,7 +21,7 @@ async function callBridge(tool: string, input: Record<string, unknown>): Promise
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tool, input }),
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(LONG_TOOLS.has(tool) ? 305_000 : 6000),
     });
 
     if (!res.ok) {

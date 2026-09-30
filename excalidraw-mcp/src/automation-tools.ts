@@ -35,6 +35,12 @@ const block = z
   .describe(
     "BlockNote block: type, optional id, props, content, children. Call document_get_schema for allowed types/properties."
   );
+const flowPath = z
+  .string()
+  .min(1)
+  .describe("Path of a .flow3d file, absolute or relative to the workspace.");
+const flowItem = z.record(z.string(), z.unknown());
+
 interface Definition {
   description: string;
   input: z.ZodRawShape;
@@ -200,6 +206,79 @@ export const automationDefinitions: Record<string, Definition> = {
   },
 };
 
+/**
+ * Tools the app's own agent has too (same implementation in the frontend):
+ * 3D flows, workspace search and the notes list.
+ */
+export const agentToolDefinitions: Record<string, Definition> = {
+  // ── 3D flows (.flow3d): executable automations ─────────────────────────────
+  flow3d_create: {
+    description:
+      "Create an executable automation flow (.flow3d) in the workspace and open it in the 3D editor. Call flow3d_read on any flow first to get the full format reference. Start with exactly one trigger; the layout is automatic.",
+    input: {
+      name: z.string().min(1).describe("Flow name, also used for the file name."),
+      folder: z.string().optional().describe("Workspace-relative folder."),
+      nodes: z
+        .array(flowItem)
+        .describe(
+          "Steps: { id, kind: trigger|action|condition|transform|ai|output|note, label, description?, config? }."
+        ),
+      edges: z
+        .array(flowItem)
+        .describe('Connections: { id, from, to, label? } — "sí"/"no" on condition branches.'),
+    },
+  },
+  flow3d_read: {
+    description:
+      "Read a flow: steps, connections, the result of its last run (status, errors, outputs per step) and the format reference. Without filePath, reads the flow open in the active tab.",
+    input: { filePath: flowPath.optional() },
+    readOnly: true,
+  },
+  flow3d_update: {
+    description:
+      "Replace the steps and connections of a flow, keeping its name and settings. Send the complete lists; keep the ids of unchanged steps. In an open editor it shows at once and Ctrl+Z undoes it.",
+    input: { filePath: flowPath.optional(), nodes: z.array(flowItem), edges: z.array(flowItem) },
+  },
+  flow3d_run: {
+    description:
+      "Run a flow for real (shell commands, HTTP calls, AI steps, notes it writes) and return each step's status, output and error. Can take minutes. An open flow is animated in its tab.",
+    input: {
+      filePath: flowPath.optional(),
+      payload: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe("Starting data for the trigger; defaults to its configured payload."),
+    },
+  },
+
+  // ── Finding things ─────────────────────────────────────────────────────────
+  workspace_search: {
+    description:
+      "Search text across the workspace: note blocks, Markdown, diagram texts, flow steps and code. Returns files with matching lines and an anchor (block, heading, shape or step id) usable with open_reference.",
+    input: {
+      query: z.string().min(1),
+      regex: z.boolean().optional(),
+      caseSensitive: z.boolean().optional(),
+      wholeWord: z.boolean().optional(),
+      maxResults: z.number().int().min(1).max(200).optional(),
+    },
+    readOnly: true,
+  },
+  notes_list: {
+    description:
+      "List the workspace notes (.md, .note) like the app's Notes view: title, first line, notebook (folder), tags, status and last change, newest first. Filter by tag, status, notebook or text.",
+    input: {
+      sort: z.enum(["updated", "title"]).optional(),
+      tag: z.string().optional(),
+      status: z.enum(["active", "onhold", "completed", "dropped"]).optional(),
+      notebook: z.string().optional().describe("Workspace-relative folder."),
+      query: z.string().optional().describe("Text in the title or first line."),
+      limit: z.number().int().min(1).max(500).optional(),
+    },
+    readOnly: true,
+  },
+};
+
 export function registerAutomationTools(
   server: McpServer,
   bridge: (
@@ -207,7 +286,10 @@ export function registerAutomationTools(
     input: Record<string, unknown>
   ) => Promise<{ result: unknown; error: string | null }>
 ) {
-  for (const [name, definition] of Object.entries(automationDefinitions)) {
+  for (const [name, definition] of Object.entries({
+    ...automationDefinitions,
+    ...agentToolDefinitions,
+  })) {
     server.registerTool(
       name,
       {

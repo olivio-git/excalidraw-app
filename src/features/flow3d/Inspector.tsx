@@ -10,6 +10,7 @@ import {
   Ungroup,
   UnfoldVertical,
   WandSparkles,
+  Bot,
   X,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
@@ -38,6 +39,7 @@ import { StepConfigEditor } from "./StepConfigEditor";
 import type { StepRecord } from "./executor";
 import { AutomationToggle, StatusDot } from "./RunTools";
 import { relativeTime } from "./run-history";
+import { openAgent } from "@/features/ai-chat/open-agent";
 
 const KIND_ITEMS = NODE_KIND_ORDER.map((kind) => ({ value: kind, label: NODE_KINDS[kind].label }));
 
@@ -474,6 +476,22 @@ function StepData({
           >
             <WandSparkles />
             {diagnosis.loading ? "Pensando…" : "Diagnosticar con IA"}
+          </Button>
+          <Button
+            size="xs"
+            variant="outline"
+            className="w-full"
+            data-fix-with-agent
+            onClick={() => {
+              const node = store.getState().doc.nodes.find((n) => n.id === nodeId);
+              openAgent({
+                prompt: `El paso «${node?.label ?? nodeId}» (id ${nodeId}) falló con este error:\n${step.error}\n\nRevisa el flujo, arréglalo y vuelve a ejecutarlo para comprobarlo.`,
+                send: true,
+              });
+            }}
+          >
+            <Bot />
+            Arreglar con el agente
           </Button>
           {diagnosis.text && (
             <p className="rounded-md border border-primary/30 bg-primary/5 p-2 text-[11px] leading-snug whitespace-pre-wrap">

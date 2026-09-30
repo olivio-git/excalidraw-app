@@ -3,7 +3,7 @@ import { posix } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { server } from "../src/index";
-import { automationDefinitions } from "../src/automation-tools";
+import { agentToolDefinitions, automationDefinitions } from "../src/automation-tools";
 import { dispatchMcpTool } from "../../src/core/shell/hooks/useMcpBridge";
 import { AUTOMATION_TOOLS } from "../../src/core/automation/dispatch";
 import { referenceActions } from "../../src/core/automation/references";
@@ -165,6 +165,11 @@ describe("MCP → JSON bridge → shared app services", () => {
     expect(
       tools.find((tool) => tool.name === "get_elements")?.inputSchema.properties
     ).toHaveProperty("tabId");
+    for (const name of Object.keys(agentToolDefinitions))
+      expect(
+        tools.some((tool) => tool.name === name),
+        name
+      ).toBe(true);
   });
   it("discovers block capabilities and navigates a native outline reference", async () => {
     expect((await call("document_get_schema")).value).toMatchObject({

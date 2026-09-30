@@ -198,3 +198,45 @@ describe("dispatchMcpTool — create_diagram", () => {
     expect(res.error).toContain("File already exists");
   });
 });
+
+describe("flows, search and notes for external agents", () => {
+  beforeEach(async () => {
+    mockWorkspaceStore.workspaceDir = "/ws";
+    const { executeAITool } = await import("@/features/ai-chat/utils/tool-executor");
+    vi.mocked(executeAITool).mockReset();
+  });
+
+  it("runs the app agent's own tool and returns its JSON", async () => {
+    const { executeAITool } = await import("@/features/ai-chat/utils/tool-executor");
+    vi.mocked(executeAITool).mockResolvedValue({
+      toolCallId: "",
+      result: JSON.stringify({ total: 1, files: [] }),
+      isError: false,
+    });
+    const answer = await dispatchMcpTool("workspace_search", { query: "pedido" });
+    expect(answer).toEqual({ result: { total: 1, files: [] }, error: null });
+    expect(vi.mocked(executeAITool).mock.calls[0][0]).toBe("workspace_search");
+  });
+
+  it("keeps flow files inside the workspace", async () => {
+    const { executeAITool } = await import("@/features/ai-chat/utils/tool-executor");
+    for (const filePath of ["/etc/x.flow3d", "../fuera.flow3d"]) {
+      const answer = await dispatchMcpTool("flow3d_run", { filePath });
+      expect(answer.error).toContain("inside the workspace");
+    }
+    expect(executeAITool).not.toHaveBeenCalled();
+  });
+
+  it("reports tool errors as errors", async () => {
+    const { executeAITool } = await import("@/features/ai-chat/utils/tool-executor");
+    vi.mocked(executeAITool).mockResolvedValue({
+      toolCallId: "",
+      result: "No flow is open. Pass filePath.",
+      isError: true,
+    });
+    expect(await dispatchMcpTool("flow3d_read", {})).toEqual({
+      result: null,
+      error: "No flow is open. Pass filePath.",
+    });
+  });
+});

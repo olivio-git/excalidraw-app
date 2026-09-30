@@ -8,7 +8,7 @@ import type { AIChatContext } from "../utils/context-resolver";
 import { getToolsForContext } from "../tools";
 import { executeAITool } from "../utils/tool-executor";
 import { buildSystemPrompt } from "../system-prompt";
-import type { DiagramContextInfo, DocumentContextInfo } from "../system-prompt";
+import type { DiagramContextInfo, DocumentContextInfo, FlowContextInfo } from "../system-prompt";
 import { useDocumentStore } from "@/stores/documentStore";
 import { getDocumentController } from "@/features/document-editor/documentController.singleton";
 import { useThemeStore } from "@/stores/themeStore";
@@ -136,6 +136,19 @@ export function useAIChat() {
       }
     }
 
+    let flowContext: FlowContextInfo | undefined;
+    if (context.kind === "flow") {
+      const { flow3dRegistry } = await import("@/features/flow3d/flow3d-registry");
+      const state = flow3dRegistry.get(context.filePath)?.store.getState();
+      if (state)
+        flowContext = {
+          filePath: context.filePath,
+          name: state.doc.name ?? context.filePath.split(/[\\/]/).pop() ?? "",
+          stepCount: state.doc.nodes.length,
+          lastRun: state.run?.status,
+        };
+    }
+
     const controller = new AbortController();
     setAbortController(controller);
     setStatus("streaming");
@@ -163,6 +176,7 @@ export function useAIChat() {
           customInstructions,
           diagramContext,
           documentContext,
+          flowContext,
         });
         const tools = getToolsForContext(context);
 

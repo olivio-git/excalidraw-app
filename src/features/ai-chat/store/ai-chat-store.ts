@@ -26,6 +26,12 @@ export interface AgentInspectorSnapshot {
   };
 }
 
+export interface QueuedPrompt {
+  text: string;
+  /** Send it right away, or leave it in the input for the user to finish. */
+  send: boolean;
+}
+
 export interface PendingQuestion {
   toolCallId: string;
   question: string;
@@ -40,6 +46,8 @@ interface AIChatState {
   abortController: AbortController | null;
   pendingQuestion: PendingQuestion | null;
   lastInspectorSnapshot: AgentInspectorSnapshot | null;
+  /** Text other parts of the app hand to the chat (see open-agent.ts). */
+  queuedPrompt: QueuedPrompt | null;
 
   addMessage: (msg: Omit<AIMessage, "id" | "timestamp">) => string;
   updateMessage: (id: string, patch: Partial<AIMessage>) => void;
@@ -57,6 +65,7 @@ interface AIChatState {
   setInspectorSnapshot: (snapshot: AgentInspectorSnapshot) => void;
   clearMessages: () => void;
   setMessages: (messages: AIMessage[]) => void;
+  queuePrompt: (prompt: QueuedPrompt | null) => void;
 }
 
 export const useAIChatStore = create<AIChatState>()((set, _get) => ({
@@ -66,6 +75,7 @@ export const useAIChatStore = create<AIChatState>()((set, _get) => ({
   abortController: null,
   pendingQuestion: null,
   lastInspectorSnapshot: null,
+  queuedPrompt: null,
 
   addMessage: (msg: Omit<AIMessage, "id" | "timestamp">) => {
     const id = crypto.randomUUID();
@@ -169,4 +179,5 @@ export const useAIChatStore = create<AIChatState>()((set, _get) => ({
   },
 
   setMessages: (messages) => set({ messages, status: "idle", errorMessage: null }),
+  queuePrompt: (queuedPrompt) => set({ queuedPrompt }),
 }));

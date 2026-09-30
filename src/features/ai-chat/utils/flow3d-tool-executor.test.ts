@@ -14,8 +14,9 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
 }));
 vi.mock("@tauri-apps/api/path", () => ({ join: async (...parts: string[]) => parts.join("/") }));
 vi.mock("@/core/shell/services/file-navigation", () => ({ openFileInWorkbench: vi.fn() }));
+vi.mock("@/features/flow3d/runtime-services", () => ({ createRuntimeServices: vi.fn(() => ({})) }));
 vi.mock("@/features/flow3d/app-stores", () => ({
-  runHistory: { list: vi.fn(async () => []) },
+  runHistory: { list: vi.fn(async () => []), add: vi.fn(async () => undefined) },
   flowSecrets: { all: vi.fn(async () => ({})) },
 }));
 
@@ -66,6 +67,41 @@ describe("flow3d chat tools", () => {
     store.getState().undo();
     expect(store.getState().doc.nodes).toHaveLength(6);
     expect(writeTextFile).not.toHaveBeenCalled();
+    unregister();
+  });
+
+  it("runs an open flow in its tab and reports each step", async () => {
+    const store = createFlowEditorStore(parseFlow(JSON.stringify({ name: "P", ...steps })));
+    const run = {
+      status: "error" as const,
+      steps: {
+        t: { nodeId: "t", status: "done" as const, start: 0, end: 0.1, output: { ok: 1 } },
+        a: {
+          nodeId: "a",
+          status: "error" as const,
+          start: 0.1,
+          end: 0.2,
+          error: "ls: no such file",
+        },
+      },
+      order: ["t", "a"],
+      startedAt: 0,
+      trigger: "manual" as const,
+    };
+    const execute = vi.fn(async () => run);
+    store.setState({ execute } as never);
+    const unregister = flow3dRegistry.register("/ws/p.flow3d", { store, save: async () => true });
+    const result = await executeFlow3DTool("flow3d_run", {
+      filePath: "p.flow3d",
+      payload: { x: 1 },
+    });
+    const data = JSON.parse(result.result);
+    expect(data.status).toBe("error");
+    expect(data.steps).toContain("ls: no such file");
+    expect(execute).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ payload: { x: 1 }, trigger: "manual" })
+    );
     unregister();
   });
 

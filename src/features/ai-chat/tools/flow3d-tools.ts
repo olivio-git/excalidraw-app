@@ -51,6 +51,22 @@ export const FLOW3D_TOOLS: AIToolDefinition[] = [
       required: ["nodes", "edges"],
     },
   },
+  {
+    name: "flow3d_run",
+    description:
+      "Run a flow for real (its commands, HTTP calls, AI steps and notes) and return how each step went: status, output and error. Use it to test a flow after building or fixing it. In an open editor the run is shown step by step. Without filePath, runs the flow open in the active tab.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        filePath: { type: "string", description: "Workspace-relative or absolute path" },
+        payload: {
+          type: "object",
+          description:
+            "Starting data for the trigger (optional; defaults to its configured payload)",
+        },
+      },
+    },
+  },
 ];
 
 export const FLOW3D_TOOL_NAMES: ReadonlySet<string> = new Set(FLOW3D_TOOLS.map((t) => t.name));

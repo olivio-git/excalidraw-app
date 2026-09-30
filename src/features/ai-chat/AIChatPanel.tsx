@@ -18,6 +18,8 @@ import { useChatHistoryStore } from "./store/chat-history-store";
 import { useAIPermissionStore } from "./store/ai-permission-store";
 import { listConversations, loadConversation, deleteConversation } from "./hooks/useChatHistory";
 import { useAIChat } from "./hooks/useAIChat";
+import { resolveAIChatContext } from "./utils/context-resolver";
+import { useTabStore } from "@/core/tabs/store/tab-store";
 import { AIChatMessage } from "./AIChatMessage";
 import { AIChatInput } from "./AIChatInput";
 import { PluginManager } from "@/plugins/plugin-manager";
@@ -39,6 +41,28 @@ export function AIChatPanel() {
 
   const { messages, status, sendMessage, cancelStream, answerPendingQuestion } = useAIChat();
   const isWaiting = status === "waiting_for_user";
+
+  // Prompts handed over by other features (openAgent): sent, or left in the input.
+  const queuedPrompt = useAIChatStore((s) => s.queuedPrompt);
+  const [draft, setDraft] = useState<{ text: string; id: number } | null>(null);
+  useEffect(() => {
+    if (!queuedPrompt || !hasApiKey) return;
+    useAIChatStore.getState().queuePrompt(null);
+    if (queuedPrompt.send) void sendMessage(queuedPrompt.text);
+    else setDraft({ text: queuedPrompt.text, id: Date.now() });
+    // sendMessage is recreated every render; the queue is what triggers this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queuedPrompt, hasApiKey]);
+
+  // Re-render with the active tab: the empty state says what the agent can do here.
+  useTabStore((s) => s.activeTabId);
+  const contextKind = resolveAIChatContext().kind;
+  const emptyState = {
+    diagram: t("aiChat.emptyState"),
+    document: t("aiChat.emptyStateDocument"),
+    flow: t("aiChat.emptyStateFlow"),
+    none: t("aiChat.emptyStateNone"),
+  }[contextKind];
 
   const activeConversationTitle = conversations.find((c) => c.id === activeConversationId)?.title;
 
@@ -130,7 +154,7 @@ export function AIChatPanel() {
   };
 
   return (
-    <div className={cn("flex flex-col h-full overflow-hidden")}>
+    <div data-ai-chat className={cn("flex flex-col h-full overflow-hidden")}>
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
         <DropdownMenu>
@@ -275,9 +299,7 @@ export function AIChatPanel() {
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
         <div className="px-3 py-2">
           {messages.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-6">
-              {t("aiChat.emptyState")}
-            </p>
+            <p className="text-xs text-muted-foreground text-center py-6">{emptyState}</p>
           )}
           {messages.map((m) => (
             <AIChatMessage key={m.id} message={m} />
@@ -292,6 +314,7 @@ export function AIChatPanel() {
             onSend={sendMessage}
             onAnswer={answerPendingQuestion}
             onCancel={cancelStream}
+            draft={draft}
             isStreaming={status === "streaming"}
             isWaitingForUser={isWaiting}
           />

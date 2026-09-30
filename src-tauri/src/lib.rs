@@ -154,6 +154,12 @@ async fn handle_tool(
 ) -> Result<Json<ToolResponse>, (StatusCode, Json<ToolResponse>)> {
     let uuid = Uuid::new_v4().to_string();
     let (tx, rx) = oneshot::channel::<McpResponse>();
+    // Running a flow or scanning the whole workspace takes longer than an edit.
+    let wait = if matches!(req.tool.as_str(), "flow3d_run" | "workspace_search" | "notes_list") {
+        std::time::Duration::from_secs(300)
+    } else {
+        std::time::Duration::from_secs(5)
+    };
 
     state.pending.lock().await.insert(uuid.clone(), tx);
 
@@ -174,7 +180,7 @@ async fn handle_tool(
         ));
     }
 
-    match tokio::time::timeout(std::time::Duration::from_secs(5), rx).await {
+    match tokio::time::timeout(wait, rx).await {
         Ok(Ok(response)) => Ok(Json(ToolResponse {
             result: response.result,
             error: response.error,

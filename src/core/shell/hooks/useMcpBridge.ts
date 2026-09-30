@@ -6,6 +6,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { convertToExcalidrawElements } from "@excalidraw/excalidraw";
 import { DiagramController } from "@/core/diagram/DiagramController";
 import { executeAITool } from "@/features/ai-chat/utils/tool-executor";
+import { FLOW3D_TOOL_NAMES } from "@/features/ai-chat/tools/flow3d-tools";
+import { KNOWLEDGE_TOOL_NAMES } from "@/features/ai-chat/tools/knowledge-tools";
+import { resolveAIChatContext } from "@/features/ai-chat/utils/context-resolver";
 import { useTabStore } from "@/core/tabs/store/tab-store";
 import { useDiagramStore } from "@/core/diagram/store/diagram-store";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
@@ -89,6 +92,36 @@ async function saveMcpDiagram(
   await store.waitForSaves(instanceId);
 }
 
+/**
+ * Flows, search and notes: external agents get the same tools as the app's own
+ * agent (one implementation), limited to files inside the workspace.
+ */
+async function dispatchAgentTool(
+  tool: string,
+  input: Record<string, unknown>
+): Promise<{ result: unknown; error: string | null }> {
+  const workspaceDir = useWorkspaceStore.getState().workspaceDir;
+  if (!workspaceDir) return { result: null, error: "No workspace folder is open." };
+  for (const key of ["filePath", "folder"] as const) {
+    const value = input[key];
+    if (value === undefined) continue;
+    if (typeof value !== "string") return { result: null, error: `${key} must be a string` };
+    const absolute = /^([a-zA-Z]:[\\/]|[\\/])/.test(value)
+      ? value
+      : await join(workspaceDir, value);
+    if (value.includes("..") || !isWorkspacePath(absolute, workspaceDir))
+      return { result: null, error: `${key} must be inside the workspace: ${value}` };
+  }
+  const answer = await executeAITool(tool, input, resolveAIChatContext());
+  let result: unknown = answer.result;
+  try {
+    result = JSON.parse(answer.result);
+  } catch {
+    // Plain-text answer.
+  }
+  return answer.isError ? { result: null, error: String(answer.result) } : { result, error: null };
+}
+
 export async function dispatchMcpTool(
   tool: string,
   input: Record<string, unknown>
@@ -96,6 +129,8 @@ export async function dispatchMcpTool(
   try {
     const automated = await dispatchAutomationTool(tool, input);
     if (automated) return automated;
+    if (FLOW3D_TOOL_NAMES.has(tool) || KNOWLEDGE_TOOL_NAMES.has(tool))
+      return await dispatchAgentTool(tool, input);
     let instanceId = DiagramController.getActiveInstanceId();
     if (
       [

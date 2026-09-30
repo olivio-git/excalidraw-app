@@ -12,7 +12,7 @@ import { LibraryBrowserPanel } from "@/features/library-browser/LibraryBrowserPa
 
 const t = (key: string) => () => i18n.t(key, { ns: "common" });
 
-/** Built-in views; they start in the primary side bar. */
+/** Built-in views; they start in the primary side bar (the agent in the secondary one). */
 export const BUILTIN_VIEWS: WorkbenchView[] = [
   {
     id: "explorer",
@@ -59,7 +59,9 @@ export const BUILTIN_VIEWS: WorkbenchView[] = [
     title: t("panels.aiChat"),
     icon: Bot,
     component: AIChatPanel,
-    defaultLocation: "primary",
+    // Beside the editor, not instead of the explorer: you keep your files in
+    // view while talking to the agent (Ctrl+Alt+I).
+    defaultLocation: "secondary",
     order: 4,
   },
   {

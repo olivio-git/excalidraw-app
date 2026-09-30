@@ -1,5 +1,6 @@
 import { convertToExcalidrawElements } from "@excalidraw/excalidraw";
 import { FLOW3D_TOOL_NAMES } from "../tools/flow3d-tools";
+import { KNOWLEDGE_TOOL_NAMES } from "../tools/knowledge-tools";
 import { DiagramController } from "@/core/diagram/DiagramController";
 import { getDocumentController } from "@/features/document-editor/documentController.singleton";
 import { getDocumentCodec } from "@/features/document-editor/note-codec";
@@ -1022,6 +1023,11 @@ export async function executeAITool(
     return executeFlow3DTool(toolName, toolInput);
   }
 
+  if (KNOWLEDGE_TOOL_NAMES.has(toolName)) {
+    const { executeKnowledgeTool } = await import("./knowledge-tool-executor");
+    return executeKnowledgeTool(toolName, toolInput);
+  }
+
   if (DOCUMENT_TOOL_NAMES.has(toolName)) {
     const input = toolInput as { filePath?: string };
     const activeDocumentPath = useDocumentStore.getState().activeDocumentId;
@@ -1051,6 +1057,7 @@ export async function executeAITool(
       return executeDiagramTool(toolName, toolInput, context.instanceId);
     case "document":
       return executeDocumentTool(toolName, toolInput, context.filePath);
+    case "flow":
     case "none":
       return { toolCallId: "", result: `Unknown tool: ${toolName}`, isError: true };
   }

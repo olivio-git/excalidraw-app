@@ -111,3 +111,22 @@ test("adds a connected step with Tab", async ({ page }) => {
   );
   expect(added).toEqual(["Petición HTTP", "http", true]);
 });
+
+test("asks the agent (right side bar) to change the open flow", async ({ page }) => {
+  // The chat shows its input once a provider has a key.
+  await page.evaluate(async () => {
+    const { useAISettingsStore } = await import("/src/features/settings/ai/ai-settings-store.ts");
+    const state = useAISettingsStore.getState();
+    const provider = state.activeProvider;
+    useAISettingsStore.setState({
+      providers: { ...state.providers, [provider]: { ...state.providers[provider], apiKey: "k" } },
+    });
+  });
+  await page.getByRole("button", { name: /Crear o cambiar con el agente/ }).click();
+  const chat = page.locator("[data-panel='secondary'] [data-ai-chat]");
+  const input = chat.locator("[data-ai-chat-input]");
+  await expect(input).toHaveValue("Cambia este flujo para que ");
+  await expect(input).toBeFocused();
+  // The agent knows which flow "this flow" is.
+  await expect(chat).toContainText("informe");
+});

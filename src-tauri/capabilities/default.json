@@ -49,7 +49,15 @@
     "fs:allow-unwatch",
     {
       "identifier": "fs:scope",
-      "allow": [{ "path": "$HOME/**" }, { "path": "$HOME" }, { "path": "$APPDATA/**" }]
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$HOME" },
+        { "path": "$APPDATA/**" },
+        { "path": "$HOME/.config/qori" },
+        { "path": "$HOME/.config/qori/**" },
+        { "path": "$HOME/**/.qori" },
+        { "path": "$HOME/**/.qori/**" }
+      ]
     },
     "dialog:default",
     "dialog:allow-open",

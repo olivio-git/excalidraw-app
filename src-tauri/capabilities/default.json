@@ -21,6 +21,7 @@
     "core:window:allow-unmaximize",
     "core:window:allow-is-maximized",
     "core:window:allow-start-dragging",
+    "core:window:allow-set-effects",
     "store:allow-get",
     "store:allow-set",
     "store:allow-save",

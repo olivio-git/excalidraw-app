@@ -1,0 +1,105 @@
+/*
+ * Styles driven by ~/.config/qori/config.toml (see src/core/config/apply.ts).
+ * Unlayered on purpose: these override the theme's layered tokens.
+ */
+
+/* ── Fonts ──────────────────────────────────────────────────────────────── */
+:root[data-config-fonts] body {
+  font-family: var(--qori-font-sans, var(--font-sans));
+}
+:root[data-config-fonts] :is(code, pre, kbd, .font-mono) {
+  font-family: var(--qori-font-mono, var(--font-mono));
+}
+
+/* Editor text (Markdown and code editors, rich notes size). */
+:root[data-config-editor] .cm-editor :is(.cm-content, .cm-gutters) {
+  font-family: var(--qori-editor-font, inherit);
+  font-size: var(--qori-editor-size, inherit);
+  line-height: var(--qori-editor-line-height, inherit);
+}
+:root[data-config-editor] .bn-editor {
+  font-size: var(--qori-editor-size, inherit);
+  line-height: var(--qori-editor-line-height, inherit);
+}
+
+/* ── Density ────────────────────────────────────────────────────────────── */
+:root[data-density="comfortable"] {
+  --spacing: 0.3rem;
+}
+
+/* ── Translucency ───────────────────────────────────────────────────────── */
+/* The window shows through: the desktop (native/transparent) or a wallpaper. */
+:root.qori-translucent,
+:root.qori-translucent body {
+  background: transparent !important;
+}
+
+:root.qori-translucent {
+  --color-background: hsl(var(--background) / var(--qori-opacity));
+  --color-secondary: hsl(var(--secondary) / var(--qori-opacity));
+  --color-card: hsl(var(--card) / calc((var(--qori-opacity) + 1) / 2));
+  --color-muted: hsl(var(--muted) / var(--qori-sidebar-opacity));
+  --color-popover: hsl(var(--popover) / 0.9);
+}
+
+/* Each area paints its translucency once, on its outer frame; everything
+   inside is transparent so layers don't stack up into an opaque colour. */
+:root.qori-translucent [data-panel="main"] {
+  background-color: hsl(var(--background) / var(--qori-opacity)) !important;
+  --color-background: transparent;
+  --color-secondary: transparent;
+}
+/* Side bars and the title bar are lighter, like a sidebar with vibrancy. */
+:root.qori-translucent
+  :is([data-panel="sidebar"], [data-panel="secondary"], [data-tauri-drag-region]) {
+  background-color: hsl(var(--sidebar-background) / var(--qori-sidebar-opacity)) !important;
+  --color-background: transparent;
+  --color-secondary: transparent;
+  --color-muted: hsl(var(--muted) / 0.35);
+}
+:root.qori-translucent :is([data-panel="sidebar"], [data-panel="secondary"]) [data-part] {
+  background-color: transparent !important;
+}
+/* The bottom panel sits inside the main area: same frame rule. */
+:root.qori-translucent [data-panel="main"] [data-part] {
+  background-color: hsl(
+    var(--sidebar-background) / calc(var(--qori-sidebar-opacity) * 0.6)
+  ) !important;
+}
+
+/* Code editors keep their theme's text colours, but not an opaque background. */
+:root.qori-translucent :is(.cm-editor, .cm-gutters) {
+  background-color: var(--color-background) !important;
+}
+
+/* Floating surfaces blur what is behind them. */
+:root.qori-translucent
+  :is(
+    [data-slot="popover-content"],
+    [data-slot="dropdown-menu-content"],
+    [data-slot="select-content"],
+    [data-slot="dialog-content"],
+    [data-slot="command"]
+  ) {
+  -webkit-backdrop-filter: blur(var(--qori-blur)) saturate(1.4);
+  backdrop-filter: blur(var(--qori-blur)) saturate(1.4);
+}
+
+/* Wallpaper mode: an image behind the window, blurred by the app (works on
+   every platform, no compositor needed). */
+:root[data-translucency="wallpaper"] body::before,
+:root[data-translucency="wallpaper"] body::after {
+  content: "";
+  position: fixed;
+  pointer-events: none;
+  z-index: -1;
+}
+:root[data-translucency="wallpaper"] body::before {
+  inset: calc(var(--qori-blur) * -2);
+  background: var(--qori-wallpaper, none) center / cover no-repeat;
+  filter: blur(var(--qori-blur)) saturate(1.15);
+}
+:root[data-translucency="wallpaper"] body::after {
+  inset: 0;
+  background: hsl(var(--background) / var(--qori-wallpaper-dim));
+}

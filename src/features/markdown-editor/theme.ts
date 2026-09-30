@@ -13,13 +13,15 @@ export const editorTheme = EditorView.theme({
   "&": {
     height: "100%",
     color: color("--foreground"),
-    backgroundColor: color("--background"),
-    fontSize: "15px",
+    // The theme token (not the raw HSL) so window translucency shows through.
+    backgroundColor: "var(--color-background)",
+    // config.toml [editor] can change the font, size and spacing.
+    fontSize: "var(--qori-editor-size, 15px)",
   },
   "&.cm-focused": { outline: "none" },
   ".cm-scroller": {
-    fontFamily: "var(--font-family-active, var(--font-sans))",
-    lineHeight: "1.7",
+    fontFamily: "var(--qori-editor-font, var(--font-family-active, var(--font-sans)))",
+    lineHeight: "var(--qori-editor-line-height, 1.7)",
   },
   ".cm-content": {
     maxWidth: "46rem",

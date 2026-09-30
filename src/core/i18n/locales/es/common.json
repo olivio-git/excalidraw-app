@@ -237,5 +237,26 @@
     "noWorkspace": "Abre una carpeta primero.",
     "created": "Creado {{name}}",
     "failed": "No se pudo crear el archivo"
+  },
+  "notesList": {
+    "title": "Notas",
+    "allNotes": "Todas las notas",
+    "count": "{{count}} notas",
+    "search": "Buscar notas",
+    "sortUpdated": "Fecha de cambio",
+    "sortTitle": "Título",
+    "noWorkspace": "Abre una carpeta para ver sus notas.",
+    "empty": "Todavía no hay notas. Aquí aparecen las notas Markdown y enriquecidas.",
+    "loading": "Leyendo notas…",
+    "noResults": "Ninguna nota coincide.",
+    "pinned": "Fijada",
+    "status": {
+      "active": "Activa",
+      "onhold": "En pausa",
+      "completed": "Completada",
+      "dropped": "Descartada"
+    },
+    "root": "(raíz)",
+    "disabled": "La vista Notas está apagada (notes.enabled = false en config.toml)."
   }
 }

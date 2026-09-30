@@ -237,5 +237,26 @@
     "noWorkspace": "Open a folder first.",
     "created": "Created {{name}}",
     "failed": "Could not create the file"
+  },
+  "notesList": {
+    "title": "Notes",
+    "allNotes": "All notes",
+    "count": "{{count}} notes",
+    "search": "Search notes",
+    "sortUpdated": "Date updated",
+    "sortTitle": "Title",
+    "noWorkspace": "Open a folder to see its notes.",
+    "empty": "No notes yet. Markdown and rich notes appear here.",
+    "loading": "Reading notes…",
+    "noResults": "No notes match.",
+    "pinned": "Pinned",
+    "status": {
+      "active": "Active",
+      "onhold": "On hold",
+      "completed": "Completed",
+      "dropped": "Dropped"
+    },
+    "root": "(root)",
+    "disabled": "The Notes view is off (notes.enabled = false in config.toml)."
   }
 }

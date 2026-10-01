@@ -41,6 +41,10 @@ export interface AppConfig {
   editor: {
     /** Editor for .md files: rich blocks or Markdown source (CodeMirror). */
     markdown: "rich" | "source";
+    /** Keys: like any editor, or Vim (modes, motions, :w…). */
+    keymap: "default" | "vim";
+    /** Markdown text across the whole tab, or a centered reading column. */
+    content_width: "full" | "readable";
     font_family: string;
     font_size: number;
     line_height: number;
@@ -76,6 +80,8 @@ export const DEFAULT_CONFIG: AppConfig = {
   },
   editor: {
     markdown: "rich",
+    keymap: "default",
+    content_width: "full",
     font_family: "",
     font_size: 0,
     line_height: 0,
@@ -119,6 +125,8 @@ export const RULES: { [S in keyof AppConfig]: { [K in keyof AppConfig[S]]: Rule 
   },
   editor: {
     markdown: str(["rich", "source"]),
+    keymap: str(["default", "vim"]),
+    content_width: str(["full", "readable"]),
     font_family: str(),
     font_size: num(0, 32),
     line_height: num(0, 3),
@@ -233,7 +241,7 @@ export const DEFAULT_CONFIG_FILE = `# QoriApp — configuración
 # Edita y guarda: los cambios se aplican al instante. Borra una línea para
 # volver al valor por defecto. Un proyecto puede tener su propio
 # .qori/config.toml, que se aplica encima de este.
-# Atajos de teclado: keymap.toml · CSS propio: styles.css (misma carpeta).
+# Atajos de teclado: keymap.toml · CSS propio: styles.css · Vim: vimrc (misma carpeta).
 
 [appearance]
 # theme = "system"          # system | light | dark
@@ -261,6 +269,8 @@ export const DEFAULT_CONFIG_FILE = `# QoriApp — configuración
 
 [editor]
 # markdown = "rich"         # rich (bloques) | source (Markdown como texto, estilo Inkdrop)
+# keymap = "default"        # default | vim (modos, movimientos, :w, :q… mapeos en vimrc)
+# content_width = "full"    # full (todo el ancho) | readable (columna centrada para leer)
 # font_family = "JetBrains Mono"   # vacío: la del tema
 # font_size = 15
 # line_height = 1.6
@@ -287,6 +297,25 @@ export const DEFAULT_KEYMAP_FILE = `# QoriApp — atajos de teclado
 # key = "ctrl+shift+g"
 # command = "knowledgeGraph.open"
 # when = ""                 # opcional: contexto (como en VS Code)
+`;
+
+export const DEFAULT_VIMRC_FILE = `" QoriApp — vimrc
+"
+" Se usa con keymap = "vim" en config.toml (editor de código y Markdown).
+" Se admite: let mapleader, map/nmap/imap/vmap/xmap y sus versiones noremap.
+" Comandos: :w guarda, :q cierra la pestaña, :wq / :x ambas cosas,
+" :qori <comando> ejecuta cualquier comando de la app (Ctrl+Shift+P los lista).
+" Se aplica al guardar.
+
+" let mapleader = " "
+
+" Salir de modo insertar con jk
+" inoremap jk <Esc>
+
+" Guardar y buscar archivos con la tecla líder
+" nnoremap <leader>w :w<CR>
+" nnoremap <leader>ff :qori workbench.action.openQuickOpen<CR>
+" nnoremap <leader>a :qori workbench.action.toggleAgent<CR>
 `;
 
 export const DEFAULT_STYLES_FILE = `/* QoriApp — CSS propio

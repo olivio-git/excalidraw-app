@@ -1,4 +1,4 @@
-import { expect, openApp, test, WORKSPACE } from "./fixtures/app";
+import { expect, openApp, openFile, test, WORKSPACE } from "./fixtures/app";
 
 // The mocked backend resolves the home folder to /appdata.
 const CONFIG = "/appdata/.config/qori/config.toml";
@@ -48,4 +48,36 @@ test("lists every note by date in the Notes view", async ({ page }) => {
   await page.locator("[data-notes-panel] input[data-panel-search]").fill("blog");
   await expect(titles).toHaveCount(1);
   await expect(titles.first()).toHaveText("Post del blog");
+});
+
+test("edits with Vim keys when config.toml asks for it", async ({ page }) => {
+  await openApp(page, {
+    [CONFIG]: '[editor]\nkeymap = "vim"\n',
+    "/appdata/.config/qori/vimrc": "inoremap jk <Esc>\n",
+    [`${WORKSPACE}/codigo.txt`]: "uno\ndos\ntres\n",
+  });
+  await openFile(page, `${WORKSPACE}/codigo.txt`);
+  const content = page.locator(".cm-content").first();
+  await content.click();
+  await expect(page.locator(".cm-vim-panel")).toBeVisible();
+  // Normal mode: gg, dd deletes the first line; i…jk inserts and leaves insert mode.
+  await page.keyboard.type("ggdd");
+  await expect(content).not.toContainText("uno");
+  await page.keyboard.type("iHola jk");
+  await expect(content).toContainText("Hola dos");
+  // Back in normal mode the cursor sits on the space (like Vim): x deletes it.
+  await page.keyboard.type("x");
+  await expect(content).toContainText("Holados");
+});
+
+test("Markdown uses the whole width unless content_width = readable", async ({ page }) => {
+  await openApp(page, { [`${WORKSPACE}/nota.md`]: "# Nota\n\ntexto" });
+  await page.evaluate(async () => {
+    const { useEditorPreferencesStore } = await import("/src/stores/editorPreferencesStore.ts");
+    useEditorPreferencesStore.getState().setMarkdownEditor("markdown");
+  });
+  await openFile(page, `${WORKSPACE}/nota.md`);
+  const content = page.locator(".cm-content").first();
+  await expect(content).toContainText("texto");
+  expect(await content.evaluate((el) => getComputedStyle(el).maxWidth)).toBe("none");
 });

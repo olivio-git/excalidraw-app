@@ -14,6 +14,7 @@ import {
   DEFAULT_CONFIG_FILE,
   DEFAULT_KEYMAP_FILE,
   DEFAULT_STYLES_FILE,
+  DEFAULT_VIMRC_FILE,
   mergeConfig,
   validateConfig,
   type ConfigIssue,
@@ -21,6 +22,7 @@ import {
 } from "./schema";
 import { expandHome, parseToml, validateKeymap } from "./loader";
 import { applyAppearance, applyKeymap, applyUserStyles } from "./apply";
+import { parseVimrc, setVimrcMappings } from "./vim-mode";
 import { useConfigStore, type ConfigFiles } from "./config-store";
 
 /**
@@ -28,6 +30,7 @@ import { useConfigStore, type ConfigFiles } from "./config-store";
  *   ~/.config/qori/config.toml   options (appearance, editor, notes…)
  *   ~/.config/qori/keymap.toml   keybindings
  *   ~/.config/qori/styles.css    your own CSS
+ *   ~/.config/qori/vimrc         Vim mappings (with keymap = "vim")
  *   <project>/.qori/config.toml  per-project options, over the user's
  * Saved changes apply at once; mistakes are reported, never fatal.
  */
@@ -42,6 +45,7 @@ export async function configFiles(workspace: string | null): Promise<ConfigFiles
     config: await join(dir, "config.toml"),
     keymap: await join(dir, "keymap.toml"),
     styles: await join(dir, "styles.css"),
+    vimrc: await join(dir, "vimrc"),
     workspace: workspace ? await join(workspace, ".qori", "config.toml") : null,
   };
 }
@@ -61,11 +65,12 @@ const lastGood = new Map<string, PartialConfig>();
 /** Read every file, validate, merge and apply. */
 export async function reloadConfig(): Promise<void> {
   const files = await configFiles(useWorkspaceStore.getState().workspaceDir);
-  const [userText, keymapText, stylesText, workspaceText] = await Promise.all([
+  const [userText, keymapText, stylesText, workspaceText, vimrcText] = await Promise.all([
     read(files.config),
     read(files.keymap),
     read(files.styles),
     read(files.workspace),
+    read(files.vimrc),
   ]);
   const issues: ConfigIssue[] = [];
   const layer = (text: string | null, file: string): PartialConfig => {
@@ -95,6 +100,11 @@ export async function reloadConfig(): Promise<void> {
     issues.push(...valid.issues);
     binds = valid.binds;
   }
+
+  const vimrc = parseVimrc(vimrcText ?? "");
+  setVimrcMappings(vimrc.mappings);
+  for (const problem of vimrc.problems)
+    issues.push({ file: files.vimrc, path: "", message: problem.message, line: problem.line });
 
   const workspace = useWorkspaceStore.getState().workspaceDir;
   const resolvePath = (path: string) => {
@@ -180,12 +190,13 @@ export async function startUserConfig(): Promise<void> {
   });
 }
 
-export type ConfigFileKind = "config" | "keymap" | "styles" | "workspace";
+export type ConfigFileKind = "config" | "keymap" | "styles" | "vimrc" | "workspace";
 
 const TEMPLATES: Record<ConfigFileKind, string> = {
   config: DEFAULT_CONFIG_FILE,
   keymap: DEFAULT_KEYMAP_FILE,
   styles: DEFAULT_STYLES_FILE,
+  vimrc: DEFAULT_VIMRC_FILE,
   workspace: `# Configuración de este proyecto: se aplica encima de ~/.config/qori/config.toml.\n# Mismas opciones (ver ese archivo).\n\n# [notes]\n# pinned = ["README.md"]\n`,
 };
 

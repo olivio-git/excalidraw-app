@@ -7,6 +7,7 @@ export interface ConfigFiles {
   config: string;
   keymap: string;
   styles: string;
+  vimrc: string;
   /** `<workspace>/.qori/config.toml`, when a workspace is open. */
   workspace: string | null;
 }

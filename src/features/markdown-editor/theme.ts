@@ -24,9 +24,10 @@ export const editorTheme = EditorView.theme({
     lineHeight: "var(--qori-editor-line-height, 1.7)",
   },
   ".cm-content": {
-    maxWidth: "46rem",
+    // Full width by default; config.toml `content_width = "readable"` sets a column.
+    maxWidth: "var(--qori-content-width, none)",
     margin: "0 auto",
-    padding: "2.5rem 1.5rem 40vh",
+    padding: "1.5rem 2rem 40vh",
     caretColor: color("--primary"),
   },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: color("--primary"), borderLeftWidth: "2px" },

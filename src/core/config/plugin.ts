@@ -8,6 +8,7 @@ function activate(api: PluginAPI): void {
   api.registerCommand("config.open", () => openConfigFile("config"));
   api.registerCommand("config.openKeymap", () => openConfigFile("keymap"));
   api.registerCommand("config.openStyles", () => openConfigFile("styles"));
+  api.registerCommand("config.openVimrc", () => openConfigFile("vimrc"));
   api.registerCommand("config.openWorkspace", () => openConfigFile("workspace"));
   api.registerCommand("config.reload", async () => {
     await reloadConfig();
@@ -39,6 +40,7 @@ export const userConfigPlugin: Plugin = {
       { id: "config.open", name: "Preferencias: Abrir config.toml" },
       { id: "config.openKeymap", name: "Preferencias: Abrir keymap.toml (atajos)" },
       { id: "config.openStyles", name: "Preferencias: Abrir styles.css (CSS propio)" },
+      { id: "config.openVimrc", name: "Preferencias: Abrir vimrc (mapeos de Vim)" },
       {
         id: "config.openWorkspace",
         name: "Preferencias: Abrir configuración del proyecto (.qori/config.toml)",

@@ -186,3 +186,25 @@ test("editor and preview scroll together", async ({ page }) => {
     )
     .toBeLessThanOrEqual(1);
 });
+
+test("code blocks in the preview are colored like the editor", async ({ page }) => {
+  const file = `${WORKSPACE}/codigo.md`;
+  await openApp(page, {
+    [CONFIG]: '[editor]\nmarkdown = "code"\n',
+    [file]: '# Código\n\n```javascript\nfunction test() {\n  return "hola"; // saludo\n}\n```\n',
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const { markdownRouteId } = await import("/src/stores/editorPreferencesStore.ts");
+        return markdownRouteId();
+      })
+    )
+    .toBe("code-editor");
+  await openFile(page, file);
+  await page.locator("[data-open-preview]").click();
+  const block = page.locator('[data-markdown-preview] [data-code-block="javascript"]');
+  await expect(block.locator(".tok-keyword").first()).toHaveText("function");
+  await expect(block.locator(".tok-string")).toHaveText('"hola"');
+  await expect(block.locator(".tok-comment")).toHaveText("// saludo");
+});

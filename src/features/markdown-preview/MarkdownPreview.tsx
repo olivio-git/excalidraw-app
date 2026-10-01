@@ -1,4 +1,4 @@
-import { createElement, useEffect, useRef, useState } from "react";
+import { createElement, isValidElement, useEffect, useRef, useState } from "react";
 import ReactMarkdown, { type Components, type ExtraProps } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { readTextFile } from "@tauri-apps/plugin-fs";
@@ -18,6 +18,7 @@ import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { renderDiagramPreview } from "@/features/document-editor/diagram-preview";
 import { notify } from "@/shared/lib/notify";
+import { highlight, type HighlightedLines } from "./highlight";
 import "./markdown-preview.css";
 
 /** The file's text: the open editor's buffer as you type, else the file on disk. */
@@ -66,6 +67,47 @@ function LocalImage({ src, alt, sourcePath }: { src: string; alt: string; source
   }, [src, sourcePath, dark]);
   if (failed) return <span className="qori-md-missing">No se encontró «{src}»</span>;
   return url ? <img src={url} alt={alt} /> : null;
+}
+
+/** A fenced code block, colored like the editor (same parsers, same palette). */
+function CodeBlock({ code, language, line }: { code: string; language: string; line?: number }) {
+  const [tokens, setTokens] = useState<{ key: string; lines: HighlightedLines } | null>(null);
+  const key = `${language}\u0000${code}`;
+  useEffect(() => {
+    if (!language) return;
+    let cancelled = false;
+    highlight(code, language).then(
+      (lines) => !cancelled && lines && setTokens({ key: `${language}\u0000${code}`, lines }),
+      () => undefined
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [code, language]);
+  const lines = tokens?.key === key ? tokens.lines : null;
+  return (
+    <pre data-line={line} data-code-block={language || "text"}>
+      {language && <span className="qori-md-lang">{language}</span>}
+      <code>
+        {lines
+          ? lines.map((tokensOfLine, i) => (
+              <span key={i}>
+                {tokensOfLine.map((token, j) =>
+                  token.classes ? (
+                    <span key={j} className={token.classes}>
+                      {token.text}
+                    </span>
+                  ) : (
+                    token.text
+                  )
+                )}
+                {i < lines.length - 1 ? "\n" : ""}
+              </span>
+            ))
+          : code}
+      </code>
+    </pre>
+  );
 }
 
 const isExternal = (href: string) => /^[a-z][a-z\d+.-]*:/i.test(href);
@@ -156,6 +198,18 @@ export default function MarkdownPreview() {
                   {children}
                 </a>
               ),
+              // Fenced code: the <code> inside carries "language-xxx" and the text.
+              pre: ({ node, children }) => {
+                const child = Array.isArray(children) ? children[0] : children;
+                const props = isValidElement<{ className?: string; children?: unknown }>(child)
+                  ? child.props
+                  : {};
+                const language = /language-([\w#+.-]+)/.exec(props.className ?? "")?.[1] ?? "";
+                const code = String(props.children ?? "").replace(/\n$/, "");
+                return (
+                  <CodeBlock code={code} language={language} line={node?.position?.start.line} />
+                );
+              },
               img: ({ src = "", alt = "" }) =>
                 typeof src === "string" && src && !isExternal(src) ? (
                   <LocalImage src={src} alt={alt} sourcePath={sourcePath} />

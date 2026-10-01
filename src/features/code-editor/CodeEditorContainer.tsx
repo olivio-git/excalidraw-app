@@ -3,6 +3,7 @@ import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import type { CompletionSource } from "@codemirror/autocomplete";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { liveBuffers } from "@/core/shell/services/live-buffers";
 import { useTabContext } from "@/core/tabs/hooks/use-tab-context";
 import { useTabStore } from "@/core/tabs/store/tab-store";
 import { registerTabCloseHandler } from "@/core/tabs/tab-lifecycle";
@@ -47,6 +48,8 @@ function setEditorContext(doc: CodeDocument | null, focused: boolean): void {
  * extensions, and hooks for language features (see editor-contributions).
  * Changes autosave after a short pause, on Ctrl+S and when the tab closes.
  */
+const PROSE_LANGUAGES = new Set(["markdown", "plaintext"]);
+
 export default function CodeEditorContainer() {
   const { tabId, isActive } = useTabContext();
   const tab = useTabStore((s) => s.getTab(tabId));
@@ -135,6 +138,7 @@ export default function CodeEditorContainer() {
       async (content) => {
         if (cancelled || !hostRef.current) return;
         savedRef.current = content;
+        liveBuffers.publish(filePath, content);
         const registry = getLanguageRegistry();
         const languageId =
           languageOverride ?? registry.resolve(filePath, content.split("\n", 1)[0]) ?? "plaintext";
@@ -155,27 +159,32 @@ export default function CodeEditorContainer() {
           parent: hostRef.current,
           state: EditorState.create({
             doc: content,
-            extensions: createCodeEditorExtensions(
-              compartments,
-              {
-                onChange: (next, changes) => {
-                  version++;
-                  setDirty(next !== savedRef.current);
-                  editorContributions.didChange(doc, changes);
-                  if (timerRef.current) clearTimeout(timerRef.current);
-                  timerRef.current = setTimeout(() => void save(), AUTOSAVE_MS);
+            extensions: [
+              // Prose wraps like in VS Code (Markdown/plain text); code scrolls sideways.
+              PROSE_LANGUAGES.has(languageId) ? EditorView.lineWrapping : [],
+              createCodeEditorExtensions(
+                compartments,
+                {
+                  onChange: (next, changes) => {
+                    version++;
+                    liveBuffers.publish(doc.filePath, next);
+                    setDirty(next !== savedRef.current);
+                    editorContributions.didChange(doc, changes);
+                    if (timerRef.current) clearTimeout(timerRef.current);
+                    timerRef.current = setTimeout(() => void save(), AUTOSAVE_MS);
+                  },
+                  onSave: () => void save(),
+                  onSelectionChange: (selections) =>
+                    editorContributions.didChangeSelection(doc, selections),
+                  onFocusChange: (focused) => {
+                    setEditorContext(doc, focused);
+                    if (focused) editorContributions.didFocus(doc);
+                  },
                 },
-                onSave: () => void save(),
-                onSelectionChange: (selections) =>
-                  editorContributions.didChangeSelection(doc, selections),
-                onFocusChange: (focused) => {
-                  setEditorContext(doc, focused);
-                  if (focused) editorContributions.didFocus(doc);
-                },
-              },
-              useThemeStore.getState().resolvedTheme === "dark",
-              []
-            ),
+                useThemeStore.getState().resolvedTheme === "dark",
+                []
+              ),
+            ],
           }),
         });
         viewRef.current = view;
@@ -207,7 +216,10 @@ export default function CodeEditorContainer() {
   useEffect(
     () => () => {
       void save().finally(() => {
-        if (docRef.current) editorContributions.didClose(docRef.current);
+        if (docRef.current) {
+          editorContributions.didClose(docRef.current);
+          liveBuffers.release(docRef.current.filePath);
+        }
         viewRef.current?.destroy();
         viewRef.current = null;
       });
@@ -274,8 +286,26 @@ export default function CodeEditorContainer() {
         </div>
       )}
       <div ref={hostRef} className="h-full" hidden={load.status !== "ready"} />
+      {/\.(md|markdown)$/i.test(filePath) && load.status === "ready" && (
+        <button
+          type="button"
+          data-open-preview
+          title="Vista previa al lado (Ctrl+K V)"
+          onClick={() =>
+            void import("@/features/markdown-preview").then(({ openMarkdownPreview }) =>
+              openMarkdownPreview(filePath)
+            )
+          }
+          className="absolute top-2 right-4 z-10 rounded border border-border bg-card/80 px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground"
+        >
+          Vista previa
+        </button>
+      )}
       {language.name && (
-        <span className="pointer-events-none absolute right-3 bottom-2 rounded border border-border bg-card/80 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+        <span
+          data-language-badge
+          className="pointer-events-none absolute right-3 bottom-2 rounded border border-border bg-card/80 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+        >
           {language.name}
         </span>
       )}

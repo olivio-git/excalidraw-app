@@ -178,8 +178,8 @@ export default function SettingsPage() {
             <section className="space-y-3">
               <h2 className="text-base font-semibold">{t("markdownEditor.title")}</h2>
               <p className="text-sm text-muted-foreground">{t("markdownEditor.description")}</p>
-              <div className="grid gap-2 sm:grid-cols-2" role="radiogroup">
-                {(["markdown", "classic"] as const).map((choice) => (
+              <div className="grid gap-2 sm:grid-cols-3" role="radiogroup">
+                {(["code", "markdown", "classic"] as const).map((choice) => (
                   <button
                     key={choice}
                     type="button"

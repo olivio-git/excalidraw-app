@@ -14,6 +14,7 @@ import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { notify } from "@/shared/lib/notify";
 import { refreshEmbeds } from "./embeds";
 import { markdownEditorRegistry } from "./editor-registry";
+import { liveBuffers } from "@/core/shell/services/live-buffers";
 import { findHeading } from "./headings";
 import type { NoteContext } from "./note-context";
 import { createEditorExtensions } from "./setup";
@@ -76,6 +77,7 @@ export default function MarkdownEditorContainer() {
       (content) => {
         if (cancelled || !hostRef.current) return;
         savedRef.current = content;
+        liveBuffers.publish(filePath, content);
         const context: NoteContext = {
           getFilePath: () => pathRef.current,
           getWorkspaceDir: () => useWorkspaceStore.getState().workspaceDir,
@@ -115,6 +117,7 @@ export default function MarkdownEditorContainer() {
             doc: content,
             extensions: createEditorExtensions(context, {
               onChange: (next) => {
+                liveBuffers.publish(pathRef.current, next);
                 setDirty(next !== savedRef.current);
                 if (timerRef.current) clearTimeout(timerRef.current);
                 timerRef.current = setTimeout(() => void save(), AUTOSAVE_MS);
@@ -139,6 +142,7 @@ export default function MarkdownEditorContainer() {
   useEffect(
     () => () => {
       void save().finally(() => {
+        liveBuffers.release(pathRef.current);
         viewRef.current?.destroy();
         viewRef.current = null;
       });

@@ -81,3 +81,35 @@ test("Markdown uses the whole width unless content_width = readable", async ({ p
   await expect(content).toContainText("texto");
   expect(await content.evaluate((el) => getComputedStyle(el).maxWidth)).toBe("none");
 });
+
+test("markdown = code opens .md like config.toml, with a live preview beside it", async ({
+  page,
+}) => {
+  await openApp(page, {
+    [CONFIG]: '[editor]\nmarkdown = "code"\n',
+    [`${WORKSPACE}/guia.md`]: "# Guía\n\n- uno\n- dos\n",
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const { markdownRouteId } = await import("/src/stores/editorPreferencesStore.ts");
+        return markdownRouteId();
+      })
+    )
+    .toBe("code-editor");
+  await openFile(page, `${WORKSPACE}/guia.md`);
+  const editor = page.locator("[data-code-editor] .cm-content");
+  await expect(editor).toContainText("# Guía");
+  await expect(page.locator("[data-code-editor] .cm-lineNumbers")).toBeVisible();
+
+  await page.locator("[data-open-preview]").click();
+  const preview = page.locator("[data-markdown-preview]");
+  await expect(preview.locator("h1")).toHaveText("Guía");
+  await expect(preview.locator("li")).toHaveCount(2);
+
+  // Typing in the editor updates the preview before autosave.
+  await editor.click();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type("- tres");
+  await expect(preview.locator("li")).toHaveCount(3);
+});

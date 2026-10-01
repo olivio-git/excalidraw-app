@@ -1,0 +1,103 @@
+/* Rendered Markdown beside the editor (Ctrl+K V). Built from the app's theme tokens. */
+.qori-md-preview {
+  padding: 1.5rem 2rem 30vh;
+  color: hsl(var(--foreground));
+  font-family: var(--qori-font-sans, var(--font-sans));
+  font-size: var(--qori-editor-size, 15px);
+  line-height: 1.7;
+  max-width: var(--qori-content-width, none);
+  margin: 0 auto;
+}
+.qori-md-preview > :first-child {
+  margin-top: 0;
+}
+.qori-md-preview :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 1.4em 0 0.5em;
+}
+.qori-md-preview h1 {
+  font-size: 1.9em;
+}
+.qori-md-preview h2 {
+  font-size: 1.5em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.qori-md-preview h3 {
+  font-size: 1.25em;
+}
+.qori-md-preview :is(p, ul, ol, blockquote, pre, table) {
+  margin: 0.7em 0;
+}
+.qori-md-preview :is(ul, ol) {
+  padding-left: 1.6em;
+}
+.qori-md-preview ul {
+  list-style: disc;
+}
+.qori-md-preview ol {
+  list-style: decimal;
+}
+.qori-md-preview li::marker {
+  color: hsl(var(--primary));
+}
+.qori-md-preview li:has(> input[type="checkbox"]) {
+  list-style: none;
+  margin-left: -1.3em;
+}
+.qori-md-preview a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.qori-md-preview code {
+  font-family: var(--qori-font-mono, var(--font-mono));
+  font-size: 0.88em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: hsl(var(--muted));
+}
+.qori-md-preview pre {
+  padding: 0.9em 1em;
+  border-radius: 6px;
+  background: hsl(var(--muted));
+  overflow-x: auto;
+}
+.qori-md-preview pre code {
+  padding: 0;
+  background: none;
+}
+.qori-md-preview blockquote {
+  padding-left: 1em;
+  border-left: 3px solid hsl(var(--primary) / 0.6);
+  color: hsl(var(--muted-foreground));
+}
+.qori-md-preview table {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+}
+.qori-md-preview :is(th, td) {
+  padding: 0.35em 0.75em;
+  border: 1px solid hsl(var(--border));
+}
+.qori-md-preview th {
+  background: hsl(var(--muted) / 0.6);
+  font-weight: 600;
+}
+.qori-md-preview hr {
+  margin: 1.5em 0;
+  border: 0;
+  border-top: 1px solid hsl(var(--border));
+}
+.qori-md-preview img {
+  max-width: 100%;
+  max-height: 520px;
+  border-radius: 6px;
+}
+.qori-md-missing {
+  font-size: 0.85em;
+  color: hsl(var(--destructive));
+}

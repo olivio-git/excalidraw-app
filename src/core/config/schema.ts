@@ -40,7 +40,7 @@ export interface AppConfig {
   };
   editor: {
     /** Editor for .md files: rich blocks or Markdown source (CodeMirror). */
-    markdown: "rich" | "source";
+    markdown: "rich" | "source" | "code";
     /** Keys: like any editor, or Vim (modes, motions, :w…). */
     keymap: "default" | "vim";
     /** Markdown text across the whole tab, or a centered reading column. */
@@ -124,7 +124,7 @@ export const RULES: { [S in keyof AppConfig]: { [K in keyof AppConfig[S]]: Rule 
     accent: str(),
   },
   editor: {
-    markdown: str(["rich", "source"]),
+    markdown: str(["rich", "source", "code"]),
     keymap: str(["default", "vim"]),
     content_width: str(["full", "readable"]),
     font_family: str(),
@@ -268,7 +268,7 @@ export const DEFAULT_CONFIG_FILE = `# QoriApp — configuración
 # accent = "#7c3aed"        # color de acento (CSS)
 
 [editor]
-# markdown = "rich"         # rich (bloques) | source (Markdown como texto, estilo Inkdrop)
+# markdown = "rich"         # rich (bloques) | source (Markdown con formato al escribir) | code (texto plano, como este archivo; vista previa con Ctrl+K V)
 # keymap = "default"        # default | vim (modos, movimientos, :w, :q… mapeos en vimrc)
 # content_width = "full"    # full (todo el ancho) | readable (columna centrada para leer)
 # font_family = "JetBrains Mono"   # vacío: la del tema

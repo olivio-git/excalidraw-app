@@ -565,7 +565,8 @@ export function Flow3DEditor({
             <Palette store={store} />
           </div>
         )}
-        <div className="pointer-events-none absolute top-2 right-2 bottom-2 flex flex-col">
+        {/* Floating, draggable and resizable inspector windows live in this layer. */}
+        <div className="pointer-events-none absolute inset-0">
           <Inspector
             store={store}
             editable={editable}

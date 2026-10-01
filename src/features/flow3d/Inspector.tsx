@@ -34,6 +34,8 @@ import {
   type FlowNode,
   type FlowNodeKind,
 } from "./model";
+import { FloatingPanel } from "./FloatingPanel";
+import { AppearanceSection, EdgeAppearance } from "./AppearanceSection";
 import { useFlowEditor, type FlowEditorStore } from "./editor-store";
 import { StepConfigEditor } from "./StepConfigEditor";
 import type { StepRecord } from "./executor";
@@ -100,6 +102,11 @@ export function Inspector({ store, editable, onLinkFile, onOpenLink, onDiagnose 
             }
           />
         </Field>
+        <EdgeAppearance
+          edge={edge}
+          editable={canEdit}
+          onChange={(patch) => store.getState().updateEdge(edge.id, patch)}
+        />
         {canEdit && (
           <Button
             size="xs"
@@ -151,7 +158,8 @@ function NodePanel({
   const doc = useFlowEditor(store, (s) => s.doc);
   const step = useFlowEditor(store, (s) => s.run?.steps[node.id]);
   const stale = useFlowEditor(store, (s) => s.runStale);
-  const executes = NODE_KINDS[node.kind].executes;
+  // Visual elements run nothing: no run/data tabs.
+  const executes = NODE_KINDS[node.kind].executes && node.kind !== "element";
   const [tab, setTab] = useState<NodeTab>(step && executes ? "data" : "step");
   const update = (patch: Partial<FlowNode>) => store.getState().updateNode(node.id, patch);
   const outgoing = doc.edges.filter((e) => e.from === node.id);
@@ -259,18 +267,9 @@ function NodePanel({
                   }}
                 />
               </Field>
-              <Field label="Color">
-                <input
-                  type="color"
-                  aria-label="Color"
-                  className="h-7 w-full cursor-pointer rounded-md border border-input bg-transparent p-0.5"
-                  value={nodeColor(node)}
-                  disabled={!editable}
-                  onChange={(event) => update({ color: event.target.value })}
-                />
-              </Field>
             </div>
           )}
+          <AppearanceSection node={node} editable={editable} onChange={update} />
           {node.kind === "condition" &&
             outgoing.length > 1 &&
             node.config?.type !== "condition" && (
@@ -704,21 +703,8 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <aside
-      aria-label="Propiedades"
-      className="pointer-events-auto max-h-full w-72 space-y-2.5 overflow-y-auto rounded-lg border border-border bg-popover/95 p-3 text-popover-foreground shadow-lg backdrop-blur"
-      onKeyDown={(event) => event.stopPropagation()}
-    >
-      <div className="flex items-center gap-2">
-        {color && <span className="size-2.5 rounded-full" style={{ background: color }} />}
-        <h3 className="flex-1 truncate text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {title}
-        </h3>
-        <Button size="icon-xs" variant="ghost" aria-label="Cerrar propiedades" onClick={onClose}>
-          <X />
-        </Button>
-      </div>
+    <FloatingPanel id="inspector" title={title} color={color} onClose={onClose}>
       {children}
-    </aside>
+    </FloatingPanel>
   );
 }

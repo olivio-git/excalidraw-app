@@ -17,7 +17,9 @@ import { NODE_KINDS, nodeColor, type FlowNode } from "../model";
 import { sampleNode, type TimelineSpan } from "../timeline";
 import type { PlaybackClock } from "../editor-store";
 import type { SceneTheme } from "./theme";
-import { NODE_SIZE, NOTE_SIZE, PORT_OFFSET } from "./geometry";
+import { NODE_SIZE, NOTE_SIZE, PORT_OFFSET, nodeShape, nodeSize } from "./geometry";
+import { ShapeNodeView } from "./ShapeNodeView";
+import { iconTexture, useImageTexture } from "./node-textures";
 import { FONT_URL } from "./font";
 
 // Shared geometries: every node reuses them (one GPU buffer each).
@@ -154,12 +156,22 @@ interface FlowNodeViewProps {
   handlers: NodeHandlers;
 }
 
+/** A node: the classic card, or any other 3D shape its style asks for. */
+export const FlowNodeView = memo(function FlowNodeView(props: FlowNodeViewProps) {
+  return nodeShape(props.node) === "card" ? (
+    <CardNodeView {...props} />
+  ) : (
+    <ShapeNodeView {...props} />
+  );
+});
+
 /**
  * One step of the flow: a rounded card with a colored tile and a 3D glyph for
- * its kind, its label, and ports to connect. Playback state (running, done)
- * animates through refs in useFrame: no React renders per frame.
+ * its kind (or the style's icon or picture), its label, and ports to connect.
+ * Playback state (running, done) animates through refs in useFrame: no React
+ * renders per frame.
  */
-export const FlowNodeView = memo(function FlowNodeView({
+function CardNodeView({
   node,
   theme,
   selected,
@@ -184,6 +196,18 @@ export const FlowNodeView = memo(function FlowNodeView({
   const isNote = node.kind === "note";
   const size = isNote ? NOTE_SIZE : NODE_SIZE;
   const front = size.depth / 2 + 0.005;
+  // Style: a bigger/smaller card scales as a whole; icon/picture replace the kind's glyph.
+  const [styleWidth, styleHeight, styleDepth] = nodeSize(node);
+  const cardScale: [number, number, number] = [
+    styleWidth / size.width,
+    styleHeight / size.height,
+    styleDepth / size.depth,
+  ];
+  const picture = useImageTexture(node.style?.image);
+  const icon = node.style?.icon;
+  const iconMap = useMemo(() => (icon ? iconTexture(icon) : null), [icon]);
+  const opacity = node.style?.opacity ?? (isNote ? 0.85 : 1);
+  const hideLabel = node.style?.label === "hidden";
 
   useFrame(({ invalidate }, delta) => {
     if (isNote) return;
@@ -243,7 +267,7 @@ export const FlowNodeView = memo(function FlowNodeView({
   const outline = selected ? theme.primary : failed ? ERROR_COLOR : highlighted ? color : null;
 
   return (
-    <group position={node.position} userData={{ flowNodeId: node.id }}>
+    <group position={node.position} scale={cardScale} userData={{ flowNodeId: node.id }}>
       {shadow && !isNote && (
         // Fades as the card rises: height reads at a glance.
         <mesh
@@ -281,8 +305,8 @@ export const FlowNodeView = memo(function FlowNodeView({
             roughness={0.42}
             metalness={0.08}
             envMapIntensity={0.9}
-            transparent={isNote}
-            opacity={isNote ? 0.85 : 1}
+            transparent={opacity < 1}
+            opacity={opacity}
           />
           {outline && <Outlines thickness={selected ? 0.05 : 0.03} color={outline} />}
         </mesh>
@@ -292,15 +316,25 @@ export const FlowNodeView = memo(function FlowNodeView({
             <mesh geometry={tileGeometry} position={[-0.82, 0, front + 0.02]}>
               <meshStandardMaterial
                 ref={tile}
-                color={kindColor}
+                color={picture ? "#ffffff" : kindColor}
+                map={picture}
                 emissive={kindColor}
-                emissiveIntensity={0.06}
+                emissiveIntensity={node.style?.glow ? 0.8 : 0.06}
                 roughness={0.4}
               />
             </mesh>
-            <group ref={glyph} position={[-0.82, 0, front + 0.2]}>
-              <KindGlyph kind={node.kind} />
-            </group>
+            {iconMap ? (
+              <mesh position={[-0.82, 0, front + 0.1]} raycast={() => null}>
+                <planeGeometry args={[0.56, 0.56]} />
+                <meshBasicMaterial map={iconMap} transparent toneMapped={false} />
+              </mesh>
+            ) : (
+              !picture && (
+                <group ref={glyph} position={[-0.82, 0, front + 0.2]}>
+                  <KindGlyph kind={node.kind} />
+                </group>
+              )
+            )}
           </>
         )}
 
@@ -313,6 +347,7 @@ export const FlowNodeView = memo(function FlowNodeView({
           maxWidth={isNote ? size.width - 0.36 : 1.6}
           lineHeight={1.15}
           color={isNote ? "#0f172a" : theme.foreground}
+          visible={!hideLabel}
         >
           {node.label || " "}
         </Text>
@@ -403,4 +438,4 @@ export const FlowNodeView = memo(function FlowNodeView({
       </group>
     </group>
   );
-});
+}

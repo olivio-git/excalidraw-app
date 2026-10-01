@@ -130,3 +130,45 @@ test("asks the agent (right side bar) to change the open flow", async ({ page })
   // The agent knows which flow "this flow" is.
   await expect(chat).toContainText("informe");
 });
+
+test("the inspector is a window you can drag, resize and use to restyle a node", async ({
+  page,
+}) => {
+  await flowStore(page, FLOW, 's.getState().select({ type: "node", id: "each" })');
+  const panel = page.locator('[data-floating-panel="inspector"]');
+  await expect(panel).toBeVisible();
+  const before = (await panel.boundingBox())!;
+
+  // Drag by the title bar.
+  const title = panel.locator("[data-panel-titlebar]");
+  const t = (await title.boundingBox())!;
+  await page.mouse.move(t.x + 40, t.y + t.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(t.x - 260, t.y + 80, { steps: 8 });
+  await page.mouse.up();
+  const moved = (await panel.boundingBox())!;
+  expect(moved.x).toBeLessThan(before.x - 200);
+  expect(moved.y).toBeGreaterThan(before.y + 50);
+
+  // Resize from the corner.
+  const grip = (await panel.locator("[data-panel-resize]").boundingBox())!;
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + 120, grip.y + 60, { steps: 8 });
+  await page.mouse.up();
+  expect((await panel.boundingBox())!.width).toBeGreaterThan(moved.width + 80);
+
+  // Appearance: turn the step into a glowing sphere with an icon.
+  await panel.getByRole("combobox", { name: "Forma" }).click();
+  await page.getByRole("option", { name: "Esfera" }).click();
+  await panel.getByPlaceholder("🧠  DB  ⚙️").fill("⚙️");
+  await expect
+    .poll(() =>
+      flowStore<unknown>(
+        page,
+        FLOW,
+        'return s.getState().doc.nodes.find((n) => n.id === "each").style'
+      )
+    )
+    .toMatchObject({ shape: "sphere", icon: "⚙️" });
+});

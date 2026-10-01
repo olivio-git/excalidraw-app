@@ -98,6 +98,27 @@ descargar mapas HDR), una sombra difusa bajo cada tarjeta que se atenúa con la 
 y brillo (bloom) en los paquetes y en los pasos que se ejecutan. La elección se
 recuerda. Los flujos incrustados en notas van sin efectos para ser ligeros.
 
+## Diagramas visuales 3D
+
+Un flujo también es un diagrama 3D libre: redes neuronales, arquitecturas, matrices, torres…
+
+- **Tipo `element`**: una pieza visual que no ejecuta nada (neurona, servidor, bloque).
+- **Formas** (`style.shape`): `card` (por defecto), `box`, `sphere`, `cylinder`, `cone`, `capsule`,
+  `torus`, `diamond`, `gem`, `disc`, `plane`. Con `size` (`[ancho, alto, fondo]` o una escala),
+  `icon` (emoji o texto corto), `image` (ruta del proyecto o URL pintada sobre la forma),
+  `opacity`, `label` (`auto`/`above`/`below`/`inside`/`hidden`) y `glow`.
+- **Espacio**: x = izquierda→derecha, y = altura, z = fondo. Cada nodo puede tener `position`.
+- **Distribuciones** (al crear con el agente o la API): `auto` (flujo izquierda→derecha),
+  `layers` (columnas verticales por `layer`, ideal para redes neuronales), `grid` (matriz de
+  `columns`; `layer` empuja capas hacia el fondo), `radial` (anillo con un centro opcional) y
+  `manual` (respeta las posiciones). Si todos los nodos traen posición, se respetan.
+- **Conexiones** (`edge.style`): `color`, `dashed`, `width`, `curve` (`auto`/`straight`/`smooth`),
+  `arrow`. Entre formas que no son tarjetas van rectas de superficie a superficie.
+- **Inspector**: la ventana de propiedades se arrastra por el título, se redimensiona desde las
+  esquinas, se maximiza y recuerda su sitio (doble clic en el título la devuelve a la derecha).
+  La sección **Apariencia** edita forma, color, tamaño, posición, icono, imagen, opacidad y brillo.
+- **Plantillas**: «Red neuronal (3D)», «Arquitectura en capas (3D)» y «Torre de bloques (3D)».
+
 ## Integración
 
 - **Excalidraw**: `Flow 3D: Ver diagrama de Excalidraw en 3D` convierte el diagrama

@@ -40,6 +40,18 @@ const flowPath = z
   .min(1)
   .describe("Path of a .flow3d file, absolute or relative to the workspace.");
 const flowItem = z.record(z.string(), z.unknown());
+const flowLayout = {
+  layout: z
+    .enum(["auto", "layers", "grid", "radial", "manual"])
+    .optional()
+    .describe(
+      "Placement. Default: manual when every node has a position, otherwise auto (left-to-right). layers = vertical columns by node.layer (neural networks), grid = matrix, radial = ring."
+    ),
+  layoutOptions: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("{ gap, spacing, columns (grid), radius, center (radial), plane: xz|xy }"),
+};
 
 interface Definition {
   description: string;
@@ -214,18 +226,21 @@ export const agentToolDefinitions: Record<string, Definition> = {
   // ── 3D flows (.flow3d): executable automations ─────────────────────────────
   flow3d_create: {
     description:
-      "Create an executable automation flow (.flow3d) in the workspace and open it in the 3D editor. Call flow3d_read on any flow first to get the full format reference. Start with exactly one trigger; the layout is automatic.",
+      "Create a .flow3d in the workspace and open it in the 3D editor: an executable automation (one trigger) or a visual 3D diagram (kind element, shapes, positions in x/y/z, layouts). Call flow3d_read on any flow first to get the full format reference, including the visual guide.",
     input: {
       name: z.string().min(1).describe("Flow name, also used for the file name."),
       folder: z.string().optional().describe("Workspace-relative folder."),
       nodes: z
         .array(flowItem)
         .describe(
-          "Steps: { id, kind: trigger|action|condition|transform|ai|output|note, label, description?, config? }."
+          "Nodes: { id, kind: trigger|action|condition|transform|ai|output|note|element, label, description?, config?, position?: [x,y,z] (y up, z depth), layer?, color?, style?: { shape: card|box|sphere|cylinder|cone|capsule|torus|diamond|gem|disc|plane, size, icon, image, opacity, label, glow } }."
         ),
       edges: z
         .array(flowItem)
-        .describe('Connections: { id, from, to, label? } — "sí"/"no" on condition branches.'),
+        .describe(
+          'Connections: { id, from, to, label?, style?: { color, dashed, width, curve: auto|straight|smooth, arrow } } — "sí"/"no" on condition branches.'
+        ),
+      ...flowLayout,
     },
   },
   flow3d_read: {
@@ -237,7 +252,12 @@ export const agentToolDefinitions: Record<string, Definition> = {
   flow3d_update: {
     description:
       "Replace the steps and connections of a flow, keeping its name and settings. Send the complete lists; keep the ids of unchanged steps. In an open editor it shows at once and Ctrl+Z undoes it.",
-    input: { filePath: flowPath.optional(), nodes: z.array(flowItem), edges: z.array(flowItem) },
+    input: {
+      filePath: flowPath.optional(),
+      nodes: z.array(flowItem),
+      edges: z.array(flowItem),
+      ...flowLayout,
+    },
   },
   flow3d_run: {
     description:

@@ -99,14 +99,14 @@ function useScrollSync(filePath: string, ready: boolean) {
   useEffect(() => {
     const container = ref.current;
     if (!container || !filePath || !ready) return;
-    const guard = createEchoGuard();
+    const guard = createEchoGuard(container);
     const unsubscribe = scrollSync.subscribe(filePath, (position) => {
       if (position.from === "preview") return;
-      guard.mute();
       container.scrollTop = previewOffsetFor(container, position);
+      guard.mark();
     });
     const onScroll = () => {
-      if (guard.muted()) return;
+      if (guard.isEcho()) return;
       scrollSync.publish(filePath, { ...previewPositionAt(container), from: "preview" });
     };
     container.addEventListener("scroll", onScroll, { passive: true });

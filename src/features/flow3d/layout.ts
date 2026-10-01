@@ -79,8 +79,144 @@ export function autoLayout(doc: FlowDocument): Record<string, Vec3> {
   return positions;
 }
 
-export function applyLayout(doc: FlowDocument): FlowDocument {
-  const positions = autoLayout(doc);
+/** How nodes are placed. `manual` keeps the positions they already have. */
+export type FlowLayout = "auto" | "layers" | "grid" | "radial" | "manual";
+
+export const FLOW_LAYOUTS: FlowLayout[] = ["auto", "layers", "grid", "radial", "manual"];
+
+export interface LayoutOptions {
+  /** Distance between layers / columns (x). */
+  gap?: number;
+  /** Distance between nodes inside a layer, or between grid rows (y). */
+  spacing?: number;
+  /** grid: nodes per row. */
+  columns?: number;
+  /** radial: circle radius; `center`: node id placed in the middle. */
+  radius?: number;
+  center?: string;
+  /** radial: the circle lies flat (xz, default) or stands up (xy). */
+  plane?: "xz" | "xy";
+}
+
+/** Layer of each node: its `layer` field, else its rank along the edges (sources first). */
+function layerIndex(doc: FlowDocument): Map<string, number> {
+  const result = new Map<string, number>();
+  const explicit = doc.nodes.filter((n) => n.layer !== undefined);
+  if (explicit.length === doc.nodes.length) {
+    for (const node of doc.nodes) result.set(node.id, node.layer!);
+    return result;
+  }
+  const preds = new Map<string, string[]>(doc.nodes.map((n) => [n.id, []]));
+  for (const edge of doc.edges) preds.get(edge.to)?.push(edge.from);
+  const rankOf = (id: string, stack = new Set<string>()): number => {
+    if (result.has(id)) return result.get(id)!;
+    const node = doc.nodes.find((n) => n.id === id);
+    if (node?.layer !== undefined) {
+      result.set(id, node.layer);
+      return node.layer;
+    }
+    if (stack.has(id)) return 0;
+    stack.add(id);
+    const incoming = preds.get(id) ?? [];
+    const value = incoming.length ? Math.max(...incoming.map((p) => rankOf(p, stack) + 1)) : 0;
+    result.set(id, value);
+    return value;
+  };
+  for (const node of doc.nodes) rankOf(node.id);
+  return result;
+}
+
+/**
+ * Layers side by side along x, each one a vertical column centered on y = 0:
+ * neural networks (inputs, hidden layers, outputs), pipelines, architectures.
+ */
+export function layersLayout(doc: FlowDocument, options: LayoutOptions = {}): Record<string, Vec3> {
+  const gap = options.gap ?? 4;
+  const spacing = options.spacing ?? 1.6;
+  const layers = layerIndex(doc);
+  const columns = new Map<number, string[]>();
+  for (const node of doc.nodes) {
+    const layer = layers.get(node.id) ?? 0;
+    columns.set(layer, [...(columns.get(layer) ?? []), node.id]);
+  }
+  const order = [...columns.keys()].sort((a, b) => a - b);
+  const positions: Record<string, Vec3> = {};
+  order.forEach((layer, index) => {
+    const ids = columns.get(layer)!;
+    ids.forEach((id, i) => {
+      positions[id] = [index * gap, ((ids.length - 1) / 2 - i) * spacing, 0];
+    });
+  });
+  return positions;
+}
+
+/**
+ * A matrix: rows of `columns` nodes on the xy plane (first row on top); nodes
+ * with a `layer` go back in depth (z), so layers of a grid stack like slices.
+ */
+export function gridLayout(doc: FlowDocument, options: LayoutOptions = {}): Record<string, Vec3> {
+  const gap = options.gap ?? 2;
+  const spacing = options.spacing ?? gap;
+  const columns = Math.max(
+    1,
+    Math.round(options.columns ?? Math.ceil(Math.sqrt(doc.nodes.length)))
+  );
+  const positions: Record<string, Vec3> = {};
+  const perLayer = new Map<number, number>();
+  for (const node of doc.nodes) {
+    const layer = node.layer ?? 0;
+    const index = perLayer.get(layer) ?? 0;
+    perLayer.set(layer, index + 1);
+    positions[node.id] = [
+      (index % columns) * gap,
+      -Math.floor(index / columns) * spacing,
+      -layer * gap * 1.5,
+    ];
+  }
+  return positions;
+}
+
+/** Nodes on a circle (hub in the middle if `center` names one). */
+export function radialLayout(doc: FlowDocument, options: LayoutOptions = {}): Record<string, Vec3> {
+  const ring = doc.nodes.filter((n) => n.id !== options.center);
+  const radius = options.radius ?? Math.max(3, (ring.length * 2.2) / (2 * Math.PI));
+  const positions: Record<string, Vec3> = {};
+  if (options.center && doc.nodes.some((n) => n.id === options.center))
+    positions[options.center] = [0, 0, 0];
+  ring.forEach((node, i) => {
+    const angle = (i / ring.length) * Math.PI * 2 - Math.PI / 2;
+    const a = Math.cos(angle) * radius;
+    const b = Math.sin(angle) * radius;
+    positions[node.id] = options.plane === "xy" ? [a, -b, 0] : [a, 0, b];
+  });
+  return positions;
+}
+
+export function layoutPositions(
+  doc: FlowDocument,
+  layout: FlowLayout = "auto",
+  options: LayoutOptions = {}
+): Record<string, Vec3> {
+  switch (layout) {
+    case "layers":
+      return layersLayout(doc, options);
+    case "grid":
+      return gridLayout(doc, options);
+    case "radial":
+      return radialLayout(doc, options);
+    case "manual":
+      return Object.fromEntries(doc.nodes.map((n) => [n.id, n.position]));
+    default:
+      return autoLayout(doc);
+  }
+}
+
+export function applyLayout(
+  doc: FlowDocument,
+  layout: FlowLayout = "auto",
+  options: LayoutOptions = {}
+): FlowDocument {
+  const positions = layoutPositions(doc, layout, options);
   return {
     ...doc,
     nodes: doc.nodes.map((node) => ({ ...node, position: positions[node.id] ?? node.position })),

@@ -12,7 +12,66 @@ export type FlowNodeKind =
   | "transform"
   | "ai"
   | "output"
-  | "note";
+  | "note"
+  /** A visual element (neuron, block, device…): part of the diagram, runs nothing. */
+  | "element";
+
+/** 3D form of a node. `card` is the classic step card. */
+export type NodeShape =
+  | "card"
+  | "box"
+  | "sphere"
+  | "cylinder"
+  | "cone"
+  | "capsule"
+  | "torus"
+  | "diamond"
+  | "gem"
+  | "disc"
+  | "plane";
+
+export const NODE_SHAPES: NodeShape[] = [
+  "card",
+  "box",
+  "sphere",
+  "cylinder",
+  "cone",
+  "capsule",
+  "torus",
+  "diamond",
+  "gem",
+  "disc",
+  "plane",
+];
+
+/** How a node looks: any form, size, icon or picture, so diagrams aren't just cards. */
+export interface NodeStyle {
+  shape?: NodeShape;
+  /** World units [width (x), height (y), depth (z)], or a number that scales the default size. */
+  size?: Vec3 | number;
+  /** Emoji or a short text (≤ 3 characters) drawn on the node. */
+  icon?: string;
+  /** Picture painted on the node: workspace-relative path, absolute path or URL. */
+  image?: string;
+  /** 0.1–1. */
+  opacity?: number;
+  /** Where the label goes (auto: on the card, above other shapes). */
+  label?: "auto" | "above" | "below" | "inside" | "hidden";
+  /** Glows softly (lights, active neurons…). */
+  glow?: boolean;
+}
+
+/** How a connection looks. */
+export interface EdgeStyle {
+  color?: string;
+  dashed?: boolean;
+  /** Line width in pixels (1–8). */
+  width?: number;
+  /** auto: card ports with a smooth bend, straight lines between other shapes. */
+  curve?: "auto" | "straight" | "smooth";
+  /** Arrowhead at the end (default true). */
+  arrow?: boolean;
+}
 
 export interface FlowNode {
   id: string;
@@ -32,6 +91,10 @@ export interface FlowNode {
   config?: StepConfig;
   /** Group (subflow) the node belongs to. */
   group?: string;
+  /** Appearance: shape, size, icon, picture. */
+  style?: NodeStyle;
+  /** Column/layer index for the `layers` layout (neural networks, pipelines). */
+  layer?: number;
 }
 
 export type ConditionOperator =
@@ -112,6 +175,7 @@ export interface FlowEdge {
   from: string;
   to: string;
   label?: string;
+  style?: EdgeStyle;
 }
 
 export interface FlowDocument {
@@ -147,6 +211,7 @@ export const NODE_KINDS: Record<FlowNodeKind, NodeKindInfo> = {
   ai: { label: "IA", color: "#ec4899", duration: 1.4, executes: true },
   output: { label: "Salida", color: "#f43f5e", duration: 0.8, executes: true },
   note: { label: "Nota", color: "#94a3b8", duration: 0, executes: false },
+  element: { label: "Elemento", color: "#64748b", duration: 0.5, executes: true },
 };
 
 export const NODE_KIND_ORDER: FlowNodeKind[] = [
@@ -156,6 +221,7 @@ export const NODE_KIND_ORDER: FlowNodeKind[] = [
   "transform",
   "ai",
   "output",
+  "element",
   "note",
 ];
 
@@ -194,6 +260,46 @@ const isVec3 = (value: unknown): value is Vec3 =>
   Array.isArray(value) &&
   value.length === 3 &&
   value.every((n) => typeof n === "number" && Number.isFinite(n));
+
+const LABEL_PLACES = ["auto", "above", "below", "inside", "hidden"] as const;
+const clampNumber = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
+
+/** Keep the valid parts of a node style. */
+export function parseNodeStyle(value: unknown): NodeStyle | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+  const style: NodeStyle = {};
+  if (NODE_SHAPES.includes(raw.shape as NodeShape)) style.shape = raw.shape as NodeShape;
+  if (isVec3(raw.size))
+    style.size = raw.size.map((n) => clampNumber(Math.abs(n), 0.05, 50)) as Vec3;
+  else if (typeof raw.size === "number" && Number.isFinite(raw.size))
+    style.size = clampNumber(raw.size, 0.1, 20);
+  if (typeof raw.icon === "string" && raw.icon.trim())
+    style.icon = [...raw.icon.trim()].slice(0, 3).join("");
+  if (typeof raw.image === "string" && raw.image.trim()) style.image = raw.image.trim();
+  if (typeof raw.opacity === "number" && Number.isFinite(raw.opacity))
+    style.opacity = clampNumber(raw.opacity, 0.1, 1);
+  if (LABEL_PLACES.includes(raw.label as (typeof LABEL_PLACES)[number]))
+    style.label = raw.label as NodeStyle["label"];
+  if (raw.glow === true) style.glow = true;
+  return Object.keys(style).length > 0 ? style : undefined;
+}
+
+/** Keep the valid parts of an edge style. */
+export function parseEdgeStyle(value: unknown): EdgeStyle | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+  const style: EdgeStyle = {};
+  if (typeof raw.color === "string" && raw.color) style.color = raw.color;
+  if (raw.dashed === true) style.dashed = true;
+  if (typeof raw.width === "number" && Number.isFinite(raw.width))
+    style.width = clampNumber(raw.width, 1, 8);
+  if (raw.curve === "auto" || raw.curve === "straight" || raw.curve === "smooth")
+    style.curve = raw.curve;
+  if (raw.arrow === false) style.arrow = false;
+  return Object.keys(style).length > 0 ? style : undefined;
+}
 
 /**
  * Parse a `.flow3d` file. Unknown kinds become actions, broken edges and
@@ -236,6 +342,11 @@ export function parseFlow(text: string): FlowDocument {
       branch: typeof node.branch === "string" ? node.branch : undefined,
       config: parseConfig(node.config),
       group: typeof node.group === "string" && node.group ? node.group : undefined,
+      style: parseNodeStyle(node.style),
+      layer:
+        typeof node.layer === "number" && Number.isFinite(node.layer)
+          ? Math.round(node.layer)
+          : undefined,
     });
   }
   const groups: FlowGroup[] = [];
@@ -268,6 +379,7 @@ export function parseFlow(text: string): FlowDocument {
       from: edge.from,
       to: edge.to,
       label: typeof edge.label === "string" && edge.label ? edge.label : undefined,
+      style: parseEdgeStyle(edge.style),
     });
   }
   const settings =

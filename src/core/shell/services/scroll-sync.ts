@@ -34,26 +34,38 @@ export const scrollSync = {
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
 /**
- * Ignores the scroll event our own programmatic scroll causes, so the two
- * sides don't bounce positions back and forth.
+ * Recognizes the scroll event our own programmatic scroll causes (it lands
+ * where we put it), so the two sides don't bounce positions back and forth.
+ * Any other scroll — the user's, even right after — goes through.
  */
-export function createEchoGuard() {
+export function createEchoGuard(element: HTMLElement) {
+  let expected: number | null = null;
   let until = 0;
   return {
-    mute: () => (until = performance.now() + 120),
-    muted: () => performance.now() < until,
+    /** Call right after setting scrollTop. */
+    mark: () => {
+      expected = element.scrollTop;
+      until = performance.now() + 500;
+    },
+    /** True for the echo of the last programmatic scroll (consumed once). */
+    isEcho: () => {
+      if (expected === null || performance.now() > until) return false;
+      const echo = Math.abs(element.scrollTop - expected) < 2;
+      if (echo) expected = null;
+      return echo;
+    },
   };
 }
 
 /** Sync a CodeMirror editor with the preview of its file. Returns the cleanup. */
 export function attachEditorScrollSync(view: EditorView, getPath: () => string): () => void {
-  const guard = createEchoGuard();
   const scroller = view.scrollDOM;
+  const guard = createEchoGuard(scroller);
   // Document height (from its top) currently at the top edge of the scroller.
   const topHeight = () => scroller.getBoundingClientRect().top - view.documentTop;
 
   const onScroll = () => {
-    if (guard.muted()) return;
+    if (guard.isEcho()) return;
     const height = topHeight();
     const block = view.lineBlockAtHeight(Math.max(0, height));
     scrollSync.publish(getPath(), {
@@ -71,8 +83,8 @@ export function attachEditorScrollSync(view: EditorView, getPath: () => string):
     const doc = view.state.doc;
     const line = doc.line(Math.min(Math.max(position.line, 1), doc.lines));
     const block = view.lineBlockAt(line.from);
-    guard.mute();
     scroller.scrollTop += block.top + position.fraction * block.height - topHeight();
+    guard.mark();
   }
   // The file can be renamed while open.
   const resubscribe = window.setInterval(() => {

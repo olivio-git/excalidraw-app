@@ -4,13 +4,25 @@ const FLOW_INPUT = {
   nodes: {
     type: "array",
     description:
-      "Steps: { id, kind: trigger|action|condition|transform|ai|output|note, label, description?, config? }. config.type: manual|schedule|fileWatch|http|command|appCommand|ai|writeNote|template|condition (see flow3d_read for examples). Text fields accept {{input.x}}, {{steps.id.output.x}}, {{item}}, {{secrets.NAME}}.",
+      'Nodes: { id, kind: trigger|action|condition|transform|ai|output|note|element, label, description?, config?, position?: [x,y,z] (y = up, z = depth), layer?: number, color?, style?: { shape: card|box|sphere|cylinder|cone|capsule|torus|diamond|gem|disc|plane, size: [w,h,d]|scale, icon: emoji/short text, image: path or URL, opacity, label: auto|above|below|inside|hidden, glow } }. kind "element" = visual piece (neuron, server, brick). config.type: manual|schedule|fileWatch|http|command|appCommand|ai|writeNote|template|condition (see flow3d_read). Text fields accept {{input.x}}, {{steps.id.output.x}}, {{item}}, {{secrets.NAME}}.',
     items: { type: "object" },
   },
   edges: {
     type: "array",
-    description: 'Connections: { id, from, to, label? } — label "sí"/"no" on condition branches.',
+    description:
+      'Connections: { id, from, to, label?, style?: { color, dashed, width, curve: auto|straight|smooth, arrow } } — label "sí"/"no" on condition branches.',
     items: { type: "object" },
+  },
+  layout: {
+    type: "string",
+    enum: ["auto", "layers", "grid", "radial", "manual"],
+    description:
+      "How to place nodes. Default: manual when every node has a position, otherwise auto (left-to-right). layers = vertical columns by node.layer (neural networks); grid = matrix (layoutOptions.columns); radial = ring.",
+  },
+  layoutOptions: {
+    type: "object",
+    description:
+      "{ gap (between layers/columns), spacing (inside a layer / between rows), columns (grid), radius and center (radial), plane: xz|xy (radial) }",
   },
 };
 
@@ -19,7 +31,7 @@ export const FLOW3D_TOOLS: AIToolDefinition[] = [
   {
     name: "flow3d_create",
     description:
-      "Create an executable automation flow (.flow3d) in the workspace and open it in the 3D editor. Start with one trigger; the layout is automatic.",
+      "Create a .flow3d in the workspace and open it in the 3D editor: an executable automation (start with one trigger) or a visual 3D diagram (kind element, shapes, positions in x/y/z, layouts layers/grid/radial). Read the visual guide in flow3d_read's format reference.",
     inputSchema: {
       type: "object",
       properties: {
@@ -44,7 +56,7 @@ export const FLOW3D_TOOLS: AIToolDefinition[] = [
   {
     name: "flow3d_update",
     description:
-      "Replace the steps and connections of a flow (keeps its name and settings). In an open editor the change can be undone with Ctrl+Z. Without filePath, changes the flow open in the active tab.",
+      "Replace the nodes and connections of a flow (keeps its name and settings), with their positions, shapes and styles. In an open editor the change can be undone with Ctrl+Z. Without filePath, changes the flow open in the active tab.",
     inputSchema: {
       type: "object",
       properties: { filePath: { type: "string" }, ...FLOW_INPUT },

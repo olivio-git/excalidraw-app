@@ -81,6 +81,19 @@ status: active # active | onhold | completed | dropped (o activo, en espera, com
 
 Un clic muestra la vista previa y doble clic abre la nota.
 
+## Editor de Markdown
+
+```toml
+[editor]
+markdown = "code"   # rich (bloques) | source (formato al escribir) | code (texto plano)
+```
+
+Con `code`, los `.md` se abren en el mismo editor que `config.toml`: texto plano con números de
+línea, colores y Vim; las líneas largas se ajustan al ancho. **Ctrl+K V** (o el botón «Vista
+previa») abre al lado el documento formateado, que se actualiza mientras escribes: tablas, listas
+de tareas, citas, código, enlaces a otros archivos e imágenes, incluidos diagramas `.excalidraw`.
+El editor y la vista previa se desplazan juntos: al bajar en uno, el otro va a la misma sección.
+
 ## Modo Vim
 
 ```toml

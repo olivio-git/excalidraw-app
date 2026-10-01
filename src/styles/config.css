@@ -126,3 +126,7 @@
   background: none !important;
   outline: 1px solid hsl(var(--primary) / 0.7);
 }
+/* The language label sits above the Vim mode bar. */
+[data-code-editor]:has(.cm-vim-panel) [data-language-badge] {
+  bottom: 1.75rem;
+}

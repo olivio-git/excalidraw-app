@@ -81,3 +81,108 @@ test("Markdown uses the whole width unless content_width = readable", async ({ p
   await expect(content).toContainText("texto");
   expect(await content.evaluate((el) => getComputedStyle(el).maxWidth)).toBe("none");
 });
+
+test("markdown = code opens .md like config.toml, with a live preview beside it", async ({
+  page,
+}) => {
+  await openApp(page, {
+    [CONFIG]: '[editor]\nmarkdown = "code"\n',
+    [`${WORKSPACE}/guia.md`]: "# Guía\n\n- uno\n- dos\n",
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const { markdownRouteId } = await import("/src/stores/editorPreferencesStore.ts");
+        return markdownRouteId();
+      })
+    )
+    .toBe("code-editor");
+  await openFile(page, `${WORKSPACE}/guia.md`);
+  const editor = page.locator("[data-code-editor] .cm-content");
+  await expect(editor).toContainText("# Guía");
+  await expect(page.locator("[data-code-editor] .cm-lineNumbers")).toBeVisible();
+
+  await page.locator("[data-open-preview]").click();
+  const preview = page.locator("[data-markdown-preview]");
+  await expect(preview.locator("h1")).toHaveText("Guía");
+  await expect(preview.locator("li")).toHaveCount(2);
+
+  // Typing in the editor updates the preview before autosave.
+  await editor.click();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type("- tres");
+  await expect(preview.locator("li")).toHaveCount(3);
+});
+
+test("editor and preview scroll together", async ({ page }) => {
+  const sections = Array.from(
+    { length: 40 },
+    (_, i) => `## Sección ${i + 1}\n\nTexto de la sección ${i + 1}.\n\n- punto a\n- punto b\n`
+  ).join("\n");
+  const file = `${WORKSPACE}/larga.md`;
+  await openApp(page, {
+    [CONFIG]: '[editor]\nmarkdown = "code"\n',
+    [file]: `# Larga\n\n${sections}`,
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const { markdownRouteId } = await import("/src/stores/editorPreferencesStore.ts");
+        return markdownRouteId();
+      })
+    )
+    .toBe("code-editor");
+  await openFile(page, file);
+  await expect(page.locator("[data-code-editor] .cm-content")).toContainText("Sección 1");
+  await page.locator("[data-open-preview]").click();
+  const preview = page.locator("[data-markdown-preview]");
+  await expect(preview.locator("h2").first()).toBeVisible();
+
+  // Distance from the top of the preview to a heading.
+  const headingOffset = (n: number) =>
+    preview.evaluate((container, title) => {
+      const heading = [...container.querySelectorAll("h2")].find((h) => h.textContent === title);
+      return heading!.getBoundingClientRect().top - container.getBoundingClientRect().top;
+    }, `Sección ${n}`);
+
+  // Editor → preview: put "## Sección 30" at the top of the editor.
+  await page.evaluate(async (path) => {
+    const { codeEditorRegistry } =
+      await import("/src/features/code-editor/code-editor-registry.ts");
+    const view = codeEditorRegistry.get(path)!.getView()!;
+    const doc = view.state.doc;
+    let line = 1;
+    for (; line <= doc.lines; line++) if (doc.line(line).text === "## Sección 30") break;
+    const block = view.lineBlockAt(doc.line(line).from);
+    const scroller = view.scrollDOM;
+    scroller.scrollTop += block.top - (scroller.getBoundingClientRect().top - view.documentTop);
+  }, file);
+  await expect.poll(() => headingOffset(30)).toBeLessThan(60);
+  expect(await headingOffset(30)).toBeGreaterThan(-60);
+
+  // Preview → editor: scroll the preview to "Sección 10".
+  await preview.evaluate((container) => {
+    const heading = [...container.querySelectorAll("h2")].find(
+      (h) => h.textContent === "Sección 10"
+    )!;
+    container.scrollTop +=
+      heading.getBoundingClientRect().top - container.getBoundingClientRect().top;
+  });
+  // The editor's top line is the heading (give or take a pixel of rounding).
+  await expect
+    .poll(() =>
+      page.evaluate(async (path) => {
+        const { codeEditorRegistry } =
+          await import("/src/features/code-editor/code-editor-registry.ts");
+        const view = codeEditorRegistry.get(path)!.getView()!;
+        const doc = view.state.doc;
+        let heading = 1;
+        for (; heading <= doc.lines; heading++)
+          if (doc.line(heading).text === "## Sección 10") break;
+        const height = view.scrollDOM.getBoundingClientRect().top - view.documentTop;
+        const top = doc.lineAt(view.lineBlockAtHeight(Math.max(0, height)).from).number;
+        return Math.abs(top - heading);
+      }, file)
+    )
+    .toBeLessThanOrEqual(1);
+});

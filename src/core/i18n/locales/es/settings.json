@@ -154,6 +154,8 @@
     "classic": "Clásico (bloques)",
     "classicHint": "Editor por bloques. La conversión a Markdown puede perder formato.",
     "markdown": "Markdown (beta)",
-    "markdownHint": "Markdown puro con vista previa en vivo, comandos /, enlaces [[, diagramas y fórmulas. Guarda exactamente lo que escribes."
+    "markdownHint": "Markdown puro con vista previa en vivo, comandos /, enlaces [[, diagramas y fórmulas. Guarda exactamente lo que escribes.",
+    "code": "Código (texto plano)",
+    "codeHint": "Texto plano con números de línea y colores, como el editor de config.toml. Vista previa al lado con Ctrl+K V."
   }
 }

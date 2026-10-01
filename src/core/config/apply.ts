@@ -126,7 +126,8 @@ export async function applyAppearance(
   // Editor text.
   const e = config.editor;
   if (explicit.has("editor.markdown")) {
-    const choice = e.markdown === "source" ? "markdown" : "classic";
+    const choice =
+      e.markdown === "source" ? "markdown" : e.markdown === "code" ? "code" : "classic";
     if (useEditorPreferencesStore.getState().markdownEditor !== choice)
       useEditorPreferencesStore.getState().setMarkdownEditor(choice);
   }

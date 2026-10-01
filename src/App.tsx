@@ -15,6 +15,7 @@ import { registerDefaultKeybindings } from "@/core/keybindings/default-keybindin
 import { initializeCoreCommands } from "@/core/keybindings/default-commands";
 import { initTerminal } from "@/features/terminal";
 import { initCodeEditor } from "@/features/code-editor";
+import { initMarkdownPreview } from "@/features/markdown-preview";
 import { initExtensionContributions } from "@/plugins/vscode/contribution-service";
 import { initExtensionHostUi } from "@/plugins/vscode/host";
 import { useLanguageStore } from "@/stores/languageStore";
@@ -25,6 +26,7 @@ registerDefaultKeybindings();
 initializeCoreCommands();
 initTerminal();
 initCodeEditor();
+initMarkdownPreview();
 PluginManager.loadInternalPlugins();
 
 export default function App() {

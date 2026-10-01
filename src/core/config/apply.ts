@@ -5,6 +5,7 @@ import { keyNormalizer } from "@/core/keybindings/key-normalizer";
 import { KeybindingSource } from "@/core/keybindings/types";
 import { useThemeStore } from "@/stores/themeStore";
 import { useEditorPreferencesStore } from "@/stores/editorPreferencesStore";
+import { setEditorKeymap } from "./vim-mode";
 
 type Platform = "macos" | "windows" | "linux";
 
@@ -129,6 +130,8 @@ export async function applyAppearance(
     if (useEditorPreferencesStore.getState().markdownEditor !== choice)
       useEditorPreferencesStore.getState().setMarkdownEditor(choice);
   }
+  setVar("--qori-content-width", e.content_width === "readable" ? "46rem" : null);
+  await setEditorKeymap(e.keymap);
   setVar("--qori-editor-font", e.font_family ? `"${e.font_family}", var(--font-mono)` : null);
   setVar("--qori-editor-size", e.font_size ? `${e.font_size}px` : null);
   setVar("--qori-editor-line-height", e.line_height ? String(e.line_height) : null);

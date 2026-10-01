@@ -103,3 +103,26 @@
   inset: 0;
   background: hsl(var(--background) / var(--qori-wallpaper-dim));
 }
+
+/* ── Vim mode (keymap = "vim") ──────────────────────────────────────────── */
+.cm-vim-panel {
+  padding: 2px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  background: transparent;
+  border-top: 1px solid hsl(var(--border) / 0.6);
+}
+.cm-vim-panel input {
+  font-family: inherit;
+  color: hsl(var(--foreground));
+}
+/* Block cursor of normal mode in the accent colour. */
+.cm-editor .cm-fat-cursor {
+  background: hsl(var(--primary) / 0.7) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}
+.cm-editor:not(.cm-focused) .cm-fat-cursor {
+  background: none !important;
+  outline: 1px solid hsl(var(--primary) / 0.7);
+}

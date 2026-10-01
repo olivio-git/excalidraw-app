@@ -35,6 +35,7 @@ import { getLanguageConfiguration, type LanguageConfiguration } from "./extensio
 import { textMateService } from "./textmate/textmate-service";
 import { textMateHighlighting } from "./textmate/highlighter";
 import { codeEditorTheme, codeHighlightStyle } from "./theme";
+import { editorKeymapExtension } from "@/core/config/vim-mode";
 import type { ContentChange, EditorSelection, TextPosition } from "./editor-contributions";
 import type { ChangeSet, Text } from "@codemirror/state";
 
@@ -154,6 +155,8 @@ export function createCodeEditorExtensions(
   completionSources: CompletionSource[]
 ): Extension[] {
   return [
+    // Vim (or default) keys from config.toml; first so it wins over the keymaps below.
+    editorKeymapExtension(callbacks.onSave),
     lineNumbers(),
     highlightActiveLineGutter(),
     foldGutter(),

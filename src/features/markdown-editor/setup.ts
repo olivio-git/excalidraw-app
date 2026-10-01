@@ -17,6 +17,7 @@ import { insertLink, toggleInline } from "./formatting";
 import { linkClickHandler, livePreview } from "./live-preview";
 import { type NoteContext, noteContext } from "./note-context";
 import { editorHighlight, editorTheme } from "./theme";
+import { editorKeymapExtension } from "@/core/config/vim-mode";
 
 export interface EditorCallbacks {
   onChange: (content: string) => void;
@@ -28,6 +29,8 @@ export function createEditorExtensions(
   callbacks: EditorCallbacks
 ): Extension[] {
   return [
+    // Vim (or default) keys from config.toml; first so it wins over the keymaps below.
+    editorKeymapExtension(callbacks.onSave),
     noteContext.of(context),
     history(),
     drawSelection(),

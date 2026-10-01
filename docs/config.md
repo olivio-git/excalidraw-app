@@ -81,6 +81,35 @@ status: active # active | onhold | completed | dropped (o activo, en espera, com
 
 Un clic muestra la vista previa y doble clic abre la nota.
 
+## Modo Vim
+
+```toml
+[editor]
+keymap = "vim"          # default | vim
+markdown = "source"     # para escribir notas con Vim (el editor por bloques no lo admite)
+content_width = "full"  # full | readable (columna centrada de lectura)
+```
+
+Es el mismo motor que usa Inkdrop (`@replit/codemirror-vim`): JavaScript puro, funciona igual en
+Windows, macOS y Linux sin instalar Vim. Funciona en el editor de código y en el Markdown como texto:
+modos normal/insertar/visual, movimientos y operadores, registros, macros, marcas, `/` y `:s`.
+
+- `:w` guarda, `:q` cierra la pestaña, `:wq` / `:x` ambas cosas.
+- `:qori <comando>` ejecuta cualquier comando de la app (los IDs salen en Ctrl+Shift+P).
+
+Mapeos en `~/.config/qori/vimrc` (**Preferencias: Abrir vimrc**), se aplican al guardar:
+
+```vim
+let mapleader = " "
+inoremap jk <Esc>
+nnoremap <leader>w :w<CR>
+nnoremap <leader>ff :qori workbench.action.openQuickOpen<CR>
+nnoremap <leader>a :qori workbench.action.toggleAgent<CR>
+```
+
+Se admiten `let mapleader` y `map`/`nmap`/`imap`/`vmap`/`xmap` con sus versiones `noremap`.
+Otras líneas (`set …`, funciones, plugins) se reportan como problema y se ignoran.
+
 ## keymap.toml
 
 ```toml

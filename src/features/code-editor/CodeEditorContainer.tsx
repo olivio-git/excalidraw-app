@@ -4,6 +4,7 @@ import { EditorView } from "@codemirror/view";
 import type { CompletionSource } from "@codemirror/autocomplete";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { liveBuffers } from "@/core/shell/services/live-buffers";
+import { attachEditorScrollSync } from "@/core/shell/services/scroll-sync";
 import { useTabContext } from "@/core/tabs/hooks/use-tab-context";
 import { useTabStore } from "@/core/tabs/store/tab-store";
 import { registerTabCloseHandler } from "@/core/tabs/tab-lifecycle";
@@ -61,6 +62,7 @@ export default function CodeEditorContainer() {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const pathRef = useRef(filePath);
+  const scrollSyncRef = useRef<(() => void) | null>(null);
   const savedRef = useRef("");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const docRef = useRef<CodeDocument | null>(null);
@@ -188,6 +190,9 @@ export default function CodeEditorContainer() {
           }),
         });
         viewRef.current = view;
+        // Markdown: the preview beside it scrolls along.
+        if (languageId === "markdown")
+          scrollSyncRef.current = attachEditorScrollSync(view, () => pathRef.current);
         setLoad({ status: "ready" });
         editorContributions.didOpen(doc);
         applyContributions();
@@ -216,6 +221,7 @@ export default function CodeEditorContainer() {
   useEffect(
     () => () => {
       void save().finally(() => {
+        scrollSyncRef.current?.();
         if (docRef.current) {
           editorContributions.didClose(docRef.current);
           liveBuffers.release(docRef.current.filePath);

@@ -15,6 +15,7 @@ import { notify } from "@/shared/lib/notify";
 import { refreshEmbeds } from "./embeds";
 import { markdownEditorRegistry } from "./editor-registry";
 import { liveBuffers } from "@/core/shell/services/live-buffers";
+import { attachEditorScrollSync } from "@/core/shell/services/scroll-sync";
 import { findHeading } from "./headings";
 import type { NoteContext } from "./note-context";
 import { createEditorExtensions } from "./setup";
@@ -40,6 +41,7 @@ export default function MarkdownEditorContainer() {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const pathRef = useRef(filePath);
+  const scrollSyncRef = useRef<(() => void) | null>(null);
   const savedRef = useRef("");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [load, setLoad] = useState<LoadState>({ status: "loading" });
@@ -127,6 +129,7 @@ export default function MarkdownEditorContainer() {
           }),
         });
         viewRef.current = view;
+        scrollSyncRef.current = attachEditorScrollSync(view, () => pathRef.current);
         setLoad({ status: "ready" });
       },
       (error) => {
@@ -143,6 +146,7 @@ export default function MarkdownEditorContainer() {
     () => () => {
       void save().finally(() => {
         liveBuffers.release(pathRef.current);
+        scrollSyncRef.current?.();
         viewRef.current?.destroy();
         viewRef.current = null;
       });

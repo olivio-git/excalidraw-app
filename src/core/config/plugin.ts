@@ -2,9 +2,46 @@ import type { Plugin, PluginAPI } from "@/plugins/types";
 import { notify } from "@/shared/lib/notify";
 import { openConfigFile, reloadConfig, startUserConfig } from "./user-config";
 import { useConfigStore } from "./config-store";
+import { PluginManager } from "@/plugins/plugin-manager";
+import { editorContributions } from "@/features/code-editor/editor-contributions";
+import {
+  configCompletionSource,
+  configEditorExtensions,
+  type ConfigFileKind,
+} from "./config-intellisense";
+
+const same = (a: string, b: string) => a.replaceAll("\\", "/") === b.replaceAll("\\", "/");
+
+/** Which config file a path is, if any. */
+function configKind(filePath: string): ConfigFileKind | null {
+  const files = useConfigStore.getState().files;
+  if (files) {
+    if (same(filePath, files.config) || (files.workspace && same(filePath, files.workspace)))
+      return "config";
+    if (same(filePath, files.keymap)) return "keymap";
+    if (same(filePath, files.vimrc)) return "vimrc";
+  }
+  // Another project's .qori/config.toml.
+  return /[\\/]\.qori[\\/]config\.toml$/.test(filePath) ? "config" : null;
+}
+
+const commands = () =>
+  PluginManager.getCommands().map((command) => ({ id: command.id, name: command.name }));
 
 function activate(api: PluginAPI): void {
   void startUserConfig();
+  // Suggestions, problems on their line and hover docs while editing the config files.
+  editorContributions.register({
+    id: "user-config-intellisense",
+    extensions: (doc) => {
+      const kind = configKind(doc.filePath);
+      return kind ? configEditorExtensions(kind, commands) : [];
+    },
+    completionSources: (doc) => {
+      const kind = configKind(doc.filePath);
+      return kind ? [configCompletionSource(kind, commands)] : [];
+    },
+  });
   api.registerCommand("config.open", () => openConfigFile("config"));
   api.registerCommand("config.openKeymap", () => openConfigFile("keymap"));
   api.registerCommand("config.openStyles", () => openConfigFile("styles"));

@@ -45,6 +45,10 @@ export interface AppConfig {
     keymap: "default" | "vim";
     /** Markdown text across the whole tab, or a centered reading column. */
     content_width: "full" | "readable";
+    /** Code editor: minimap on the right, like VS Code. */
+    minimap: boolean;
+    /** Code editor: vertical guides at each indentation level. */
+    indent_guides: boolean;
     font_family: string;
     font_size: number;
     line_height: number;
@@ -82,6 +86,8 @@ export const DEFAULT_CONFIG: AppConfig = {
     markdown: "rich",
     keymap: "default",
     content_width: "full",
+    minimap: true,
+    indent_guides: true,
     font_family: "",
     font_size: 0,
     line_height: 0,
@@ -127,6 +133,8 @@ export const RULES: { [S in keyof AppConfig]: { [K in keyof AppConfig[S]]: Rule 
     markdown: str(["rich", "source", "code"]),
     keymap: str(["default", "vim"]),
     content_width: str(["full", "readable"]),
+    minimap: bool,
+    indent_guides: bool,
     font_family: str(),
     font_size: num(0, 32),
     line_height: num(0, 3),
@@ -139,6 +147,49 @@ export const RULES: { [S in keyof AppConfig]: { [K in keyof AppConfig[S]]: Rule 
   flow3d: {
     effects: bool,
   },
+};
+
+/** What each section and option does: shown in the editor's suggestions and on hover. */
+export const SECTION_DOCS: Record<keyof AppConfig, string> = {
+  appearance: "Aspecto de la app: tema, translucidez, fuentes, densidad y color de acento.",
+  editor: "Editores de texto: editor de Markdown, teclas (Vim), fuente, minimapa y guías.",
+  notes: "Vista «Notas»: lista de notas por fecha, orden y notas fijadas.",
+  flow3d: "Editor de flujos y diagramas 3D.",
+};
+
+export const OPTION_DOCS: Record<string, string> = {
+  "appearance.theme": "Tema de color. `system` sigue al sistema operativo.",
+  "appearance.translucency":
+    "Translucidez de la ventana: `none` opaca, `native` efecto del sistema (macOS/Windows), `transparent` ventana transparente (en Linux el desenfoque lo pone el compositor), `wallpaper` una imagen tuya desenfocada por la app.",
+  "appearance.native_effect":
+    'Efecto nativo con `translucency = "native"`: vibrancia en macOS (`sidebar`, `under-window`, `hud`) o Mica/Acrílico/Blur en Windows.',
+  "appearance.opacity": "Opacidad de la zona del editor cuando la ventana es translúcida.",
+  "appearance.sidebar_opacity":
+    "Opacidad de las barras laterales y paneles cuando la ventana es translúcida.",
+  "appearance.blur": "Radio de desenfoque en píxeles (fondo de pantalla y paneles flotantes).",
+  "appearance.wallpaper":
+    'Imagen detrás de la ventana con `translucency = "wallpaper"`: ruta absoluta, `~/…` o relativa al proyecto.',
+  "appearance.wallpaper_dim": "Oscurece (tema oscuro) o aclara (tema claro) el fondo de pantalla.",
+  "appearance.radius": "Radio de las esquinas de la interfaz, en píxeles.",
+  "appearance.font_family": "Fuente de la interfaz (vacío: la del tema).",
+  "appearance.mono_font_family": "Fuente monoespaciada (código, terminal).",
+  "appearance.font_size": "Tamaño base de la interfaz, en píxeles.",
+  "appearance.density": "Espaciado de la interfaz: `compact` o `comfortable`.",
+  "appearance.accent": "Color de acento en hex, p. ej. `#7c3aed`.",
+  "editor.markdown":
+    "Editor de los `.md`: `rich` por bloques, `source` Markdown con formato al escribir, `code` texto plano como este archivo (vista previa con Ctrl+K V).",
+  "editor.keymap": "Teclas de los editores de texto: `default` o `vim` (mapeos en `vimrc`).",
+  "editor.content_width":
+    "Markdown a todo el ancho (`full`) o en una columna centrada para leer (`readable`).",
+  "editor.minimap": "Minimapa a la derecha del editor de código.",
+  "editor.indent_guides": "Guías verticales en cada nivel de indentación.",
+  "editor.font_family": "Fuente de los editores (vacío: la del tema).",
+  "editor.font_size": "Tamaño de letra de los editores, en píxeles (0: el del tema).",
+  "editor.line_height": "Interlineado de los editores (0: el del tema).",
+  "notes.enabled": "Muestra la vista «Notas» en la barra lateral.",
+  "notes.sort": "Orden de la lista de notas: `updated` (más recientes primero) o `title`.",
+  "notes.pinned": "Notas fijadas arriba del todo: rutas relativas al proyecto.",
+  "flow3d.effects": "Luz, sombras y brillo en los flujos 3D (desactívalo en equipos lentos).",
 };
 
 export interface ConfigIssue {
@@ -271,6 +322,8 @@ export const DEFAULT_CONFIG_FILE = `# QoriApp — configuración
 # markdown = "rich"         # rich (bloques) | source (Markdown con formato al escribir) | code (texto plano, como este archivo; vista previa con Ctrl+K V)
 # keymap = "default"        # default | vim (modos, movimientos, :w, :q… mapeos en vimrc)
 # content_width = "full"    # full (todo el ancho) | readable (columna centrada para leer)
+# minimap = true            # minimapa a la derecha del editor de código
+# indent_guides = true      # guías verticales de indentación
 # font_family = "JetBrains Mono"   # vacío: la del tema
 # font_size = 15
 # line_height = 1.6

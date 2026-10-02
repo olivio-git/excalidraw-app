@@ -133,6 +133,8 @@ export async function applyAppearance(
   }
   setVar("--qori-content-width", e.content_width === "readable" ? "46rem" : null);
   await setEditorKeymap(e.keymap);
+  const { setEditorFeatures } = await import("@/features/code-editor/editor-features");
+  setEditorFeatures({ minimap: e.minimap, indentGuides: e.indent_guides });
   setVar("--qori-editor-font", e.font_family ? `"${e.font_family}", var(--font-mono)` : null);
   setVar("--qori-editor-size", e.font_size ? `${e.font_size}px` : null);
   setVar("--qori-editor-line-height", e.line_height ? String(e.line_height) : null);

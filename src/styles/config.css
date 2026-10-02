@@ -130,3 +130,35 @@
 [data-code-editor]:has(.cm-vim-panel) [data-language-badge] {
   bottom: 1.75rem;
 }
+
+/* Docs of a config option (suggestion details and hover). */
+.qori-config-info {
+  max-width: 380px;
+  padding: 6px 9px;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  color: hsl(var(--popover-foreground));
+}
+.cm-tooltip:has(.qori-config-info) {
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: hsl(var(--popover));
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+}
+/* Suggestion list in the theme's colors. */
+.cm-tooltip.cm-tooltip-autocomplete {
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: hsl(var(--popover));
+  overflow: hidden;
+}
+.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] {
+  background: hsl(var(--primary) / 0.22);
+  color: hsl(var(--foreground));
+}
+.cm-tooltip.cm-tooltip-autocomplete .cm-completionDetail {
+  margin-left: 0.8em;
+  font-style: normal;
+  color: hsl(var(--muted-foreground));
+}

@@ -94,6 +94,32 @@ previa») abre al lado el documento formateado, que se actualiza mientras escrib
 de tareas, citas, código, enlaces a otros archivos e imágenes, incluidos diagramas `.excalidraw`.
 El editor y la vista previa se desplazan juntos: al bajar en uno, el otro va a la misma sección.
 
+## Ayuda al editar la configuración
+
+Al abrir `config.toml`, `.qori/config.toml`, `keymap.toml` o `vimrc` en el editor:
+
+- **Sugerencias** mientras escribes (o con Ctrl+Espacio): secciones tras `[`, opciones de la
+  sección con su tipo y valor por defecto, y tras `=` los valores aceptados. En `keymap.toml`
+  y tras `:qori` en `vimrc`, los comandos de la app con su nombre.
+- **Errores en su línea**: subrayado y punto rojo en el margen (también en el minimapa) con el
+  mismo mensaje que da la app al cargar el archivo; avisos en amarillo (valores ajustados,
+  comandos que no existen).
+- **Documentación al pasar el ratón** sobre una opción o una sección.
+
+## Editor de código
+
+Sugerencias del propio lenguaje (variables y funciones en JS/TS, propiedades en CSS, etiquetas
+en HTML…), fragmentos de las extensiones y, en archivos sin lenguaje (texto, TOML, Markdown),
+las palabras del documento. Además: minimapa, guías de indentación, multicursor con Alt+clic,
+selección en columna con Alt+arrastrar, Ctrl+D para la siguiente coincidencia, Alt+↑/↓ para
+mover líneas y espacios sobrantes al final marcados.
+
+```toml
+[editor]
+minimap = true         # minimapa a la derecha
+indent_guides = true   # guías de indentación
+```
+
 ## Modo Vim
 
 ```toml

@@ -2,6 +2,7 @@ import {
   autocompletion,
   closeBrackets,
   closeBracketsKeymap,
+  completeAnyWord,
   completionKeymap,
   type CompletionSource,
 } from "@codemirror/autocomplete";
@@ -36,6 +37,7 @@ import { textMateService } from "./textmate/textmate-service";
 import { textMateHighlighting } from "./textmate/highlighter";
 import { codeEditorTheme, codeHighlightStyle } from "./theme";
 import { editorKeymapExtension } from "@/core/config/vim-mode";
+import { editorFeaturesExtension } from "./editor-features";
 import type { ContentChange, EditorSelection, TextPosition } from "./editor-contributions";
 import type { ChangeSet, Text } from "@codemirror/state";
 
@@ -89,9 +91,34 @@ export function toContentChanges(startDoc: Text, changes: ChangeSet): ContentCha
   return result.reverse();
 }
 
-/** Completion with every source (snippets, language servers) in one list. */
-export function completionExtension(sources: CompletionSource[]): Extension {
-  return autocompletion({ override: sources.length > 0 ? sources : undefined, icons: true });
+/**
+ * Completion from every source in one list: the language's own (JS scopes,
+ * CSS properties, HTML tags…), snippets, extensions and language servers.
+ * Ours are added as language data rather than `override`, which would hide
+ * the language's. Languages without completion of their own (TOML, plain
+ * text, Markdown…) get the words of the document, like VS Code.
+ */
+export function completionExtension(
+  sources: CompletionSource[],
+  /** Sources that know the file (config files, language servers): no generic words then. */
+  specific: CompletionSource[] = []
+): Extension {
+  const ours = new Set<unknown>([...sources, ...specific]);
+  const words: CompletionSource = (context) => {
+    if (specific.length > 0) return null;
+    const others = context.state
+      .languageDataAt<unknown>("autocomplete", context.pos)
+      .filter((source) => !ours.has(source));
+    return others.length > 0 ? null : completeAnyWord(context);
+  };
+  sources = [...sources, ...specific];
+  ours.add(words);
+  return [
+    autocompletion({ icons: true, activateOnTypingDelay: 60, maxRenderedOptions: 80 }),
+    EditorState.languageData.of(() =>
+      [...sources, words].map((autocomplete) => ({ autocomplete }))
+    ),
+  ];
 }
 
 /** Comment tokens and brackets from an extension's language-configuration.json. */
@@ -157,6 +184,7 @@ export function createCodeEditorExtensions(
   return [
     // Vim (or default) keys from config.toml; first so it wins over the keymaps below.
     editorKeymapExtension(callbacks.onSave),
+    editorFeaturesExtension(),
     lineNumbers(),
     highlightActiveLineGutter(),
     foldGutter(),

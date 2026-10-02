@@ -208,3 +208,59 @@ test("code blocks in the preview are colored like the editor", async ({ page }) 
   await expect(block.locator(".tok-string")).toHaveText('"hola"');
   await expect(block.locator(".tok-comment")).toHaveText("// saludo");
 });
+
+test("config.toml suggests options and values, and marks problems on their line", async ({
+  page,
+}) => {
+  await openApp(page, { [CONFIG]: '[appearance]\ntheme = "pink"\n\n[editor]\n' });
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const { useConfigStore } = await import("/src/core/config/config-store.ts");
+        return useConfigStore.getState().files?.config ?? null;
+      })
+    )
+    .toBe(CONFIG);
+  // As the user does: Ctrl+Shift+P → "Preferencias: Abrir config.toml".
+  await page.evaluate(async () => {
+    const { openConfigFile } = await import("/src/core/config/user-config.ts");
+    await openConfigFile("config");
+  });
+  const editor = page.locator("[data-code-editor] .cm-content");
+  await expect(editor).toContainText("[editor]");
+
+  // The wrong value is marked on its line.
+  await expect(page.locator("[data-code-editor] .cm-lintRange-error").first()).toBeVisible();
+
+  // Typing in [editor] offers its options with what they do.
+  await editor.click();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type("mini");
+  const list = page.locator(".cm-tooltip-autocomplete");
+  // Accept once the list has settled on the option (as a person would).
+  await expect(list.locator("li[aria-selected]")).toContainText("minimap");
+  await page.waitForTimeout(150);
+  await page.keyboard.press("Enter");
+  await expect(editor).toContainText("minimap = true");
+
+  // After =, the accepted values.
+  await page.keyboard.press("Enter");
+  await page.keyboard.type('keymap = "');
+  await expect(list).toContainText('"vim"');
+});
+
+test("code editor: suggestions from the language, minimap and indent guides", async ({ page }) => {
+  const file = `${WORKSPACE}/app.js`;
+  await openApp(page, {
+    [file]: "function calcularTotal(items) {\n  if (items) {\n    return items.length;\n  }\n}\n\n",
+  });
+  await openFile(page, file);
+  const editor = page.locator("[data-code-editor] .cm-content");
+  await expect(editor).toContainText("calcularTotal");
+  await expect(page.locator("[data-code-editor] .cm-minimap-gutter")).toBeVisible();
+  await expect(page.locator("[data-code-editor] .cm-indent-markers").first()).toBeAttached();
+  await editor.click();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type("calc");
+  await expect(page.locator(".cm-tooltip-autocomplete")).toContainText("calcularTotal");
+});

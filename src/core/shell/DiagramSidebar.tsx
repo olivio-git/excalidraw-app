@@ -1,11 +1,12 @@
 import { useRef, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, Settings, PlugZap, Palette, Sun, Moon, Monitor } from "lucide-react";
+import { ChevronRight, Settings, PlugZap, Palette, Sun, Moon, Monitor, Check } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { TooltipWrapper } from "@/shared/common/TooltipWrapper";
 import { useTabStore } from "@/core/tabs/store/tab-store";
 import { useThemeStore } from "@/stores/themeStore";
+import { setActiveColorTheme, useColorThemeState } from "@/plugins/vscode/color-theme-service";
 import { usePluginSidebarResources } from "@/plugins/hooks/usePluginSidebarResources";
 import {
   DropdownMenu,
@@ -84,7 +85,14 @@ const DiagramSidebar = () => {
     (state) => state.tabs.find((tab) => tab.id === state.activeTabId)?.routeId === "settings"
   );
   const theme = useThemeStore((s) => s.theme);
-  const setTheme = useThemeStore((s) => s.setTheme);
+  const setBaseTheme = useThemeStore((s) => s.setTheme);
+  // Color themes installed with extensions (VS Code themes) sit next to light/dark.
+  const colorThemes = useColorThemeState();
+  const activeColorTheme = colorThemes.activeKey;
+  const setTheme = (mode: "light" | "dark" | "system") => {
+    if (activeColorTheme) void setActiveColorTheme(null);
+    setBaseTheme(mode);
+  };
   const { pluginSections, pluginFooterActions } = usePluginSidebarResources();
   usePluginsView(pluginSections.length > 0);
 
@@ -186,25 +194,60 @@ const DiagramSidebar = () => {
                     <Palette className="mr-2 size-4" />
                     <span>{t("panels.theme")}</span>
                   </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>
+                  <DropdownMenuSubContent className="max-h-[70vh] overflow-y-auto">
                     <DropdownMenuItem
                       onClick={() => setTheme("light")}
-                      className={cn(theme === "light" && "bg-accent text-accent-foreground")}
+                      className={cn(
+                        !activeColorTheme && theme === "light" && "bg-accent text-accent-foreground"
+                      )}
                     >
                       <Sun className="mr-2 size-4" /> {t("panels.themeLight")}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setTheme("dark")}
-                      className={cn(theme === "dark" && "bg-accent text-accent-foreground")}
+                      className={cn(
+                        !activeColorTheme && theme === "dark" && "bg-accent text-accent-foreground"
+                      )}
                     >
                       <Moon className="mr-2 size-4" /> {t("panels.themeDark")}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setTheme("system")}
-                      className={cn(theme === "system" && "bg-accent text-accent-foreground")}
+                      className={cn(
+                        !activeColorTheme &&
+                          theme === "system" &&
+                          "bg-accent text-accent-foreground"
+                      )}
                     >
                       <Monitor className="mr-2 size-4" /> {t("panels.themeSystem")}
                     </DropdownMenuItem>
+                    {colorThemes.themes.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <div className="px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                          {t("panels.themeInstalled")}
+                        </div>
+                        {colorThemes.themes.map((option) => (
+                          <DropdownMenuItem
+                            key={option.key}
+                            data-color-theme={option.key}
+                            onClick={() => void setActiveColorTheme(option.key)}
+                            className={cn(
+                              option.key === activeColorTheme && "bg-accent text-accent-foreground"
+                            )}
+                            title={option.extension.displayName ?? option.extension.id}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 size-4",
+                                option.key !== activeColorTheme && "opacity-0"
+                              )}
+                            />
+                            <span className="truncate">{option.label}</span>
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
               </DropdownMenuGroup>

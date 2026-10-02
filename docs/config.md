@@ -21,6 +21,17 @@ Reglas:
 - Número fuera de rango: se ajusta al límite y se avisa.
 - Error de sintaxis (archivo a medio escribir): se mantiene la última versión válida de ese archivo.
 
+## Temas de extensiones
+
+Los temas de color que instalas con extensiones (temas de VS Code) aparecen en el menú de la
+rueda (abajo a la izquierda) → **Tema** → **Temas instalados**, junto a Claro, Oscuro y Sistema.
+Elegir Claro/Oscuro/Sistema vuelve al tema propio de la app. También desde el archivo:
+
+```toml
+[appearance]
+color_theme = "Dracula"   # por su nombre (sin distinguir mayúsculas); vacío: el de la app
+```
+
 ## Translucidez y desenfoque
 
 | `translucency` | macOS                                        | Windows                                                       | Linux                                             |

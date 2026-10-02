@@ -18,6 +18,8 @@ export type NativeEffect =
 export interface AppConfig {
   appearance: {
     theme: "system" | "light" | "dark";
+    /** Theme installed with an extension (VS Code color theme), by name; "" = the app's. */
+    color_theme: string;
     /** How the window lets the desktop (or a wallpaper) through. */
     translucency: Translucency;
     native_effect: NativeEffect;
@@ -68,6 +70,7 @@ export interface AppConfig {
 export const DEFAULT_CONFIG: AppConfig = {
   appearance: {
     theme: "system",
+    color_theme: "",
     translucency: "none",
     native_effect: "auto",
     opacity: 0.78,
@@ -115,6 +118,7 @@ const bool: Rule = { type: "boolean" };
 export const RULES: { [S in keyof AppConfig]: { [K in keyof AppConfig[S]]: Rule } } = {
   appearance: {
     theme: str(["system", "light", "dark"]),
+    color_theme: str(),
     translucency: str(["none", "native", "transparent", "wallpaper"]),
     native_effect: str(["auto", "sidebar", "under-window", "hud", "mica", "acrylic", "blur"]),
     opacity: num(0.2, 1),
@@ -159,6 +163,8 @@ export const SECTION_DOCS: Record<keyof AppConfig, string> = {
 
 export const OPTION_DOCS: Record<string, string> = {
   "appearance.theme": "Tema de color. `system` sigue al sistema operativo.",
+  "appearance.color_theme":
+    "Tema instalado con una extensión (tema de VS Code), por su nombre, p. ej. `Dracula`. Vacío: el tema de la app.",
   "appearance.translucency":
     "Translucidez de la ventana: `none` opaca, `native` efecto del sistema (macOS/Windows), `transparent` ventana transparente (en Linux el desenfoque lo pone el compositor), `wallpaper` una imagen tuya desenfocada por la app.",
   "appearance.native_effect":
@@ -296,6 +302,7 @@ export const DEFAULT_CONFIG_FILE = `# QoriApp — configuración
 
 [appearance]
 # theme = "system"          # system | light | dark
+# color_theme = "Dracula"   # un tema instalado con una extensión (su nombre); vacío: el de la app
 
 # Translucidez de la ventana:
 #   none        opaca (por defecto)

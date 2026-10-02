@@ -79,7 +79,8 @@
     "theme": "Tema",
     "themeLight": "Claro",
     "themeDark": "Oscuro",
-    "themeSystem": "Sistema"
+    "themeSystem": "Sistema",
+    "themeInstalled": "Temas instalados"
   },
   "commandPalette": {
     "noCommandsFound": "No se encontraron comandos",

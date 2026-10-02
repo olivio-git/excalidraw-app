@@ -192,6 +192,11 @@ function subscribe(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
+/** Current themes and active one, outside React. */
+export function getColorThemeState(): ColorThemeState {
+  return state;
+}
+
 export function useColorThemeState(): ColorThemeState {
   return useSyncExternalStore(subscribe, () => state);
 }

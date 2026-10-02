@@ -43,6 +43,28 @@ export function nativeEffectFor(effect: NativeEffect, platform: Platform): strin
   return windows[effect] ?? "mica";
 }
 
+/** A theme installed with an extension, by name or key ("" or "none": the app's own). */
+async function applyColorTheme(name: string): Promise<string | null> {
+  const service = await import("@/plugins/vscode/color-theme-service");
+  await service.ensureColorThemesInitialized();
+  const { themes, activeKey } = service.getColorThemeState();
+  const wanted = name.trim().toLowerCase();
+  if (!wanted || wanted === "none") {
+    if (activeKey) await service.setActiveColorTheme(null);
+    return null;
+  }
+  const match =
+    themes.find((t) => t.key.toLowerCase() === wanted) ??
+    themes.find((t) => t.label.toLowerCase() === wanted) ??
+    themes.find((t) => t.label.toLowerCase().includes(wanted));
+  if (!match)
+    return `appearance.color_theme: no hay ningún tema instalado llamado «${name}»${
+      themes.length ? ` (instalados: ${themes.map((t) => t.label).join(", ")})` : ""
+    }`;
+  if (match.key !== activeKey) await service.setActiveColorTheme(match.key);
+  return null;
+}
+
 let appliedEffect: string | null = null;
 
 async function applyNativeEffect(effect: string | null): Promise<string | null> {
@@ -99,6 +121,10 @@ export async function applyAppearance(
 
   if (explicit.has("appearance.theme") && useThemeStore.getState().theme !== a.theme)
     useThemeStore.getState().setTheme(a.theme);
+  if (explicit.has("appearance.color_theme")) {
+    const problem = await applyColorTheme(a.color_theme);
+    if (problem) problems.push(problem);
+  }
 
   // Typography, shape and density.
   setVar("--qori-font-sans", a.font_family ? `"${a.font_family}", var(--font-sans)` : null);

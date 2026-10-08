@@ -1,10 +1,11 @@
-import { invoke } from "@tauri-apps/api/core";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { PluginManager } from "@/plugins/plugin-manager";
 import { useAISettingsStore } from "@/features/settings/ai/ai-settings-store";
 import { AIProviderFactory } from "@/features/ai-chat/providers/factory";
-import { looseJson, type CommandResult, type ExecutorServices } from "./executor";
+import { runCommand } from "@/features/terminal/command-runner";
+import { runInOutputTerminal } from "@/features/terminal/output-terminal";
+import { looseJson, type ExecutorServices } from "./executor";
 
 const AI_SYSTEM =
   "Eres un paso dentro de un flujo automatizado. Responde solo con el resultado pedido, sin explicaciones ni saludos.";
@@ -21,8 +22,17 @@ export function resolveStepPath(path: string, flowPath: string): string {
   return `${base}${separator}${clean.replace(/^\.[\\/]/, "")}`;
 }
 
-/** Services that run steps on the real platform (Tauri). */
-export function createRuntimeServices(flowPath: string): ExecutorServices {
+const flowName = (flowPath: string) =>
+  (flowPath.split(/[\\/]/).pop() ?? flowPath).replace(/\.flow3d$/i, "");
+
+/**
+ * Services that run steps on the real platform (Tauri). With `liveOutput`
+ * (the default) command steps show in the terminal "Flujo: <name>" while they run.
+ */
+export function createRuntimeServices(
+  flowPath: string,
+  options: { liveOutput?: boolean } = {}
+): ExecutorServices {
   return {
     http: async ({ method, url, headers, body, signal }) => {
       const response = await tauriFetch(url, { method, headers, body, signal });
@@ -39,12 +49,21 @@ export function createRuntimeServices(flowPath: string): ExecutorServices {
       };
     },
 
-    shell: ({ command, cwd, timeoutMs }) =>
-      invoke<CommandResult>("flow_run_command", {
+    shell: ({ command, cwd, timeoutMs, signal, show }) => {
+      const request = {
         command,
         cwd: cwd ? resolveStepPath(cwd, flowPath) : dirname(flowPath),
         timeoutMs,
-      }),
+        signal,
+      };
+      return show && options.liveOutput !== false
+        ? runInOutputTerminal(`Flujo: ${flowName(flowPath)}`, {
+            ...request,
+            title: show.step,
+            hide: show.hide,
+          })
+        : runCommand(request);
+    },
 
     appCommand: async (id) => {
       if (!PluginManager.hasCommand(id)) throw new Error(`Comando no encontrado: ${id}`);

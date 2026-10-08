@@ -206,11 +206,11 @@ export function getAvailableShells(): Promise<ShellInfo[]> {
   return shellsPromise;
 }
 
-export function showTerminalPanel(id?: string): void {
+export function showTerminalPanel(id?: string, options: { focus?: boolean } = {}): void {
   if (id) useTerminalStore.setState({ activeId: id });
   panelViews.show(TERMINAL_VIEW_ID);
   const target = id ?? useTerminalStore.getState().activeId;
-  if (target) requestAnimationFrame(() => sessions.get(target)?.focus());
+  if (target && options.focus !== false) requestAnimationFrame(() => sessions.get(target)?.focus());
 }
 
 export function setActiveTerminal(id: string): void {

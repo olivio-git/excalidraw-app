@@ -227,6 +227,13 @@ describe("flows, search and notes for external agents", () => {
     expect(executeAITool).not.toHaveBeenCalled();
   });
 
+  it("does not expose the agent's shell commands", async () => {
+    const { executeAITool } = await import("@/features/ai-chat/utils/tool-executor");
+    const answer = await dispatchMcpTool("terminal_run", { command: "echo hola" });
+    expect(answer.error).toContain("Unknown tool");
+    expect(executeAITool).not.toHaveBeenCalled();
+  });
+
   it("reports tool errors as errors", async () => {
     const { executeAITool } = await import("@/features/ai-chat/utils/tool-executor");
     vi.mocked(executeAITool).mockResolvedValue({

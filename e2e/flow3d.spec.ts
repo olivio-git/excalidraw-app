@@ -1,4 +1,13 @@
-import { expect, flowStore, openApp, openFile, readFile, test, WORKSPACE } from "./fixtures/app";
+import {
+  expect,
+  flowStore,
+  openApp,
+  openFile,
+  readFile,
+  terminalText,
+  test,
+  WORKSPACE,
+} from "./fixtures/app";
 
 const FLOW = `${WORKSPACE}/informe.flow3d`;
 
@@ -64,6 +73,12 @@ test("executes for real, passing data between steps", async ({ page }) => {
   expect(commands).toEqual(["echo a", "echo b"]);
   expect(await readFile(page, `${WORKSPACE}/salida.md`)).toContain('"stdout": "a\\n"');
 
+  // The commands, their output and how they ended show in the flow's terminal.
+  await expect
+    .poll(() => terminalText(page, "Flujo: informe"))
+    .toMatch(/▶ Por cada uno\s+\$ echo a\s+a\s+✓ Terminó bien/);
+  expect(await terminalText(page, "Flujo: informe")).toContain("$ echo b");
+
   // The inspector shows what went in and out of a step.
   await flowStore(page, FLOW, "s.getState().select({ type: 'node', id: 'each' })");
   await page.getByRole("radio", { name: "Datos" }).click();
@@ -90,6 +105,24 @@ test("marks a failing step and stops its branch", async ({ page }) => {
     "return Object.fromEntries(Object.entries(s.getState().run.steps).map(([k, v]) => [k, v.status]))"
   );
   expect(steps).toEqual({ start: "done", each: "error", save: "skipped" });
+});
+
+test("cancelling stops the command that is running", async ({ page }) => {
+  await flowStore(
+    page,
+    FLOW,
+    "s.getState().updateNode('each', { config: { type: 'command', command: 'sleep 30' } })"
+  );
+  await page.getByRole("radio", { name: "Ejecutar" }).click();
+  await page.locator("[data-flow3d-execute]").click();
+  await page.getByRole("button", { name: "Ejecutar" }).last().click();
+  await expect.poll(() => terminalText(page, "Flujo: informe")).toContain("$ sleep 30");
+
+  await page.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await expect(page.locator("[data-flow3d-run-status='cancelled']")).toBeAttached();
+  const kills = await page.evaluate(() => (window as unknown as { __kills?: string[] }).__kills);
+  expect(kills).toHaveLength(1);
+  await expect.poll(() => terminalText(page, "Flujo: informe")).toContain("■ Detenido");
 });
 
 test("adds a connected step with Tab", async ({ page }) => {

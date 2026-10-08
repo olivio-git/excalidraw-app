@@ -48,7 +48,8 @@ export const flowAutomation = new FlowAutomation({
     ),
   run: async (flowPath, doc, nodeId, trigger, payload) => {
     const secrets = await flowSecrets.all();
-    const services = createRuntimeServices(flowPath);
+    // Nobody started it: it doesn't open the terminal panel.
+    const services = createRuntimeServices(flowPath, { liveOutput: false });
     const open = flow3dRegistry.get(flowPath);
     const options = { payload, startAt: [nodeId], trigger, secrets };
     // An open flow runs in its tab (you see it happen); otherwise in the background, unpaced.

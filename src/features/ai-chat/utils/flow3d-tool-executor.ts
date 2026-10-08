@@ -41,7 +41,9 @@ const slug = (name: string) =>
 /** Runs the flow3d_* chat tools (flow engine loaded on demand). */
 export async function executeFlow3DTool(
   toolName: string,
-  toolInput: unknown
+  toolInput: unknown,
+  /** Stops a flow3d_run (the chat's stop button). */
+  signal?: AbortSignal
 ): Promise<AIToolResult> {
   const input = (toolInput ?? {}) as {
     name?: string;
@@ -150,6 +152,7 @@ export async function executeFlow3DTool(
         const options = {
           secrets: await flowSecrets.all(),
           trigger: "manual" as const,
+          signal,
           ...(input.payload !== undefined && { payload: input.payload }),
         };
         // Open flows run in their tab, so the user watches it happen.

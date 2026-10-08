@@ -150,7 +150,7 @@ export interface FlowEditorState {
       payload?: unknown;
       /** Tests: fake clock and pacing. */
       timing?: Pick<RunOptions, "now" | "sleep" | "edgeDuration" | "minStepDuration">;
-    } & Pick<RunOptions, "startAt" | "trigger" | "secrets">
+    } & Pick<RunOptions, "startAt" | "trigger" | "secrets" | "signal">
   ) => Promise<RunState>;
   /** Past runs of this flow (newest first). */
   history: RunHistoryEntry[];
@@ -595,6 +595,8 @@ export function createFlowEditorStore(initial: FlowDocument): FlowEditorStore {
         if (state.run?.status === "running") return state.run;
         const controller = new AbortController();
         abort = controller;
+        options.signal?.addEventListener("abort", () => controller.abort(), { once: true });
+        if (options.signal?.aborted) controller.abort();
         const now = options.timing?.now ?? (() => performance.now());
         const started = emptyRun(now(), options.trigger);
         state.clock.time = 0;

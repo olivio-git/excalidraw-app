@@ -225,6 +225,67 @@ describe("executeFlow", () => {
     expect(run.steps.end.status).toBe("skipped");
   });
 
+  it("gives commands the run's signal and hides secrets in what they show", async () => {
+    const controller = new AbortController();
+    const shell = vi.fn<ExecutorServices["shell"]>(async () => ({
+      stdout: "",
+      stderr: "",
+      code: 0,
+    }));
+    const doc = flow(
+      [
+        node("t", "trigger"),
+        node("login", "action", { type: "command", command: "login {{secrets.TOKEN}}" }),
+      ],
+      [{ id: "1", from: "t", to: "login" }]
+    );
+    await executeFlow(doc, {
+      services: fakeServices({ shell }),
+      signal: controller.signal,
+      secrets: { TOKEN: "s3cr3t-token" },
+      ...fakeTime(),
+    });
+    const request = shell.mock.calls[0][0];
+    expect(request.command).toBe("login s3cr3t-token");
+    expect(request.signal).toBeInstanceOf(AbortSignal);
+    expect(request.show?.step).toBe("login");
+    expect(request.show?.hide("token=s3cr3t-token")).toBe("token=••••");
+  });
+
+  it("a command stopped from its terminal cancels the whole run, without retrying", async () => {
+    const shell = vi.fn(async () => ({
+      stdout: "",
+      stderr: "",
+      code: null,
+      killed: true,
+    }));
+    const doc = flow(
+      [
+        node("t", "trigger"),
+        node("stop", "action", { type: "command", command: "sleep 100", retries: 3 }),
+        node("afterStop", "output"),
+        node("slow", "ai", { type: "ai", prompt: "x" }),
+        node("afterSlow", "output"),
+      ],
+      [
+        { id: "1", from: "t", to: "stop" },
+        { id: "2", from: "stop", to: "afterStop" },
+        { id: "3", from: "t", to: "slow" },
+        { id: "4", from: "slow", to: "afterSlow" },
+      ]
+    );
+    const services = fakeServices({
+      shell,
+      ai: () => new Promise((resolve) => setTimeout(() => resolve("tarde"), 20)),
+    });
+    const run = await executeFlow(doc, { services, ...fakeTime() });
+    expect(run.status).toBe("cancelled");
+    expect(shell).toHaveBeenCalledTimes(1);
+    expect(run.steps.stop).toMatchObject({ status: "error", error: "Cancelado" });
+    expect(run.steps.afterStop.status).toBe("skipped");
+    expect(run.steps.afterSlow.status).toBe("skipped");
+  });
+
   it("lists steps with side effects (GET requests are safe)", () => {
     const doc = flow(
       [

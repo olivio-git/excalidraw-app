@@ -582,6 +582,7 @@ pub fn run() {
         .register_asynchronous_uri_scheme_protocol(ext_protocol::SCHEME, ext_protocol::handle)
         .manage(mcp_state)
         .manage(pty::PtyState::default())
+        .manage(flow_exec::ExecState::default())
         .manage(exthost::ExtHostState::default())
         .setup(move |app| {
             let handle = app.handle().clone();
@@ -643,6 +644,7 @@ pub fn run() {
             exthost::exthost_send,
             exthost::exthost_stop,
             flow_exec::flow_run_command,
+            flow_exec::exec_kill,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application:review logs for details");

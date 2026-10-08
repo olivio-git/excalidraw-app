@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Trash2, ChevronDown, Plus, Bug, Copy, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/utils";
@@ -22,6 +22,7 @@ import { resolveAIChatContext } from "./utils/context-resolver";
 import { useTabStore } from "@/core/tabs/store/tab-store";
 import { AIChatMessage } from "./AIChatMessage";
 import { AIChatInput } from "./AIChatInput";
+import type { AIToolResult } from "./providers/types";
 import { PluginManager } from "@/plugins/plugin-manager";
 
 export function AIChatPanel() {
@@ -41,6 +42,14 @@ export function AIChatPanel() {
 
   const { messages, status, sendMessage, cancelStream, answerPendingQuestion } = useAIChat();
   const isWaiting = status === "waiting_for_user";
+  const busy = status === "streaming" || isWaiting;
+  // Each tool call's result, shown in its chip.
+  const toolResults = useMemo(() => {
+    const results = new Map<string, AIToolResult>();
+    for (const message of messages)
+      for (const result of message.toolResults ?? []) results.set(result.toolCallId, result);
+    return results;
+  }, [messages]);
 
   // Prompts handed over by other features (openAgent): sent, or left in the input.
   const queuedPrompt = useAIChatStore((s) => s.queuedPrompt);
@@ -302,7 +311,7 @@ export function AIChatPanel() {
             <p className="text-xs text-muted-foreground text-center py-6">{emptyState}</p>
           )}
           {messages.map((m) => (
-            <AIChatMessage key={m.id} message={m} />
+            <AIChatMessage key={m.id} message={m} toolResults={toolResults} busy={busy} />
           ))}
         </div>
       </div>

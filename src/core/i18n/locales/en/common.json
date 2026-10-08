@@ -79,7 +79,8 @@
     "theme": "Theme",
     "themeLight": "Light",
     "themeDark": "Dark",
-    "themeSystem": "System"
+    "themeSystem": "System",
+    "themeInstalled": "Installed themes"
   },
   "commandPalette": {
     "noCommandsFound": "No commands found",
@@ -147,6 +148,10 @@
     "noDiagramActive": "No active tab",
     "thinking": "Thinking…",
     "toolError": "Tool error",
+    "toolInput": "Input",
+    "toolResult": "Result",
+    "toolRunning": "Running…",
+    "toolNoResult": "Result not kept in the history",
     "waitingForAnswer": "Type your answer...",
     "tools": {
       "draw_elements": "Drawing on canvas",
@@ -159,7 +164,12 @@
       "workspace_create_diagram": "Creating diagram",
       "workspace_create_document": "Creating document",
       "workspace_open_file": "Opening file",
-      "ask_user": "Waiting for answer"
+      "ask_user": "Waiting for answer",
+      "flow3d_create": "Creating flow",
+      "flow3d_read": "Reading flow",
+      "flow3d_update": "Changing flow",
+      "flow3d_run": "Running flow",
+      "terminal_run": "Running in the terminal"
     },
     "newConversation": "New conversation",
     "conversations": "Conversations",
@@ -173,6 +183,7 @@
       "allowAlways": "Allow Always",
       "deny": "Deny",
       "sessionScopeHint": "Allow Always applies only to this session.",
+      "everyCommandHint": "Every command is confirmed separately, and you can stop it with Ctrl+C in the terminal.",
       "tools": {
         "document_append": { "description": "Append content to the document" },
         "document_replace_section": { "description": "Replace section \"{{heading}}\"" },
@@ -187,6 +198,9 @@
         "workspace_create_diagram": { "description": "Create diagram \"{{name}}\"" },
         "workspace_create_document": { "description": "Create document \"{{title}}\"" },
         "workspace_open_file": { "description": "Open file {{filePath}}" },
+        "terminal_run": {
+          "description": "Run this command in the \"Agente\" terminal, in {{cwd}}"
+        },
         "generic": { "description": "Execute tool \"{{name}}\"" }
       }
     }

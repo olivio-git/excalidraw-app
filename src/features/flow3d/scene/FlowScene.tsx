@@ -18,7 +18,7 @@ import { FlowEdgeView } from "./FlowEdgeView";
 import { GroupFrame } from "./GroupFrame";
 import { GlowEffects, StudioEnvironment } from "./SceneEffects";
 import { Packets } from "./Packets";
-import { edgeCurve, nodeAt, outPort } from "./geometry";
+import { edgeCurveBetween, nodeAt, outPortFor } from "./geometry";
 import { useSceneTheme, type SceneTheme } from "./theme";
 
 type Controls = ComponentRef<typeof CameraControls>;
@@ -141,9 +141,9 @@ function CameraRig({
 }
 
 /** The line that follows the pointer while dragging a new edge. */
-function ConnectPreview({ from, end }: { from: Vec3; end: React.RefObject<Vector3 | null> }) {
+function ConnectPreview({ from, end }: { from: FlowNode; end: React.RefObject<Vector3 | null> }) {
   const line = useRef<ComponentRef<typeof Line>>(null);
-  const start = useMemo(() => outPort(from), [from]);
+  const start = useMemo(() => outPortFor(from), [from]);
   useFrame(() => {
     const target = end.current;
     const geometry = line.current?.geometry as unknown as
@@ -274,7 +274,7 @@ function SceneContent({
         return [
           {
             edge,
-            curve: edgeCurve(from.position, to.position),
+            curve: edgeCurveBetween(from, to, edge.style),
             color: nodeColor(from),
             id: edge.id,
           },
@@ -406,7 +406,7 @@ function SceneContent({
         if (event.button !== 0) return;
         event.stopPropagation();
         (event.target as Element).setPointerCapture?.(event.pointerId);
-        connectEnd.current = outPort(node.position);
+        connectEnd.current = outPortFor(node);
         store.getState().setConnectingFrom(node.id);
         setControlsEnabled(false);
       },
@@ -631,7 +631,7 @@ function SceneContent({
         dark={theme.dark}
         hdr={effects}
       />
-      {connectingNode && <ConnectPreview from={connectingNode.position} end={connectEnd} />}
+      {connectingNode && <ConnectPreview from={connectingNode} end={connectEnd} />}
     </>
   );
 }

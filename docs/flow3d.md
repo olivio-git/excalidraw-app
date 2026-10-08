@@ -57,7 +57,13 @@ elige qué hace:
   Después se puede repetir la ejecución grabada con la línea de tiempo.
 - **Confirmación**: antes de ejecutar se listan los pasos con efectos fuera del flujo
   (red, terminal, archivos, IA; un GET no cuenta). Se puede cancelar en cualquier
-  momento.
+  momento: cancelar detiene el comando que esté corriendo y todo lo que ese comando
+  haya lanzado (en Windows, su árbol de procesos con `taskkill /T`). Un contenedor que
+  `docker run -d` dejó en marcha no es un proceso hijo y sigue vivo.
+- **Salida en vivo**: los pasos de terminal se ven mientras corren en la terminal
+  «Flujo: <nombre>» del panel inferior: el nombre del paso, el comando (con los
+  secretos como `••••`), su salida y cómo terminó. `Ctrl+C` en esa terminal (o cerrarla)
+  cancela la ejecución. Las automatizaciones que se lanzan solas no abren el panel.
 - Los pasos sin tipo solo se simulan (pasan los datos tal cual).
 - **Repetir y reintentar**: cualquier paso puede repetirse por cada elemento de una
   lista (`body.items`, o `input`), con `{{item}}` e `{{index}}`; su salida es la lista
@@ -73,7 +79,36 @@ elige qué hace:
 - **IA**: «Crear o rehacer con IA» (varita) propone el flujo completo a partir de una
   descripción; en un paso que falló, «Diagnosticar con IA» explica la causa probable y
   qué cambiar. El chat tiene `flow3d_create`, `flow3d_read` (incluye la última
-  ejecución) y `flow3d_update`.
+  ejecución), `flow3d_update` y `flow3d_run` (el botón de parar del chat también la
+  cancela). Para preparar lo que un flujo necesita (levantar un contenedor, comprobar
+  una herramienta) tiene `terminal_run`: ver [El agente y la terminal](#el-agente-y-la-terminal).
+
+## El agente y la terminal
+
+`terminal_run(command, cwd?, timeout?)` deja al agente del chat ejecutar un comando en
+la terminal **«Agente»** del panel inferior y leer su código de salida, stdout y stderr.
+
+- **Siempre pide permiso**, comando a comando, mostrando el texto exacto: «Permitir
+  siempre» no existe para esta herramienta, y tampoco la cubre desactivar las
+  confirmaciones en Ajustes.
+- Se ve en vivo y se detiene con `Ctrl+C` en la terminal, cerrándola o con el botón de
+  parar del chat; detenerlo mata también lo que el comando lanzó.
+- `cwd` tiene que estar dentro del workspace (por defecto, su raíz). Es un valor por
+  defecto, no un aislamiento: el comando puede hacer `cd` a cualquier sitio. La
+  protección real es la confirmación.
+- Límite de 60 s por defecto, 600 s como máximo. No hay entrada por teclado: un comando
+  que pregunte algo se queda esperando hasta el límite.
+- Al modelo le llega el final de la salida (12 000 caracteres de stdout y 8 000 de
+  stderr), sin códigos de color ni las líneas intermedias de las barras de progreso.
+- No se expone por MCP: los agentes externos ya tienen su propia terminal.
+
+El agente está instruido para no reemplazar el flujo abierto por otro con otro
+propósito (crea uno nuevo con `flow3d_create`), para hacer ejecutable un diagrama
+añadiendo `config` a sus pasos sin cambiarlos, y para dejar la infraestructura (docker,
+servicios) en `terminal_run` o en un flujo de preparación aparte.
+
+En el chat, cada herramienta es un chip que gira mientras corre, se pone en rojo si
+falló y se despliega para ver qué envió el agente y qué recibió.
 
 ## Automatización
 
@@ -97,6 +132,27 @@ El botón de destellos activa los **efectos**: luz de estudio (reflejos suaves, 
 descargar mapas HDR), una sombra difusa bajo cada tarjeta que se atenúa con la altura
 y brillo (bloom) en los paquetes y en los pasos que se ejecutan. La elección se
 recuerda. Los flujos incrustados en notas van sin efectos para ser ligeros.
+
+## Diagramas visuales 3D
+
+Un flujo también es un diagrama 3D libre: redes neuronales, arquitecturas, matrices, torres…
+
+- **Tipo `element`**: una pieza visual que no ejecuta nada (neurona, servidor, bloque).
+- **Formas** (`style.shape`): `card` (por defecto), `box`, `sphere`, `cylinder`, `cone`, `capsule`,
+  `torus`, `diamond`, `gem`, `disc`, `plane`. Con `size` (`[ancho, alto, fondo]` o una escala),
+  `icon` (emoji o texto corto), `image` (ruta del proyecto o URL pintada sobre la forma),
+  `opacity`, `label` (`auto`/`above`/`below`/`inside`/`hidden`) y `glow`.
+- **Espacio**: x = izquierda→derecha, y = altura, z = fondo. Cada nodo puede tener `position`.
+- **Distribuciones** (al crear con el agente o la API): `auto` (flujo izquierda→derecha),
+  `layers` (columnas verticales por `layer`, ideal para redes neuronales), `grid` (matriz de
+  `columns`; `layer` empuja capas hacia el fondo), `radial` (anillo con un centro opcional) y
+  `manual` (respeta las posiciones). Si todos los nodos traen posición, se respetan.
+- **Conexiones** (`edge.style`): `color`, `dashed`, `width`, `curve` (`auto`/`straight`/`smooth`),
+  `arrow`. Entre formas que no son tarjetas van rectas de superficie a superficie.
+- **Inspector**: la ventana de propiedades se arrastra por el título, se redimensiona desde las
+  esquinas, se maximiza y recuerda su sitio (doble clic en el título la devuelve a la derecha).
+  La sección **Apariencia** edita forma, color, tamaño, posición, icono, imagen, opacidad y brillo.
+- **Plantillas**: «Red neuronal (3D)», «Arquitectura en capas (3D)» y «Torre de bloques (3D)».
 
 ## Integración
 

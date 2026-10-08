@@ -52,8 +52,21 @@
   text-underline-offset: 2px;
   cursor: pointer;
 }
-.qori-md-preview code {
-  font-family: var(--qori-font-mono, var(--font-mono));
+.qori-md-preview :is(code, pre) {
+  /* Full fallback: Tailwind only emits --font-mono where it sees it used. */
+  font-family: var(
+    --qori-font-mono,
+    var(
+      --font-mono,
+      ui-monospace,
+      "JetBrains Mono",
+      "SF Mono",
+      Menlo,
+      Consolas,
+      "Liberation Mono",
+      monospace
+    )
+  );
   font-size: 0.88em;
   padding: 0.1em 0.35em;
   border-radius: 4px;
@@ -100,4 +113,98 @@
 .qori-md-missing {
   font-size: 0.85em;
   color: hsl(var(--destructive));
+}
+
+/* Code blocks: same palette as the code editor (VS Code Dark+/Light+). */
+.qori-md-preview pre {
+  position: relative;
+}
+.qori-md-lang {
+  position: absolute;
+  top: 0.35em;
+  right: 0.6em;
+  font-size: 0.72em;
+  color: hsl(var(--muted-foreground));
+  user-select: none;
+}
+.qori-md-preview .tok-comment {
+  color: #008000;
+}
+.qori-md-preview .tok-string {
+  color: #a31515;
+}
+.qori-md-preview .tok-number {
+  color: #098658;
+}
+.qori-md-preview :is(.tok-atom, .tok-keyword) {
+  color: #0000ff;
+}
+.qori-md-preview .tok-control {
+  color: #af00db;
+}
+.qori-md-preview .tok-function {
+  color: #795e26;
+}
+.qori-md-preview .tok-type {
+  color: #267f99;
+}
+.qori-md-preview .tok-variable {
+  color: #001080;
+}
+.qori-md-preview :is(.tok-tag, .tok-heading) {
+  color: #800000;
+}
+.qori-md-preview .tok-regexp {
+  color: #811f3f;
+}
+.qori-md-preview .tok-link {
+  color: #006ab1;
+  text-decoration: underline;
+}
+.qori-md-preview .tok-invalid {
+  color: #cd3131;
+}
+.qori-md-preview :is(.tok-strong, .tok-heading) {
+  font-weight: bold;
+}
+.qori-md-preview .tok-emphasis {
+  font-style: italic;
+}
+
+:root.dark .qori-md-preview .tok-comment {
+  color: #6a9955;
+}
+:root.dark .qori-md-preview .tok-string {
+  color: #ce9178;
+}
+:root.dark .qori-md-preview .tok-number {
+  color: #b5cea8;
+}
+:root.dark .qori-md-preview :is(.tok-atom, .tok-keyword, .tok-tag, .tok-heading) {
+  color: #569cd6;
+}
+:root.dark .qori-md-preview .tok-control {
+  color: #c586c0;
+}
+:root.dark .qori-md-preview .tok-function {
+  color: #dcdcaa;
+}
+:root.dark .qori-md-preview .tok-type {
+  color: #4ec9b0;
+}
+:root.dark .qori-md-preview .tok-variable {
+  color: #9cdcfe;
+}
+:root.dark .qori-md-preview .tok-regexp {
+  color: #d16969;
+}
+:root.dark .qori-md-preview .tok-link {
+  color: #3794ff;
+}
+:root.dark .qori-md-preview .tok-invalid {
+  color: #f44747;
+}
+/* index.css sets the UI font on every element (`*`); token spans must keep the code font. */
+.qori-md-preview :is(pre, code) * {
+  font-family: inherit;
 }

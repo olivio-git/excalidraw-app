@@ -1,4 +1,4 @@
-import { applyLayout } from "./layout";
+import { applyLayout, type FlowLayout, type LayoutOptions } from "./layout";
 import { NODE_KINDS, parseFlow, type FlowDocument } from "./model";
 import type { RunState } from "./executor";
 
@@ -26,7 +26,18 @@ StepConfig (what the step does when executed), by "type":
 - "condition": { field: path in input, operator: ==|!=|>|<|>=|<=|contains|exists|truthy, value } — leaves through the edge labelled "sí" when true, "no" when false.
 Every executable config may add: forEach (path to a list: run once per element, use {{item}} and {{index}}), retries, retryDelay (seconds).
 Text fields accept {{input.field}}, {{steps.<id>.output.field}} and {{secrets.NAME}} placeholders.
-Start with exactly one trigger. Keep 3–10 steps. Use "note" nodes only for explanations.`;
+For automations: start with exactly one trigger; keep 3–10 steps. Use "note" nodes only for explanations.
+
+VISUAL 3D DIAGRAMS (architectures, neural networks, matrices, stacks, towers, LEGO-like builds):
+- kind "element" = a visual piece that runs nothing (neuron, server, brick, layer, planet…).
+- Space: x = left→right, y = height (up), z = depth (toward the viewer). A card is 2.6 wide; leave ≥1.2 between shapes. Use all three axes: stack on y, put things behind on z, build grids and rings.
+- "position": [x, y, z] on every node places it exactly (kept as given). Or omit positions and pick a "layout" for the tool call:
+  "layers" (columns along x, each a vertical stack: neural networks, pipelines; set "layer": 0,1,2… on nodes),
+  "grid" (matrix of rows × layoutOptions.columns on the xy plane; "layer" pushes a slice back in z),
+  "radial" (ring around layoutOptions.center), "auto" (left-to-right flow), "manual" (keep positions).
+- "style" on a node: { shape: card|box|sphere|cylinder|cone|capsule|torus|diamond|gem|disc|plane, size: [w,h,d] or a scale number, icon: emoji or ≤3 chars (e.g. "🧠", "DB"), image: workspace path or URL painted on it, opacity: 0.1–1, label: auto|above|below|inside|hidden, glow: true }. "color" sets its color.
+- "style" on an edge: { color, dashed, width: 1–8, curve: auto|straight|smooth, arrow: false }.
+- Examples: neural network = spheres with layer 0..n via layout "layers", edges from every node of a layer to every node of the next with { arrow: false, width: 1 }; a 3×3 matrix = boxes with layout "grid" and columns 3; a LEGO tower = boxes with size [2,0.6,1] and positions stepping up in y.`;
 
 const CREATE_SYSTEM = `You design automation flows for a 3D flow editor.
 ${FLOW_FORMAT_GUIDE}
@@ -45,11 +56,29 @@ export function extractJson(answer: string): unknown {
   }
 }
 
-/** A flow from model output: repaired, laid out, always valid. */
-export function flowFromAI(raw: unknown, fallbackName?: string): FlowDocument {
+const hasPosition = (node: unknown) =>
+  !!node &&
+  typeof node === "object" &&
+  Array.isArray((node as { position?: unknown }).position) &&
+  (node as { position: unknown[] }).position.length === 3;
+
+/**
+ * A flow from model output: repaired and placed, always valid. Positions the
+ * model gives are kept (it can build matrices, stacks, towers…); without
+ * them, or with an explicit `layout`, the nodes are laid out automatically.
+ */
+export function flowFromAI(
+  raw: unknown,
+  fallbackName?: string,
+  layout?: FlowLayout,
+  options?: LayoutOptions
+): FlowDocument {
   const doc = parseFlow(JSON.stringify(raw ?? {}));
   if (doc.nodes.length === 0) throw new Error("La IA no propuso ningún paso");
-  return applyLayout({ ...doc, name: doc.name || fallbackName });
+  const rawNodes = (raw as { nodes?: unknown[] } | null)?.nodes ?? [];
+  const positioned = rawNodes.length > 0 && rawNodes.every(hasPosition);
+  const mode = layout ?? (positioned ? "manual" : "auto");
+  return applyLayout({ ...doc, name: doc.name || fallbackName }, mode, options);
 }
 
 export async function generateFlow(

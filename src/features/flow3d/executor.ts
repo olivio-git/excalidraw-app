@@ -30,6 +30,8 @@ export interface CommandResult {
   stderr: string;
   code: number | null;
   timedOut?: boolean;
+  /** Stopped because the run was cancelled. */
+  killed?: boolean;
 }
 
 export interface ExecutorServices {
@@ -40,7 +42,15 @@ export interface ExecutorServices {
     body?: string;
     signal: AbortSignal;
   }) => Promise<HttpResponse>;
-  shell: (request: { command: string; cwd?: string; timeoutMs: number }) => Promise<CommandResult>;
+  shell: (request: {
+    command: string;
+    cwd?: string;
+    timeoutMs: number;
+    /** Aborted when the run is cancelled: stop the command. */
+    signal?: AbortSignal;
+    /** For showing it while it runs: the step's name and a filter that hides the secrets. */
+    show?: { step: string; hide: (text: string) => string };
+  }) => Promise<CommandResult>;
   appCommand: (id: string) => Promise<void>;
   ai: (request: { prompt: string; system?: string; signal?: AbortSignal }) => Promise<string>;
   writeFile: (request: { path: string; content: string; append: boolean }) => Promise<string>;
@@ -368,11 +378,15 @@ async function runStep(
     case "command": {
       const command = text(config.command).trim();
       if (!command) throw new Error("El comando está vacío");
+      const hidden = hiddenSecrets(scope.secrets);
       const result = await services.shell({
         command,
         cwd: config.cwd?.trim() ? text(config.cwd) : undefined,
         timeoutMs: Math.max(1, config.timeout ?? 30) * 1000,
+        signal,
+        show: { step: node.label, hide: (value) => String(redact(value, hidden)) },
       });
+      if (result.killed) throw new Cancelled();
       if (result.timedOut) throw new Error(`El comando superó ${config.timeout ?? 30}s`);
       if (result.code !== 0 && !config.allowErrors) {
         throw new Error(
@@ -424,7 +438,13 @@ async function runWithOptions(
       try {
         return await run();
       } catch (error) {
-        if (i >= retries || signal.aborted || error instanceof MissingSecretError) throw error;
+        if (
+          i >= retries ||
+          signal.aborted ||
+          error instanceof MissingSecretError ||
+          error instanceof Cancelled
+        )
+          throw error;
         await sleep(Math.max(0, config?.retryDelay ?? 2) * 1000, signal);
       }
     }
@@ -447,6 +467,12 @@ async function runWithOptions(
 }
 
 /** Replace secret values with dots wherever they appear in recorded data. */
+/** The secret values to hide in what a run shows or records. */
+function hiddenSecrets(secrets: Record<string, string> | undefined): string[] {
+  // Secrets shorter than 4 characters would mangle ordinary text when hidden.
+  return Object.values(secrets ?? {}).filter((s) => s.length >= 4);
+}
+
 export function redact(value: unknown, secrets: string[]): unknown {
   if (secrets.length === 0) return value;
   if (typeof value === "string") {
@@ -491,8 +517,7 @@ export async function executeFlow(doc: FlowDocument, options: RunOptions): Promi
   if (options.signal?.aborted) controller.abort();
 
   const run = emptyRun(now(), options.trigger);
-  // Secrets shorter than 4 characters would mangle ordinary text when hidden.
-  const hidden = Object.values(options.secrets ?? {}).filter((s) => s.length >= 4);
+  const hidden = hiddenSecrets(options.secrets);
   const clean = (value: unknown) => redact(value, hidden);
   const seconds = () => (now() - run.startedAt) / 1000;
   const emit = () =>
@@ -559,6 +584,8 @@ export async function executeFlow(doc: FlowDocument, options: RunOptions): Promi
     } catch (error) {
       if (error instanceof Cancelled || signal.aborted) {
         run.steps[node.id] = { ...record, status: "error", error: "Cancelado", end: seconds() };
+        // A command stopped from its terminal (Ctrl+C) cancels the whole run.
+        controller.abort();
         throw new Cancelled();
       }
       run.steps[node.id] = {

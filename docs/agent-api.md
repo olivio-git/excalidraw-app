@@ -120,7 +120,7 @@ These are the same tools the app's own agent uses (one implementation in the fro
 | `workspace_search` | Text search over note blocks, Markdown, diagram texts, flow steps and code, with anchors        |
 | `notes_list`       | The Notes view as data: title, snippet, notebook, tags, status, last change; filters            |
 
-`filePath` may be absolute or workspace-relative, and must stay inside the workspace. Without it, the flow tools act on the flow open in the active tab. `flow3d_run`, `workspace_search` and `notes_list` may take up to 300 s (the other tools keep the 5 s bridge limit). `flow3d_run` executes shell commands and HTTP calls configured in the flow: in the app's chat it asks for permission first; through MCP the client's own tool approval applies.
+`filePath` may be absolute or workspace-relative, and must stay inside the workspace. Without it, the flow tools act on the flow open in the active tab. Command steps run by `flow3d_run` stream their output to the app's "Flujo: <name>" terminal while they run. The in-app agent's `terminal_run` tool is not exposed through MCP. `flow3d_run`, `workspace_search` and `notes_list` may take up to 300 s (the other tools keep the 5 s bridge limit). `flow3d_run` executes shell commands and HTTP calls configured in the flow: in the app's chat it asks for permission first; through MCP the client's own tool approval applies.
 
 Typical loop: `flow3d_read` → `flow3d_update` → `flow3d_run` → read the failing step's `error` → `flow3d_update` → `flow3d_run`.
 

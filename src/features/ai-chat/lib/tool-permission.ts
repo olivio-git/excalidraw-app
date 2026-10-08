@@ -37,6 +37,8 @@ export const WRITE_TOOLS: ReadonlySet<string> = new Set([
   "flow3d_update",
   // runs the flow for real (commands, HTTP, notes)
   "flow3d_run",
+  // runs a shell command
+  "terminal_run",
   "activate_tab",
   "close_tab",
   "save_all_diagrams",
@@ -45,6 +47,12 @@ export const WRITE_TOOLS: ReadonlySet<string> = new Set([
 export function isWriteTool(name: string): boolean {
   return WRITE_TOOLS.has(name);
 }
+
+/**
+ * Tools confirmed on every call, whatever was allowed before: each call is an
+ * arbitrary command on the user's machine, so one approval never covers the next.
+ */
+export const ALWAYS_ASK_TOOLS: ReadonlySet<string> = new Set(["terminal_run"]);
 
 // ── Tool call description ──
 
@@ -162,6 +170,15 @@ export function describeToolCall(toolName: string, input: unknown): ToolCallDesc
         titleKey,
         descriptionKey: "aiChat.permission.tools.workspace_open_file.description",
         descriptionArgs: { filePath: String(i.filePath ?? "") },
+      };
+
+    case "terminal_run":
+      return {
+        titleKey,
+        descriptionKey: "aiChat.permission.tools.terminal_run.description",
+        descriptionArgs: { cwd: String(i.cwd ?? "") || "workspace" },
+        // The whole command: it is what the user approves.
+        preview: String(i.command ?? ""),
       };
 
     default:

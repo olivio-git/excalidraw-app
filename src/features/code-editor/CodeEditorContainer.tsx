@@ -98,10 +98,13 @@ export default function CodeEditorContainer() {
     }
   }, []);
 
-  /** Completion sources: extension snippets plus language features. */
-  const completionSources = useCallback((): CompletionSource[] => {
+  /** Completion sources: extension snippets, and the ones that know this file (contributions). */
+  const completionSources = useCallback((): {
+    snippets: CompletionSource[];
+    specific: CompletionSource[];
+  } => {
     const doc = docRef.current;
-    const sources: CompletionSource[] = [
+    const snippets: CompletionSource[] = [
       snippetCompletionSource(
         () => snippetsRef.current,
         () => ({
@@ -110,12 +113,13 @@ export default function CodeEditorContainer() {
         })
       ),
     ];
+    const specific: CompletionSource[] = [];
     if (doc) {
       for (const contribution of editorContributions.getAll()) {
-        sources.push(...(contribution.completionSources?.(doc) ?? []));
+        specific.push(...(contribution.completionSources?.(doc) ?? []));
       }
     }
-    return sources;
+    return { snippets, specific };
   }, []);
 
   const applyContributions = useCallback(() => {
@@ -127,7 +131,9 @@ export default function CodeEditorContainer() {
         compartments.contributions.reconfigure(
           editorContributions.getAll().flatMap((c) => c.extensions?.(doc) ?? [])
         ),
-        compartments.completion.reconfigure(completionExtension(completionSources())),
+        compartments.completion.reconfigure(
+          completionExtension(completionSources().snippets, completionSources().specific)
+        ),
       ],
     });
   }, [compartments, completionSources]);

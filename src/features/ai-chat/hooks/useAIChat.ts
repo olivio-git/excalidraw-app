@@ -320,7 +320,12 @@ export function useAIChat() {
                 }
 
                 // ── Normal tool execution ──
-                const result = await executeAITool(completedTool.name, parsedInput, context);
+                const result = await executeAITool(
+                  completedTool.name,
+                  parsedInput,
+                  context,
+                  controller.signal
+                );
 
                 // Re-resolve context after workspace tools that open/create a file
                 if (

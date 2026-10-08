@@ -1,4 +1,13 @@
-import { expect, flowStore, openApp, openFile, readFile, test, WORKSPACE } from "./fixtures/app";
+import {
+  expect,
+  flowStore,
+  openApp,
+  openFile,
+  readFile,
+  terminalText,
+  test,
+  WORKSPACE,
+} from "./fixtures/app";
 
 const FLOW = `${WORKSPACE}/informe.flow3d`;
 
@@ -64,6 +73,12 @@ test("executes for real, passing data between steps", async ({ page }) => {
   expect(commands).toEqual(["echo a", "echo b"]);
   expect(await readFile(page, `${WORKSPACE}/salida.md`)).toContain('"stdout": "a\\n"');
 
+  // The commands, their output and how they ended show in the flow's terminal.
+  await expect
+    .poll(() => terminalText(page, "Flujo: informe"))
+    .toMatch(/▶ Por cada uno\s+\$ echo a\s+a\s+✓ Terminó bien/);
+  expect(await terminalText(page, "Flujo: informe")).toContain("$ echo b");
+
   // The inspector shows what went in and out of a step.
   await flowStore(page, FLOW, "s.getState().select({ type: 'node', id: 'each' })");
   await page.getByRole("radio", { name: "Datos" }).click();
@@ -90,6 +105,24 @@ test("marks a failing step and stops its branch", async ({ page }) => {
     "return Object.fromEntries(Object.entries(s.getState().run.steps).map(([k, v]) => [k, v.status]))"
   );
   expect(steps).toEqual({ start: "done", each: "error", save: "skipped" });
+});
+
+test("cancelling stops the command that is running", async ({ page }) => {
+  await flowStore(
+    page,
+    FLOW,
+    "s.getState().updateNode('each', { config: { type: 'command', command: 'sleep 30' } })"
+  );
+  await page.getByRole("radio", { name: "Ejecutar" }).click();
+  await page.locator("[data-flow3d-execute]").click();
+  await page.getByRole("button", { name: "Ejecutar" }).last().click();
+  await expect.poll(() => terminalText(page, "Flujo: informe")).toContain("$ sleep 30");
+
+  await page.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await expect(page.locator("[data-flow3d-run-status='cancelled']")).toBeAttached();
+  const kills = await page.evaluate(() => (window as unknown as { __kills?: string[] }).__kills);
+  expect(kills).toHaveLength(1);
+  await expect.poll(() => terminalText(page, "Flujo: informe")).toContain("■ Detenido");
 });
 
 test("adds a connected step with Tab", async ({ page }) => {
@@ -129,4 +162,46 @@ test("asks the agent (right side bar) to change the open flow", async ({ page })
   await expect(input).toBeFocused();
   // The agent knows which flow "this flow" is.
   await expect(chat).toContainText("informe");
+});
+
+test("the inspector is a window you can drag, resize and use to restyle a node", async ({
+  page,
+}) => {
+  await flowStore(page, FLOW, 's.getState().select({ type: "node", id: "each" })');
+  const panel = page.locator('[data-floating-panel="inspector"]');
+  await expect(panel).toBeVisible();
+  const before = (await panel.boundingBox())!;
+
+  // Drag by the title bar.
+  const title = panel.locator("[data-panel-titlebar]");
+  const t = (await title.boundingBox())!;
+  await page.mouse.move(t.x + 40, t.y + t.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(t.x - 260, t.y + 80, { steps: 8 });
+  await page.mouse.up();
+  const moved = (await panel.boundingBox())!;
+  expect(moved.x).toBeLessThan(before.x - 200);
+  expect(moved.y).toBeGreaterThan(before.y + 50);
+
+  // Resize from the corner.
+  const grip = (await panel.locator("[data-panel-resize]").boundingBox())!;
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + 120, grip.y + 60, { steps: 8 });
+  await page.mouse.up();
+  expect((await panel.boundingBox())!.width).toBeGreaterThan(moved.width + 80);
+
+  // Appearance: turn the step into a glowing sphere with an icon.
+  await panel.getByRole("combobox", { name: "Forma" }).click();
+  await page.getByRole("option", { name: "Esfera" }).click();
+  await panel.getByPlaceholder("🧠  DB  ⚙️").fill("⚙️");
+  await expect
+    .poll(() =>
+      flowStore<unknown>(
+        page,
+        FLOW,
+        'return s.getState().doc.nodes.find((n) => n.id === "each").style'
+      )
+    )
+    .toMatchObject({ shape: "sphere", icon: "⚙️" });
 });

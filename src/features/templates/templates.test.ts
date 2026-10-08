@@ -26,11 +26,19 @@ describe("templates", () => {
       } else if (template.kind === "flow") {
         const flow = parseFlow(content);
         expect(flow.name).toBe("Mi archivo");
-        expect(flow.nodes.filter((n) => n.kind === "trigger")).toHaveLength(1);
-        expect(flow.nodes.every((n) => n.kind === "note" || n.config || n.kind === "action")).toBe(
-          true
-        );
-        expect(flow.edges.length).toBeGreaterThan(0);
+        if (template.id.startsWith("visual-")) {
+          // Visual diagrams: real shapes spread over more than one axis.
+          expect(flow.nodes.some((n) => n.style?.shape && n.style.shape !== "card")).toBe(true);
+          const spread = (axis: 0 | 1 | 2) =>
+            new Set(flow.nodes.map((n) => Math.round(n.position[axis] * 10))).size > 1;
+          expect([spread(0), spread(1), spread(2)].filter(Boolean).length).toBeGreaterThan(1);
+        } else {
+          expect(flow.nodes.filter((n) => n.kind === "trigger")).toHaveLength(1);
+          expect(
+            flow.nodes.every((n) => n.kind === "note" || n.config || n.kind === "action")
+          ).toBe(true);
+          expect(flow.edges.length).toBeGreaterThan(0);
+        }
       } else {
         const drawing = JSON.parse(content);
         expect(drawing.type).toBe("excalidraw");

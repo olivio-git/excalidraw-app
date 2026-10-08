@@ -39,6 +39,21 @@ export async function flowStore<T>(page: Page, filePath: string, body: string): 
   ) as Promise<T>;
 }
 
+/** What the terminal titled `title` shows (null when there is no such terminal). */
+export async function terminalText(page: Page, title: string): Promise<string | null> {
+  return page.evaluate(async (name) => {
+    const { useTerminalStore, getTerminalSession } =
+      await import("/src/features/terminal/terminal-service.ts");
+    const info = useTerminalStore.getState().terminals.find((t) => t.title === name);
+    const buffer = info && getTerminalSession(info.id)?.term.buffer.active;
+    if (!buffer) return null;
+    const lines: string[] = [];
+    for (let i = 0; i < buffer.length; i++)
+      lines.push(buffer.getLine(i)?.translateToString(true) ?? "");
+    return lines.join("\n");
+  }, title);
+}
+
 export async function readFile(page: Page, filePath: string): Promise<string | undefined> {
   return page.evaluate(
     (path) => (window as unknown as { __files: Record<string, string> }).__files[path],

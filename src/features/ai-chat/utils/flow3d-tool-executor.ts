@@ -4,6 +4,7 @@ import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useTabStore } from "@/core/tabs/store/tab-store";
 import { openFileInWorkbench } from "@/core/shell/services/file-navigation";
 import type { AIToolResult } from "../providers/types";
+import { FLOW_LAYOUTS, type FlowLayout, type LayoutOptions } from "@/features/flow3d/layout";
 
 const ok = (result: unknown): AIToolResult => ({
   toolCallId: "",
@@ -40,7 +41,9 @@ const slug = (name: string) =>
 /** Runs the flow3d_* chat tools (flow engine loaded on demand). */
 export async function executeFlow3DTool(
   toolName: string,
-  toolInput: unknown
+  toolInput: unknown,
+  /** Stops a flow3d_run (the chat's stop button). */
+  signal?: AbortSignal
 ): Promise<AIToolResult> {
   const input = (toolInput ?? {}) as {
     name?: string;
@@ -49,7 +52,13 @@ export async function executeFlow3DTool(
     nodes?: unknown[];
     edges?: unknown[];
     payload?: unknown;
+    layout?: string;
+    layoutOptions?: Record<string, unknown>;
   };
+  const layout = (FLOW_LAYOUTS as readonly string[]).includes(input.layout ?? "")
+    ? (input.layout as FlowLayout)
+    : undefined;
+  const layoutOptions = input.layoutOptions as LayoutOptions | undefined;
   const [
     { flowFromAI, summarizeRun, FLOW_FORMAT_GUIDE },
     { parseFlow, serializeFlow },
@@ -68,7 +77,9 @@ export async function executeFlow3DTool(
         if (!root) return fail("No workspace folder is open.");
         const doc = flowFromAI(
           { name: input.name, nodes: input.nodes, edges: input.edges },
-          input.name
+          input.name,
+          layout,
+          layoutOptions
         );
         const dir = input.folder ? await join(root, input.folder) : root;
         if (input.folder) await mkdir(dir, { recursive: true }).catch(() => undefined);
@@ -100,7 +111,12 @@ export async function executeFlow3DTool(
         if (!path) return fail("No flow is open. Pass filePath.");
         const open = flow3dRegistry.get(path);
         const current = open ? open.store.getState().doc : parseFlow(await readTextFile(path));
-        const next = flowFromAI({ nodes: input.nodes, edges: input.edges }, current.name);
+        const next = flowFromAI(
+          { nodes: input.nodes, edges: input.edges },
+          current.name,
+          layout,
+          layoutOptions
+        );
         const doc = {
           ...next,
           name: current.name,
@@ -136,6 +152,7 @@ export async function executeFlow3DTool(
         const options = {
           secrets: await flowSecrets.all(),
           trigger: "manual" as const,
+          signal,
           ...(input.payload !== undefined && { payload: input.payload }),
         };
         // Open flows run in their tab, so the user watches it happen.

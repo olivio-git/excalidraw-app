@@ -1,13 +1,18 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { CheckCircle2, ChevronDown, ChevronRight, Loader2, XCircle } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/utils";
-import type { AIMessage } from "./providers/types";
+import { ToolCallChips } from "./components/ToolCallChips";
+import type { AIMessage, AIToolResult } from "./providers/types";
 
 interface AIChatMessageProps {
   message: AIMessage;
+  /** Results of every tool call in the conversation, by call id. */
+  toolResults: ReadonlyMap<string, AIToolResult>;
+  /** The chat is still working (calls without a result are running). */
+  busy: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +141,7 @@ const markdownComponents: React.ComponentProps<typeof ReactMarkdown>["components
 // AIChatMessage
 // ---------------------------------------------------------------------------
 
-export function AIChatMessage({ message }: AIChatMessageProps) {
+export function AIChatMessage({ message, toolResults, busy }: AIChatMessageProps) {
   const { t } = useTranslation("common");
 
   if (message.role === "user") {
@@ -206,45 +211,13 @@ export function AIChatMessage({ message }: AIChatMessageProps) {
 
           {/* Tool actions */}
           {message.toolCalls && message.toolCalls.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-1">
-              {message.toolCalls.map((tc) => {
-                const toolKey = `aiChat.tools.${tc.name}` as const;
-                const label = t(toolKey as Parameters<typeof t>[0], { defaultValue: tc.name });
-                return (
-                  <span
-                    key={tc.id}
-                    className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/30 px-2 py-0.5 text-[10px] text-muted-foreground"
-                  >
-                    {!tc.isComplete ? (
-                      <Loader2 className="size-2.5 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="size-2.5 text-green-500" />
-                    )}
-                    {label}
-                  </span>
-                );
-              })}
-            </div>
+            <ToolCallChips calls={message.toolCalls} results={toolResults} busy={busy} />
           )}
         </div>
       </div>
     );
   }
 
-  // Tool result messages — show only errors
-  if (message.role === "tool") {
-    const hasError = message.toolResults?.some((tr) => tr.isError);
-    if (!hasError) return null;
-
-    return (
-      <div className="flex justify-start mb-1">
-        <span className="inline-flex items-center gap-1 rounded-full border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[10px] text-destructive">
-          <XCircle className="size-2.5 shrink-0" />
-          {message.toolResults?.find((tr) => tr.isError)?.result ?? t("aiChat.toolError")}
-        </span>
-      </div>
-    );
-  }
-
+  // Tool result messages: shown in the chip of their call.
   return null;
 }

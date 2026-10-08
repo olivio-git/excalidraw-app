@@ -21,6 +21,17 @@ Reglas:
 - Número fuera de rango: se ajusta al límite y se avisa.
 - Error de sintaxis (archivo a medio escribir): se mantiene la última versión válida de ese archivo.
 
+## Temas de extensiones
+
+Los temas de color que instalas con extensiones (temas de VS Code) aparecen en el menú de la
+rueda (abajo a la izquierda) → **Tema** → **Temas instalados**, junto a Claro, Oscuro y Sistema.
+Elegir Claro/Oscuro/Sistema vuelve al tema propio de la app. También desde el archivo:
+
+```toml
+[appearance]
+color_theme = "Dracula"   # por su nombre (sin distinguir mayúsculas); vacío: el de la app
+```
+
 ## Translucidez y desenfoque
 
 | `translucency` | macOS                                        | Windows                                                       | Linux                                             |
@@ -93,6 +104,32 @@ línea, colores y Vim; las líneas largas se ajustan al ancho. **Ctrl+K V** (o e
 previa») abre al lado el documento formateado, que se actualiza mientras escribes: tablas, listas
 de tareas, citas, código, enlaces a otros archivos e imágenes, incluidos diagramas `.excalidraw`.
 El editor y la vista previa se desplazan juntos: al bajar en uno, el otro va a la misma sección.
+
+## Ayuda al editar la configuración
+
+Al abrir `config.toml`, `.qori/config.toml`, `keymap.toml` o `vimrc` en el editor:
+
+- **Sugerencias** mientras escribes (o con Ctrl+Espacio): secciones tras `[`, opciones de la
+  sección con su tipo y valor por defecto, y tras `=` los valores aceptados. En `keymap.toml`
+  y tras `:qori` en `vimrc`, los comandos de la app con su nombre.
+- **Errores en su línea**: subrayado y punto rojo en el margen (también en el minimapa) con el
+  mismo mensaje que da la app al cargar el archivo; avisos en amarillo (valores ajustados,
+  comandos que no existen).
+- **Documentación al pasar el ratón** sobre una opción o una sección.
+
+## Editor de código
+
+Sugerencias del propio lenguaje (variables y funciones en JS/TS, propiedades en CSS, etiquetas
+en HTML…), fragmentos de las extensiones y, en archivos sin lenguaje (texto, TOML, Markdown),
+las palabras del documento. Además: minimapa, guías de indentación, multicursor con Alt+clic,
+selección en columna con Alt+arrastrar, Ctrl+D para la siguiente coincidencia, Alt+↑/↓ para
+mover líneas y espacios sobrantes al final marcados.
+
+```toml
+[editor]
+minimap = true         # minimapa a la derecha
+indent_guides = true   # guías de indentación
+```
 
 ## Modo Vim
 

@@ -61,16 +61,21 @@ export const FlowEdgeView = memo(function FlowEdgeView({
     }
   });
 
-  const baseColor = selected ? theme.primary : theme.muted;
+  const style = edge.style;
+  const baseColor = selected ? theme.primary : (style?.color ?? theme.muted);
+  const width = style?.width ?? 2;
 
   return (
     <group>
       <Line
         points={points}
         color={baseColor}
-        lineWidth={selected ? 3 : 2}
+        lineWidth={selected ? width + 1 : width}
+        dashed={style?.dashed ?? false}
+        dashSize={0.25}
+        gapSize={0.18}
         transparent
-        opacity={dimmed ? 0.25 : selected ? 1 : 0.55}
+        opacity={dimmed ? 0.25 : selected || style?.color ? 0.95 : 0.55}
       />
       <Line
         ref={flow}
@@ -82,14 +87,16 @@ export const FlowEdgeView = memo(function FlowEdgeView({
         gapSize={0.22}
         visible={false}
       />
-      <mesh position={arrow.position} quaternion={arrow.quaternion}>
-        <coneGeometry args={[0.1, 0.26, 12]} />
-        <meshBasicMaterial
-          color={selected ? theme.primary : color}
-          transparent
-          opacity={dimmed ? 0.35 : 0.9}
-        />
-      </mesh>
+      {style?.arrow !== false && (
+        <mesh position={arrow.position} quaternion={arrow.quaternion}>
+          <coneGeometry args={[0.1, 0.26, 12]} />
+          <meshBasicMaterial
+            color={selected ? theme.primary : (style?.color ?? color)}
+            transparent
+            opacity={dimmed ? 0.35 : 0.9}
+          />
+        </mesh>
+      )}
       {/* Wide invisible tube so the thin line is easy to click. */}
       <mesh
         geometry={hitGeometry}

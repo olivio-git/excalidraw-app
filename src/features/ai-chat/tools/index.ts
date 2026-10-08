@@ -7,6 +7,7 @@ import { WORKSPACE_TOOLS } from "./workspace-tools";
 import { APP_TOOLS } from "./app-tools";
 import { FLOW3D_TOOLS } from "./flow3d-tools";
 import { KNOWLEDGE_TOOLS } from "./knowledge-tools";
+import { TERMINAL_TOOLS } from "./terminal-tools";
 
 export { DIAGRAM_TOOLS } from "./diagram-tools";
 export { DOCUMENT_TOOLS } from "./document-tools";
@@ -15,6 +16,7 @@ export { WORKSPACE_TOOLS } from "./workspace-tools";
 export { APP_TOOLS } from "./app-tools";
 export { FLOW3D_TOOLS } from "./flow3d-tools";
 export { KNOWLEDGE_TOOLS } from "./knowledge-tools";
+export { TERMINAL_TOOLS } from "./terminal-tools";
 
 export function getToolsForContext(context: AIChatContext): AIToolDefinition[] {
   switch (context.kind) {
@@ -24,6 +26,7 @@ export function getToolsForContext(context: AIChatContext): AIToolDefinition[] {
         ...DOCUMENT_TOOLS,
         ...WORKSPACE_TOOLS,
         ...FLOW3D_TOOLS,
+        ...TERMINAL_TOOLS,
         ...KNOWLEDGE_TOOLS,
         ...APP_TOOLS,
         ...COMMON_TOOLS,
@@ -34,6 +37,7 @@ export function getToolsForContext(context: AIChatContext): AIToolDefinition[] {
         ...DIAGRAM_TOOLS,
         ...WORKSPACE_TOOLS,
         ...FLOW3D_TOOLS,
+        ...TERMINAL_TOOLS,
         ...KNOWLEDGE_TOOLS,
         ...APP_TOOLS,
         ...COMMON_TOOLS,
@@ -41,6 +45,7 @@ export function getToolsForContext(context: AIChatContext): AIToolDefinition[] {
     case "flow":
       return [
         ...FLOW3D_TOOLS,
+        ...TERMINAL_TOOLS,
         ...KNOWLEDGE_TOOLS,
         ...WORKSPACE_TOOLS,
         ...APP_TOOLS,
@@ -53,6 +58,7 @@ export function getToolsForContext(context: AIChatContext): AIToolDefinition[] {
       return [
         ...WORKSPACE_TOOLS,
         ...FLOW3D_TOOLS,
+        ...TERMINAL_TOOLS,
         ...KNOWLEDGE_TOOLS,
         ...APP_TOOLS,
         ...DOCUMENT_TOOLS.filter((tool) => tool.name === "document_create_visual_report"),

@@ -1,7 +1,9 @@
 /**
  * Browser stand-in for the Tauri backend, injected before the app loads.
  * Files live in memory (window.__files); commands a test cares about are
- * recorded (window.__calls, window.__writes, window.__commands).
+ * recorded (window.__calls, window.__writes, window.__commands, window.__kills).
+ * Shell commands: `echo x` prints x (streamed as `exec:data` when it has a run
+ * id), `sleep …` runs until `exec_kill` stops it, anything else fails.
  *
  * Tests preload files with `window.__files = {...}` in an init script and
  * answer dialogs with window.__nextOpen / window.__nextSave.
@@ -11,7 +13,12 @@
   const encoder = new TextEncoder();
   const callbacks = new Map();
   const listeners = {};
+  /** Commands waiting for exec_kill, by run id. */
+  const sleeping = new Map();
   let next = 1;
+  const emit = (event, payload) => {
+    for (const id of listeners[event] || []) callbacks.get(id)?.({ event, id: 0, payload });
+  };
   const normalize = (path) => String(path).replace(/\/+/g, "/");
 
   window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
@@ -108,11 +115,25 @@
         case "flow_run_command": {
           (window.__commands ||= []).push(args);
           const command = String(args.command);
-          if (command.startsWith("echo ")) {
-            return { stdout: command.slice(5) + "\n", stderr: "", code: 0, timedOut: false };
+          const stream = (name, data) =>
+            args.runId && emit("exec:data", { runId: args.runId, stream: name, data });
+          const end = { timedOut: false, killed: false };
+          if (command.startsWith("sleep ")) {
+            const stopped = { stdout: "", stderr: "", code: null, timedOut: false, killed: true };
+            return new Promise((resolve) => sleeping.set(args.runId, () => resolve(stopped)));
           }
-          return { stdout: "", stderr: "command not found", code: 127, timedOut: false };
+          if (command.startsWith("echo ")) {
+            stream("stdout", command.slice(5) + "\n");
+            return { stdout: command.slice(5) + "\n", stderr: "", code: 0, ...end };
+          }
+          stream("stderr", "command not found\n");
+          return { stdout: "", stderr: "command not found", code: 127, ...end };
         }
+        case "exec_kill":
+          (window.__kills ||= []).push(args.runId);
+          sleeping.get(args.runId)?.();
+          sleeping.delete(args.runId);
+          return null;
         default:
           return null;
       }

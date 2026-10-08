@@ -340,6 +340,7 @@ version = "0.1.0"
 dependencies = [
  "arboard",
  "axum",
+ "libc",
  "log",
  "png 0.17.16",
  "portable-pty",

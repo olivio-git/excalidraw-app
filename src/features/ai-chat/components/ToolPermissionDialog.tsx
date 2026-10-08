@@ -8,7 +8,9 @@ import {
   DialogTitle,
 } from "@/shared/components/ui/dialog";
 import { Button } from "@/shared/components/ui/button";
+import { cn } from "@/shared/lib/utils";
 import { useAIPermissionStore } from "../store/ai-permission-store";
+import { ALWAYS_ASK_TOOLS } from "../lib/tool-permission";
 
 // ---------------------------------------------------------------------------
 // ToolPermissionDialog — mount-once component (same pattern as ConfirmDialog)
@@ -35,6 +37,8 @@ export function ToolPermissionDialog() {
   const description = request.descriptionArgs
     ? t(request.descriptionKey, request.descriptionArgs)
     : t(request.descriptionKey);
+  // Confirmed on every call: "allow always" would not apply.
+  const everyCall = ALWAYS_ASK_TOOLS.has(request.toolName);
 
   return (
     <Dialog
@@ -51,12 +55,21 @@ export function ToolPermissionDialog() {
         </DialogHeader>
 
         {request.preview && (
-          <pre className="rounded-md border border-border bg-muted p-3 text-xs whitespace-pre-wrap break-words max-h-40 overflow-auto">
+          <pre
+            className={cn(
+              "rounded-md border border-border bg-muted p-3 text-xs whitespace-pre-wrap break-words max-h-40 overflow-auto",
+              everyCall && "font-mono"
+            )}
+          >
             {request.preview}
           </pre>
         )}
 
-        <p className="text-xs text-muted-foreground">{t("aiChat.permission.sessionScopeHint")}</p>
+        <p className="text-xs text-muted-foreground">
+          {t(
+            everyCall ? "aiChat.permission.everyCommandHint" : "aiChat.permission.sessionScopeHint"
+          )}
+        </p>
 
         <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="destructive" onClick={() => _settle({ decision: "deny" })}>
@@ -65,9 +78,11 @@ export function ToolPermissionDialog() {
           <Button variant="outline" onClick={() => _settle({ decision: "allow-once" })}>
             {t("aiChat.permission.allowOnce")}
           </Button>
-          <Button variant="default" onClick={() => _settle({ decision: "allow-always" })}>
-            {t("aiChat.permission.allowAlways")}
-          </Button>
+          {!everyCall && (
+            <Button variant="default" onClick={() => _settle({ decision: "allow-always" })}>
+              {t("aiChat.permission.allowAlways")}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

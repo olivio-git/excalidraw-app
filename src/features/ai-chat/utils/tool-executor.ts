@@ -1,6 +1,7 @@
 import { convertToExcalidrawElements } from "@excalidraw/excalidraw";
 import { FLOW3D_TOOL_NAMES } from "../tools/flow3d-tools";
 import { KNOWLEDGE_TOOL_NAMES } from "../tools/knowledge-tools";
+import { TERMINAL_TOOL_NAMES } from "../tools/terminal-tools";
 import { DiagramController } from "@/core/diagram/DiagramController";
 import { getDocumentController } from "@/features/document-editor/documentController.singleton";
 import { getDocumentCodec } from "@/features/document-editor/note-codec";
@@ -1007,7 +1008,9 @@ const WORKSPACE_TOOL_NAMES = new Set([
 export async function executeAITool(
   toolName: string,
   toolInput: unknown,
-  context: AIChatContext
+  context: AIChatContext,
+  /** The chat's stop button: long-running tools (flow runs, commands) stop with it. */
+  signal?: AbortSignal
 ): Promise<AIToolResult> {
   // App and workspace tools are available in all contexts
   if (APP_TOOL_NAMES.has(toolName)) {
@@ -1020,7 +1023,12 @@ export async function executeAITool(
 
   if (FLOW3D_TOOL_NAMES.has(toolName)) {
     const { executeFlow3DTool } = await import("./flow3d-tool-executor");
-    return executeFlow3DTool(toolName, toolInput);
+    return executeFlow3DTool(toolName, toolInput, signal);
+  }
+
+  if (TERMINAL_TOOL_NAMES.has(toolName)) {
+    const { executeTerminalTool } = await import("./terminal-tool-executor");
+    return executeTerminalTool(toolName, toolInput, signal);
   }
 
   if (KNOWLEDGE_TOOL_NAMES.has(toolName)) {
